@@ -10,6 +10,8 @@ export interface Project {
   color: string
   status: 'live' | 'wip' | 'archived'
   link?: string
+  images?: string[]
+  metrics?: { label: string; value: string }[]
 }
 
 export default function ProjectCard({

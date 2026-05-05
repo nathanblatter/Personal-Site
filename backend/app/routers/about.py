@@ -158,3 +158,43 @@ async def delete_coursework(coursework_id: int, db: AsyncSession = Depends(get_d
         raise HTTPException(status_code=404, detail="Coursework not found")
     await db.delete(cw)
     await db.commit()
+
+
+# ── Testimonials ─────────────────────────────────────────────────────────────
+
+@router.get("/testimonials", response_model=List[schemas.TestimonialResponse])
+async def list_testimonials(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(models.Testimonial).order_by(models.Testimonial.sort_order))
+    return result.scalars().all()
+
+
+@router.post("/testimonials", response_model=schemas.TestimonialResponse, status_code=status.HTTP_201_CREATED)
+async def create_testimonial(payload: schemas.TestimonialCreate, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    t = models.Testimonial(**payload.model_dump())
+    db.add(t)
+    await db.commit()
+    await db.refresh(t)
+    return t
+
+
+@router.put("/testimonials/{tid}", response_model=schemas.TestimonialResponse)
+async def update_testimonial(tid: int, payload: schemas.TestimonialUpdate, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    result = await db.execute(select(models.Testimonial).where(models.Testimonial.id == tid))
+    t = result.scalar_one_or_none()
+    if not t:
+        raise HTTPException(status_code=404, detail="Testimonial not found")
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(t, key, value)
+    await db.commit()
+    await db.refresh(t)
+    return t
+
+
+@router.delete("/testimonials/{tid}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_testimonial(tid: int, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    result = await db.execute(select(models.Testimonial).where(models.Testimonial.id == tid))
+    t = result.scalar_one_or_none()
+    if not t:
+        raise HTTPException(status_code=404, detail="Testimonial not found")
+    await db.delete(t)
+    await db.commit()

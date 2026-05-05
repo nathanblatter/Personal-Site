@@ -19,17 +19,40 @@ services:
     build: .
     ports:
       - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
       DATABASE_URL: postgresql+asyncpg://portfolio:portfolio@db:5432/portfolio
       STATIC_DIR: /dist
       JWT_SECRET: change-me-dev
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: admin
+      SMTP_HOST: host.docker.internal
+      SMTP_PORT: 25
+      CONTACT_TO_EMAIL: nzb22@byu.edu
+      REDIS_URL: redis://host.docker.internal:6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: portfolio
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
     volumes:
       - ../frontend/dist:/dist:ro
 
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+
 volumes:
   pgdata:
+  minio_data:

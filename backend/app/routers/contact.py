@@ -1,5 +1,10 @@
+import os
+import aiosmtplib
+from datetime import date
+from email.message import EmailMessage
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
@@ -8,7 +13,70 @@ from app.auth import require_auth
 
 router = APIRouter(prefix="/contact", tags=["contact"])
 
+SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "25"))
+CONTACT_TO_EMAIL = os.getenv("CONTACT_TO_EMAIL", "nzb22@byu.edu")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+DAILY_LIMIT = 100
+IP_LIMIT = 3
+IP_WINDOW = 15 * 60  # 15 minutes in seconds
+
+_redis: Redis | None = None
+
+def get_redis() -> Redis:
+    global _redis
+    if _redis is None:
+        _redis = Redis.from_url(REDIS_URL, decode_responses=True)
+    return _redis
+
+def _real_ip(request: Request) -> str:
+    # Cloudflare sets CF-Connecting-IP; fall back to X-Forwarded-For, then direct
+    return (
+        request.headers.get("CF-Connecting-IP")
+        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+        or request.client.host
+    )
+
 SINGLETON_ID = 1
+
+
+# ── Contact form submission ───────────────────────────────────────────────────
+
+@router.post("/submit", status_code=status.HTTP_204_NO_CONTENT)
+async def submit_contact(payload: schemas.ContactSubmit, request: Request):
+    # 1. Honeypot — bots fill hidden fields, humans don't
+    if payload.honeypot:
+        return  # silent 204, don't reveal detection
+
+    redis = get_redis()
+
+    # 2. IP rate limit: 3 submissions per 15 minutes
+    ip = _real_ip(request)
+    ip_key = f"contact:ip:{ip}"
+    ip_count = await redis.incr(ip_key)
+    if ip_count == 1:
+        await redis.expire(ip_key, IP_WINDOW)
+    if ip_count > IP_LIMIT:
+        raise HTTPException(status_code=429, detail="Too many messages. Try again later.")
+
+    # 3. Daily global cap: 100 emails per day
+    daily_key = f"contact:daily:{date.today().isoformat()}"
+    daily_count = await redis.incr(daily_key)
+    if daily_count == 1:
+        await redis.expire(daily_key, 86400)
+    if daily_count > DAILY_LIMIT:
+        raise HTTPException(status_code=503, detail="Daily message limit reached. Try again tomorrow.")
+
+    msg = EmailMessage()
+    msg["From"] = "noreply@nathanblatter.com"
+    msg["To"] = CONTACT_TO_EMAIL
+    msg["Reply-To"] = payload.email
+    msg["Subject"] = f"New contact from {payload.name} — nathanblatter.com"
+    msg.set_content(
+        f"Name: {payload.name}\nEmail: {payload.email}\n\n{payload.message}"
+    )
+    await aiosmtplib.send(msg, hostname=SMTP_HOST, port=SMTP_PORT, use_tls=False, start_tls=False)
 
 
 # ── Contact meta singleton ────────────────────────────────────────────────────

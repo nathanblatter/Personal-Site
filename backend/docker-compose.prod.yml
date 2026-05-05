@@ -3,20 +3,37 @@ name: portfolio
 services:
   api:
     image: backend-api:latest
-    network_mode: host
+    env_file: .env.prod
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/portfolio
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/portfolio
       STATIC_DIR: /dist
-      JWT_SECRET: ${JWT_SECRET}
-      ADMIN_USERNAME: ${ADMIN_USERNAME}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      SMTP_HOST: docker-services-postfix-1
+      SMTP_PORT: 25
+      CONTACT_TO_EMAIL: nzb22@byu.edu
+      REDIS_URL: redis://host.docker.internal:6379
+      MINIO_ENDPOINT: docker-services-minio-1:9000
+      MINIO_BUCKET: portfolio
+    ports:
+      - "8000:8000"
     volumes:
       - ../frontend/dist:/dist:ro
     restart: unless-stopped
+    networks:
+      - portfolio
+      - docker-services
 
   tunnel:
     image: cloudflare/cloudflared:latest
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    env_file: .env.prod
+    command: tunnel --no-autoupdate run
     restart: unless-stopped
     depends_on:
       - api
+    networks:
+      - portfolio
+
+networks:
+  portfolio:
+  docker-services:
+    external: true
+    name: docker-services_default
