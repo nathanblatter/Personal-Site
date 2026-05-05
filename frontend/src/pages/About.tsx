@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import SectionHeader from '../components/SectionHeader'
 import TimelineItem from '../components/TimelineItem'
-import { api, type AboutResponse, type InterestResponse, type CourseworkResponse, type ExperienceResponse } from '../lib/api'
+import GitHubSection from '../components/GitHubSection'
+import { Quote } from 'lucide-react'
+import { api, type AboutResponse, type InterestResponse, type CourseworkResponse, type ExperienceResponse, type TestimonialResponse } from '../lib/api'
 import { getIcon } from '../lib/iconMap'
 
 export default function About() {
@@ -10,6 +12,7 @@ export default function About() {
   const [interests, setInterests] = useState<InterestResponse[]>([])
   const [coursework, setCoursework] = useState<CourseworkResponse[]>([])
   const [experience, setExperience] = useState<ExperienceResponse[]>([])
+  const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
 
   useEffect(() => {
     Promise.all([
@@ -17,11 +20,13 @@ export default function About() {
       api.interests.list(),
       api.coursework.list(),
       api.experience.list(),
-    ]).then(([ab, intr, cw, ex]) => {
+      api.testimonials.list(),
+    ]).then(([ab, intr, cw, ex, test]) => {
       setAbout(ab)
       setInterests(intr)
       setCoursework(cw)
       setExperience(ex)
+      setTestimonials(test)
     })
   }, [])
 
@@ -107,6 +112,42 @@ export default function About() {
         </div>
       </section>
 
+      {/* What I'm Looking For */}
+      {about?.looking_for && about.looking_for.length > 0 && (
+        <section className="py-16 md:py-28 bg-snow">
+          <div className="max-w-[900px] w-full mx-auto px-6">
+            <SectionHeader
+              code="// SEEKING"
+              title="What I'm Looking For"
+              subtitle="Roles and opportunities I'm excited about."
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {about.looking_for.map((item, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08 }}
+                  className="p-5 rounded-xl border border-mist bg-white"
+                >
+                  <h4 className="font-sans font-semibold text-ink mb-2">{item.role}</h4>
+                  {item.location && (
+                    <p className="font-mono text-[11px] text-steel mb-1">{item.location}</p>
+                  )}
+                  {item.timeline && (
+                    <p className="font-mono text-[11px] text-blue mb-2">{item.timeline}</p>
+                  )}
+                  {item.detail && (
+                    <p className="text-sm text-steel leading-relaxed">{item.detail}</p>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Focus Areas */}
       <section className="py-16 md:py-28 bg-snow">
         <div className="max-w-[900px] w-full mx-auto px-6">
@@ -162,8 +203,63 @@ export default function About() {
         </div>
       </section>
 
-      {/* Timeline */}
+      {/* GitHub */}
       <section className="py-16 md:py-28 bg-snow">
+        <div className="max-w-[1100px] w-full mx-auto px-6">
+          <SectionHeader
+            code="// GITHUB"
+            title="GitHub"
+            subtitle="Contributions and recent repositories."
+          />
+          <GitHubSection />
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      {testimonials.length > 0 && (
+        <section className="py-16 md:py-28 bg-snow">
+          <div className="max-w-[900px] w-full mx-auto px-6">
+            <SectionHeader
+              code="// TESTIMONIALS"
+              title="Kind Words"
+              subtitle="From professors, managers, and teammates."
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {testimonials.map((t, i) => (
+                <motion.div
+                  key={t.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="p-6 rounded-xl border border-mist bg-white"
+                >
+                  <Quote size={20} className="text-blue/30 mb-3" />
+                  <p className="text-ink/80 text-sm leading-relaxed mb-5 italic">
+                    "{t.quote}"
+                  </p>
+                  <div className="flex items-center gap-3">
+                    {t.avatar_url ? (
+                      <img src={t.avatar_url} alt={t.name} loading="lazy" className="w-9 h-9 rounded-full object-cover border border-mist" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-blue/10 flex items-center justify-center">
+                        <span className="font-mono text-xs text-blue font-bold">{t.name.charAt(0)}</span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-sm font-medium text-ink block leading-tight">{t.name}</span>
+                      <span className="font-mono text-[11px] text-steel">{t.role}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Timeline */}
+      <section className="py-16 md:py-28">
         <div className="max-w-[700px] w-full mx-auto px-6">
           <SectionHeader
             code="// TIMELINE"

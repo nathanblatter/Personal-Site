@@ -1,14 +1,27 @@
 import os
+import re
+from html import escape
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from sqlalchemy import select
 
-from app.routers import projects, skills, experience, about, contact, auth
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo
+from app.database import AsyncSessionLocal
+from app import models
 
 # Resolve static files directory: env var → frontend/dist/ at repo root
 STATIC_DIR = Path(
     os.getenv("STATIC_DIR", str(Path(__file__).parent.parent.parent / "frontend" / "dist"))
+)
+
+DOMAIN = "https://nathanblatter.com"
+
+# Known bot user-agent patterns for OG tag injection
+BOT_PATTERN = re.compile(
+    r"(facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|Slackbot|Discordbot|TelegramBot|Googlebot|bingbot|Applebot)",
+    re.IGNORECASE,
 )
 
 app = FastAPI(
@@ -33,10 +46,56 @@ app.include_router(skills.router, prefix=API_PREFIX)
 app.include_router(experience.router, prefix=API_PREFIX)
 app.include_router(about.router, prefix=API_PREFIX)
 app.include_router(contact.router, prefix=API_PREFIX)
+app.include_router(blog.router, prefix=API_PREFIX)
+app.include_router(internships.router, prefix=API_PREFIX)
+app.include_router(storage.router, prefix=API_PREFIX)
+app.include_router(github.router, prefix=API_PREFIX)
+app.include_router(analytics.router)
+app.include_router(links.router)
+app.include_router(seo.router)
+
+
+async def _blog_og_html(slug: str, index_html: str) -> str | None:
+    """If slug matches a blog post, return index.html with injected OG tags."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(models.BlogPost).where(models.BlogPost.slug == slug)
+        )
+        post = result.scalar_one_or_none()
+    if not post:
+        return None
+
+    title = escape(f"{post.title} — Nathan Blatter")
+    desc = escape(post.excerpt or post.subtitle or post.title)
+    url = f"{DOMAIN}/blog/{post.slug}"
+    image = f"{DOMAIN}/og/{post.slug}.png"
+
+    og_tags = (
+        f'<meta property="og:title" content="{title}" />\n'
+        f'    <meta property="og:description" content="{desc}" />\n'
+        f'    <meta property="og:image" content="{image}" />\n'
+        f'    <meta property="og:url" content="{url}" />\n'
+        f'    <meta property="og:type" content="article" />\n'
+        f'    <meta name="twitter:card" content="summary_large_image" />\n'
+        f'    <meta name="twitter:title" content="{title}" />\n'
+        f'    <meta name="twitter:description" content="{desc}" />\n'
+        f'    <meta name="twitter:image" content="{image}" />\n'
+        f'    <title>{title}</title>'
+    )
+
+    # Replace default OG tags and title
+    html = re.sub(r'<title>[^<]*</title>', '', index_html, count=1)
+    html = re.sub(
+        r'<!-- Open Graph -->.*?<!-- Twitter Card -->.*?<meta name="twitter:image"[^>]*/>',
+        og_tags,
+        html,
+        flags=re.DOTALL,
+    )
+    return html
 
 
 @app.get("/{full_path:path}", include_in_schema=False)
-async def serve_spa(full_path: str = ""):
+async def serve_spa(full_path: str = "", request: Request = None):
     index_path = STATIC_DIR / "index.html"
 
     if not index_path.is_file():
@@ -49,6 +108,17 @@ async def serve_spa(full_path: str = ""):
     candidate = STATIC_DIR / full_path
     if full_path and candidate.is_file():
         return FileResponse(str(candidate))
+
+    # For blog post URLs from social crawlers, inject per-post OG tags
+    if request and full_path.startswith("blog/"):
+        ua = request.headers.get("user-agent", "")
+        if BOT_PATTERN.search(ua):
+            slug = full_path.removeprefix("blog/").rstrip("/")
+            if slug:
+                index_html = index_path.read_text()
+                modified = await _blog_og_html(slug, index_html)
+                if modified:
+                    return HTMLResponse(modified)
 
     # All other paths → SPA entry point
     return FileResponse(str(index_path))

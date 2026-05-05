@@ -6,16 +6,18 @@ import SectionHeader from '../components/SectionHeader'
 import ProjectCard from '../components/ProjectCard'
 import SkillBar from '../components/SkillBar'
 import TimelineItem from '../components/TimelineItem'
-import { api, type ProjectResponse, type SkillResponse, type ExperienceResponse } from '../lib/api'
+import GitHubSection from '../components/GitHubSection'
+import { api, type ProjectResponse, type SkillResponse, type ExperienceResponse, type AboutResponse } from '../lib/api'
 
 export default function Home() {
   const [projects, setProjects] = useState<ProjectResponse[]>([])
   const [skills, setSkills] = useState<SkillResponse[]>([])
   const [experience, setExperience] = useState<ExperienceResponse[]>([])
+  const [about, setAbout] = useState<AboutResponse | null>(null)
 
   useEffect(() => {
-    Promise.all([api.projects.list(), api.skills.list(), api.experience.list()])
-      .then(([p, s, e]) => { setProjects(p); setSkills(s); setExperience(e) })
+    Promise.all([api.projects.list(), api.skills.list(), api.experience.list(), api.about.get()])
+      .then(([p, s, e, a]) => { setProjects(p); setSkills(s); setExperience(e); setAbout(a) })
   }, [])
 
   const featuredProjects = projects.slice(0, 3)
@@ -102,9 +104,11 @@ export default function Home() {
               <GraduationCap size={14} className="text-blue" />
               <span className="font-mono text-xs text-steel">BYU — IS Major</span>
             </div>
-            <div className="font-mono text-xs text-steel">
-              <span className="text-blue font-semibold">3.64</span> GPA
-            </div>
+            {about?.gpa && (
+              <div className="font-mono text-xs text-steel">
+                <span className="text-blue font-semibold">{about.gpa}</span> GPA
+              </div>
+            )}
           </motion.div>
         </div>
       </section>
@@ -155,11 +159,23 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ═══ GITHUB ═══ */}
+      <section className="py-16 md:py-28 bg-snow">
+        <div className="max-w-[1100px] w-full mx-auto px-6">
+          <SectionHeader
+            code="// 03"
+            title="GitHub"
+            subtitle="Open source and personal projects."
+          />
+          <GitHubSection compact />
+        </div>
+      </section>
+
       {/* ═══ EDUCATION & EXPERIENCE ═══ */}
       <section className="py-16 md:py-28 bg-snow">
         <div className="max-w-[700px] w-full mx-auto px-6">
           <SectionHeader
-            code="// 03"
+            code="// 04"
             title="Journey"
             subtitle="Education and experience so far."
           />

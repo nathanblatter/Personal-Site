@@ -1,0 +1,17 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy
+        working-directory: backend
+        run: |
+          DOCKER_BUILDKIT=0 docker build --pull=false -t backend-api:latest .
+          docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-recreate
+          sleep 8
+          docker compose -f docker-compose.prod.yml exec api python seed.py

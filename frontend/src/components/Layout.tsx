@@ -7,7 +7,8 @@ const navLinks = [
   { to: '/', label: 'Home', code: '00' },
   { to: '/about', label: 'About', code: '01' },
   { to: '/projects', label: 'Projects', code: '02' },
-  { to: '/contact', label: 'Contact', code: '03' },
+  { to: '/blog', label: 'Blog', code: '03' },
+  { to: '/contact', label: 'Contact', code: '04' },
 ]
 
 export default function Layout() {

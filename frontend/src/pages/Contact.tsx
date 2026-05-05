@@ -2,23 +2,34 @@ import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Send, MapPin, ArrowUpRight } from 'lucide-react'
 import SectionHeader from '../components/SectionHeader'
-import { api, type SocialResponse, type ContactMetaResponse } from '../lib/api'
+import { api, type SocialResponse, type ContactMetaResponse, type ContactSubmitRequest } from '../lib/api'
 import { getIcon } from '../lib/iconMap'
 
 export default function Contact() {
   const [socials, setSocials] = useState<SocialResponse[]>([])
   const [meta, setMeta] = useState<ContactMetaResponse | null>(null)
-  const [formData, setFormData] = useState({ name: '', email: '', message: '' })
+  const [formData, setFormData] = useState<ContactSubmitRequest>({ name: '', email: '', message: '', honeypot: '' })
   const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([api.socials.list(), api.contact.get()])
       .then(([s, m]) => { setSocials(s); setMeta(m) })
   }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSubmitted(true)
+    setLoading(true)
+    setError(null)
+    try {
+      await api.contact.submit(formData)
+      setSubmitted(true)
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -103,7 +114,7 @@ export default function Contact() {
                 <h3 className="font-sans font-semibold text-ink text-xl mb-2">Message sent!</h3>
                 <p className="text-steel text-sm">Thanks for reaching out. I'll get back to you soon.</p>
                 <button
-                  onClick={() => { setSubmitted(false); setFormData({ name: '', email: '', message: '' }); }}
+                  onClick={() => { setSubmitted(false); setFormData({ name: '', email: '', message: '' }); setError(null); }}
                   className="mt-6 font-mono text-xs text-steel hover:text-blue transition-colors"
                 >
                   Send another message
@@ -111,6 +122,17 @@ export default function Contact() {
               </motion.div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Honeypot — hidden from real users, bots fill it out */}
+                <div style={{ display: 'none' }} aria-hidden="true">
+                  <input
+                    type="text"
+                    name="honeypot"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={formData.honeypot}
+                    onChange={(e) => setFormData({ ...formData, honeypot: e.target.value })}
+                  />
+                </div>
                 <div>
                   <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase">Name</label>
                   <input
@@ -144,12 +166,16 @@ export default function Contact() {
                     placeholder="Tell me about your project or opportunity..."
                   />
                 </div>
+                {error && (
+                  <p className="font-mono text-xs text-red-500">{error}</p>
+                )}
                 <button
                   type="submit"
-                  className="group w-full flex items-center justify-center gap-3 px-6 py-3.5 bg-blue text-white font-mono text-sm font-semibold rounded-xl hover:bg-blue-dim transition-colors shadow-lg shadow-blue/20"
+                  disabled={loading}
+                  className="group w-full flex items-center justify-center gap-3 px-6 py-3.5 bg-blue text-white font-mono text-sm font-semibold rounded-xl hover:bg-blue-dim transition-colors shadow-lg shadow-blue/20 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Send Message
-                  <Send size={14} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                  {loading ? 'Sending...' : 'Send Message'}
+                  {!loading && <Send size={14} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />}
                 </button>
               </form>
             )}
