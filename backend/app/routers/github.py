@@ -7,7 +7,7 @@ import json as _json
 
 router = APIRouter(prefix="/github", tags=["github"])
 
-GITHUB_USERNAME = os.getenv("GITHUB_USERNAME", "nathanzbl")
+GITHUB_USERNAME = os.getenv("GITHUB_USERNAME", "nathanblatter")
 CACHE_TTL = 3600  # 1 hour
 
 _cache: dict = {}
