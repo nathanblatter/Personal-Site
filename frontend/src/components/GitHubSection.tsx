@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'motion/react'
 import { Github, Star, GitFork, ExternalLink } from 'lucide-react'
+import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { api, type GitHubProfile, type GitHubRepo, type GitHubContributions } from '../lib/api'
 
 const LANG_COLORS: Record<string, string> = {
@@ -22,19 +23,98 @@ const LANG_COLORS: Record<string, string> = {
   Shell: '#89e051',
 }
 
+const LEVEL_FILLS = ['#e8ecf0', '#5eead433', '#5eead473', '#5eead4b3', '#5eead4']
+
+interface HeatmapPoint {
+  week: number
+  day: number
+  date: string
+  level: number
+  repos: { name: string; url: string }[]
+}
+
+function ContributionTooltip({ active, payload }: { active?: boolean; payload?: { payload: HeatmapPoint }[] }) {
+  if (!active || !payload?.[0]) return null
+  const d = payload[0].payload
+  const formatted = new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+  })
+  return (
+    <div className="bg-ink text-white text-xs rounded-lg px-3 py-2 shadow-lg min-w-[160px]">
+      <div className="font-semibold mb-1">{formatted}</div>
+      {d.level === 0 ? (
+        <div className="text-white/60">No contributions</div>
+      ) : d.repos.length > 0 ? (
+        <div className="space-y-1">
+          {d.repos.map((repo) => (
+            <a
+              key={repo.name}
+              href={repo.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-teal hover:text-white transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLink size={10} className="shrink-0" />
+              {repo.name}
+            </a>
+          ))}
+        </div>
+      ) : (
+        <div className="text-white/60">Active</div>
+      )}
+    </div>
+  )
+}
+
+function HeatmapCell(props: { cx: number; cy: number; payload: HeatmapPoint }) {
+  const { cx, cy, payload } = props
+  return (
+    <rect
+      x={cx - 5.5}
+      y={cy - 5.5}
+      width={11}
+      height={11}
+      rx={2}
+      fill={LEVEL_FILLS[payload.level]}
+      className="cursor-pointer transition-opacity hover:opacity-80"
+      stroke={payload.level > 0 ? '#5eead4' : 'none'}
+      strokeWidth={0}
+    />
+  )
+}
+
 function ContributionGraph({ data }: { data: GitHubContributions }) {
-  const weeks: { date: string; level: number }[][] = []
-  for (let i = 0; i < data.days.length; i += 7) {
-    weeks.push(data.days.slice(i, i + 7))
+  const points: HeatmapPoint[] = data.days.map((d, i) => ({
+    week: Math.floor(i / 7),
+    day: i % 7,
+    date: d.date,
+    level: d.level,
+    repos: data.activity?.[d.date] || [],
+  }))
+
+  const totalWeeks = Math.ceil(data.days.length / 7)
+
+  // Month labels
+  const monthTicks: { week: number; label: string }[] = []
+  let lastMonth = -1
+  for (const p of points) {
+    const month = new Date(p.date + 'T00:00:00').getMonth()
+    if (month !== lastMonth) {
+      lastMonth = month
+      monthTicks.push({
+        week: p.week,
+        label: new Date(p.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }),
+      })
+    }
   }
 
-  const levelColors = [
-    'bg-mist',
-    'bg-teal/25',
-    'bg-teal/45',
-    'bg-teal/70',
-    'bg-teal',
-  ]
+  const formatWeekTick = useCallback((week: number) => {
+    const tick = monthTicks.find(t => t.week === week)
+    return tick ? tick.label : ''
+  }, [monthTicks])
+
+  const DAY_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', '']
 
   return (
     <div>
@@ -48,25 +128,53 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
           </div>
         )}
       </div>
-      <div className="flex gap-[3px] overflow-x-auto pb-2">
-        {weeks.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-[3px]">
-            {week.map((day, di) => (
-              <div
-                key={di}
-                className={`w-[11px] h-[11px] rounded-[2px] ${levelColors[day.level]} transition-colors`}
-                title={`${day.date}: level ${day.level}`}
-              />
+
+      <ResponsiveContainer width="100%" height={130}>
+        <ScatterChart margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+          <XAxis
+            type="number"
+            dataKey="week"
+            domain={[0, totalWeeks - 1]}
+            tick={{ fontSize: 10, fill: '#8c95a6' }}
+            tickLine={false}
+            axisLine={false}
+            ticks={monthTicks.map(t => t.week)}
+            tickFormatter={formatWeekTick}
+            interval={0}
+          />
+          <YAxis
+            type="number"
+            dataKey="day"
+            domain={[0, 6]}
+            tick={{ fontSize: 10, fill: '#8c95a6' }}
+            tickLine={false}
+            axisLine={false}
+            ticks={[1, 3, 5]}
+            tickFormatter={(d: number) => DAY_LABELS[d]}
+            reversed
+            width={28}
+          />
+          <Tooltip
+            content={<ContributionTooltip />}
+            cursor={false}
+            wrapperStyle={{ zIndex: 50, pointerEvents: 'auto' }}
+            allowEscapeViewBox={{ x: true, y: true }}
+          />
+          <Scatter data={points} shape={<HeatmapCell cx={0} cy={0} payload={points[0]} />} isAnimationActive={false}>
+            {points.map((_, i) => (
+              <Cell key={i} />
             ))}
-          </div>
+          </Scatter>
+        </ScatterChart>
+      </ResponsiveContainer>
+
+      {/* Legend */}
+      <div className="flex items-center gap-1.5 mt-1 justify-end font-mono text-[10px] text-steel">
+        <span className="mr-1">Less</span>
+        {LEVEL_FILLS.map((fill, i) => (
+          <div key={i} className="w-[11px] h-[11px] rounded-[2px]" style={{ background: fill }} />
         ))}
-      </div>
-      <div className="flex items-center gap-1.5 mt-2 justify-end">
-        <span className="font-mono text-[10px] text-silver mr-1">Less</span>
-        {levelColors.map((c, i) => (
-          <div key={i} className={`w-[11px] h-[11px] rounded-[2px] ${c}`} />
-        ))}
-        <span className="font-mono text-[10px] text-silver ml-1">More</span>
+        <span className="ml-1">More</span>
       </div>
     </div>
   )

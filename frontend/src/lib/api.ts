@@ -273,6 +273,7 @@ export interface GitHubContributions {
   total: number
   streak: number
   days: { date: string; level: number }[]
+  activity: Record<string, { name: string; url: string }[]>
 }
 
 // ── API client ─────────────────────────────────────────────────────────────
