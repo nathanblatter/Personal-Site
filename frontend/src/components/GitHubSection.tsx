@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { Github, Star, GitFork, ExternalLink } from 'lucide-react'
 import { api, type GitHubProfile, type GitHubRepo, type GitHubContributions } from '../lib/api'
@@ -22,79 +23,144 @@ const LANG_COLORS: Record<string, string> = {
   Shell: '#89e051',
 }
 
-const LEVEL_COLORS = [
-  'bg-[#ebedf0]',
-  'bg-teal/25',
-  'bg-teal/45',
-  'bg-teal/70',
-  'bg-teal',
+/* ─── Contribution heatmap ─────────────────────────────────────────── */
+
+const LEVEL_FILLS = [
+  'var(--color-mist)',
+  'rgba(56,178,172,0.20)',
+  'rgba(56,178,172,0.40)',
+  'rgba(56,178,172,0.65)',
+  'var(--color-teal)',
 ]
 
-function ContributionGraph({ data }: { data: GitHubContributions }) {
-  const [tooltip, setTooltip] = useState<{
-    x: number
-    y: number
-    date: string
-    level: number
-    repos: { name: string; url: string }[]
-  } | null>(null)
-  const tooltipTimeout = useRef<ReturnType<typeof setTimeout>>(undefined)
+const CELL = 11
+const GAP = 3
 
+interface TooltipData {
+  rect: DOMRect
+  date: string
+  level: number
+  repos: { name: string; url: string }[]
+}
+
+function ContributionTooltip({ data, onEnter, onLeave }: {
+  data: TooltipData
+  onEnter: () => void
+  onLeave: () => void
+}) {
+  const formatted = new Date(data.date + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+  })
+
+  // Position above the cell, centered horizontally
+  const top = data.rect.top + window.scrollY - 10
+  const left = data.rect.left + data.rect.width / 2
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 4 }}
+      transition={{ duration: 0.12 }}
+      className="absolute z-[9999]"
+      style={{
+        top,
+        left,
+        transform: 'translate(-50%, -100%)',
+      }}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+    >
+      <div className="bg-ink text-white text-xs rounded-lg px-3 py-2 shadow-xl shadow-ink/20 min-w-[160px] max-w-[220px]">
+        <div className="font-semibold text-white/90 mb-1">{formatted}</div>
+        {data.level === 0 ? (
+          <div className="text-white/50">No contributions</div>
+        ) : data.repos.length > 0 ? (
+          <div className="space-y-0.5 mt-1.5">
+            {data.repos.map((repo) => (
+              <a
+                key={repo.name}
+                href={repo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-teal hover:text-white/90 transition-colors py-0.5"
+              >
+                <ExternalLink size={9} className="shrink-0 opacity-60" />
+                <span className="truncate">{repo.name}</span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <div className="text-white/50">Active</div>
+        )}
+      </div>
+      {/* Arrow */}
+      <div
+        className="w-0 h-0 mx-auto"
+        style={{
+          borderLeft: '5px solid transparent',
+          borderRight: '5px solid transparent',
+          borderTop: '5px solid var(--color-ink)',
+        }}
+      />
+    </motion.div>,
+    document.body,
+  )
+}
+
+function ContributionGraph({ data }: { data: GitHubContributions }) {
+  const [tooltip, setTooltip] = useState<TooltipData | null>(null)
+  const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  // Build weeks grid
   const weeks: { date: string; level: number }[][] = []
   for (let i = 0; i < data.days.length; i += 7) {
     weeks.push(data.days.slice(i, i + 7))
   }
 
-  // Figure out which weeks start a new month
-  const monthLabels: { text: string; weekIndex: number }[] = []
-  let lastMonth = -1
+  // Month labels: find which column each new month starts at
+  const monthLabels: { text: string; col: number }[] = []
+  let prevMonth = -1
   for (let wi = 0; wi < weeks.length; wi++) {
-    const firstDay = weeks[wi][0]
-    if (!firstDay) continue
-    const month = new Date(firstDay.date + 'T00:00:00').getMonth()
-    if (month !== lastMonth) {
-      lastMonth = month
+    const day = weeks[wi][0]
+    if (!day) continue
+    const m = new Date(day.date + 'T00:00:00').getMonth()
+    if (m !== prevMonth) {
+      prevMonth = m
       monthLabels.push({
-        text: new Date(firstDay.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }),
-        weekIndex: wi,
+        text: new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' }),
+        col: wi,
       })
     }
   }
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
-      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
-    })
-
-  // Use fixed (viewport) positioning so scroll doesn't break it
-  const showTooltip = (e: React.MouseEvent, day: { date: string; level: number }) => {
-    clearTimeout(tooltipTimeout.current)
-    const rect = e.currentTarget.getBoundingClientRect()
+  const show = useCallback((e: React.MouseEvent, day: { date: string; level: number }) => {
+    clearTimeout(hideTimer.current)
     setTooltip({
-      x: rect.left + rect.width / 2,
-      y: rect.top,
+      rect: e.currentTarget.getBoundingClientRect(),
       date: day.date,
       level: day.level,
       repos: data.activity?.[day.date] || [],
     })
-  }
+  }, [data.activity])
 
-  const hideTooltip = () => {
-    tooltipTimeout.current = setTimeout(() => setTooltip(null), 150)
-  }
+  const scheduleHide = useCallback(() => {
+    hideTimer.current = setTimeout(() => setTooltip(null), 200)
+  }, [])
 
-  const keepTooltip = () => clearTimeout(tooltipTimeout.current)
+  const cancelHide = useCallback(() => {
+    clearTimeout(hideTimer.current)
+  }, [])
 
-  // cell size + gap
-  const CELL = 11
-  const GAP = 3
-  const COL = CELL + GAP  // 14px per week column
+  const totalWeeks = weeks.length
 
   return (
     <div>
+      {/* Stats */}
       <div className="flex items-center gap-6 mb-4">
         <div className="font-mono text-xs text-steel">
-          <span className="text-ink font-semibold text-sm">{data.total.toLocaleString()}</span> contributions in the last year
+          <span className="text-ink font-semibold text-sm">{data.total.toLocaleString()}</span>{' '}
+          contributions in the last year
         </div>
         {data.streak > 0 && (
           <div className="font-mono text-xs text-steel">
@@ -103,100 +169,106 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
         )}
       </div>
 
-      {/* Single scrollable area for month labels + day labels + grid */}
-      <div className="overflow-x-auto pb-1">
-        <div style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 'max-content' }}>
-          {/* Month labels — absolutely positioned so text doesn't get clipped to 14px slots */}
-          <div className="relative h-4 mb-1" style={{ marginLeft: 32 }}>
-            {monthLabels.map((m, i) => (
-              <span
+      {/* Scrollable grid */}
+      <div className="overflow-x-auto pb-2 -mx-1 px-1">
+        {/* CSS Grid: rows = month-label-row + 7 day-rows, cols = day-label-col + N week-cols */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `24px repeat(${totalWeeks}, ${CELL}px)`,
+            gridTemplateRows: `16px repeat(7, ${CELL}px)`,
+            columnGap: GAP,
+            rowGap: GAP,
+            width: 'max-content',
+          }}
+        >
+          {/* Month labels in row 1, spanning from their start col to next month's col */}
+          {monthLabels.map((m, i) => {
+            const startCol = m.col + 2 // +2 because col 1 is day-labels (1-indexed)
+            const endCol = i < monthLabels.length - 1
+              ? monthLabels[i + 1].col + 2
+              : totalWeeks + 2
+            const span = endCol - startCol
+            // Skip labels that would be too narrow to read
+            if (span < 3) return null
+            return (
+              <div
                 key={i}
-                className="absolute font-mono text-[10px] text-steel"
-                style={{ left: m.weekIndex * COL }}
+                className="font-mono text-[10px] text-slate leading-4 overflow-hidden whitespace-nowrap"
+                style={{
+                  gridColumn: `${startCol} / span ${span}`,
+                  gridRow: 1,
+                }}
               >
                 {m.text}
-              </span>
-            ))}
-          </div>
+              </div>
+            )
+          })}
 
-          {/* Day labels + cells */}
-          <div className="flex">
-            {/* Day-of-week labels */}
-            <div className="flex flex-col shrink-0" style={{ width: 28, gap: GAP, marginRight: 4 }}>
-              {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((d, i) => (
-                <div
-                  key={i}
-                  className="font-mono text-[9px] text-steel text-right"
-                  style={{ height: CELL, lineHeight: `${CELL}px` }}
-                >
-                  {d}
-                </div>
-              ))}
+          {/* Day-of-week labels in column 1 */}
+          {['', 'M', '', 'W', '', 'F', ''].map((label, row) => (
+            <div
+              key={row}
+              className="font-mono text-[9px] text-slate text-right pr-0.5"
+              style={{
+                gridColumn: 1,
+                gridRow: row + 2, // +2 to skip month-label row (1-indexed)
+                lineHeight: `${CELL}px`,
+              }}
+            >
+              {label}
             </div>
+          ))}
 
-            {/* Grid cells */}
-            <div className="flex" style={{ gap: GAP }}>
-              {weeks.map((week, wi) => (
-                <div key={wi} className="flex flex-col" style={{ gap: GAP }}>
-                  {week.map((day, di) => (
-                    <div
-                      key={di}
-                      className={`rounded-[2px] ${LEVEL_COLORS[day.level]} cursor-pointer hover:ring-1 hover:ring-ink/40 transition-shadow`}
-                      style={{ width: CELL, height: CELL }}
-                      onMouseEnter={(e) => showTooltip(e, day)}
-                      onMouseLeave={hideTooltip}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Contribution cells */}
+          {weeks.map((week, wi) =>
+            week.map((day, di) => (
+              <div
+                key={`${wi}-${di}`}
+                className="rounded-[2px] cursor-pointer transition-all duration-100 hover:scale-[1.3] hover:z-10 hover:shadow-sm"
+                style={{
+                  gridColumn: wi + 2,
+                  gridRow: di + 2,
+                  width: CELL,
+                  height: CELL,
+                  background: LEVEL_FILLS[day.level],
+                }}
+                onMouseEnter={(e) => show(e, day)}
+                onMouseLeave={scheduleHide}
+              />
+            )),
+          )}
         </div>
       </div>
 
-      {/* Fixed-position tooltip (uses viewport coords, immune to scroll) */}
+      {/* Legend */}
+      <div className="flex items-center gap-1.5 mt-1 justify-end">
+        <span className="font-mono text-[10px] text-steel mr-1">Less</span>
+        {LEVEL_FILLS.map((fill, i) => (
+          <div
+            key={i}
+            className="w-[10px] h-[10px] rounded-[2px]"
+            style={{ background: fill }}
+          />
+        ))}
+        <span className="font-mono text-[10px] text-steel ml-1">More</span>
+      </div>
+
+      {/* Tooltip via portal */}
       <AnimatePresence>
         {tooltip && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.1 }}
-            className="fixed z-50"
-            style={{ left: tooltip.x, top: tooltip.y - 8, transform: 'translate(-50%, -100%)' }}
-            onMouseEnter={keepTooltip}
-            onMouseLeave={hideTooltip}
-          >
-            <div className="bg-ink text-white text-xs rounded-lg px-3 py-2 shadow-lg min-w-[160px]">
-              <div className="font-semibold mb-1">{formatDate(tooltip.date)}</div>
-              {tooltip.level === 0 ? (
-                <div className="text-white/60">No contributions</div>
-              ) : tooltip.repos.length > 0 ? (
-                <div className="space-y-1">
-                  {tooltip.repos.map((repo) => (
-                    <a
-                      key={repo.name}
-                      href={repo.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-teal hover:text-white transition-colors"
-                    >
-                      <ExternalLink size={10} className="shrink-0" />
-                      {repo.name}
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-white/60">Active</div>
-              )}
-              <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-ink" />
-            </div>
-          </motion.div>
+          <ContributionTooltip
+            data={tooltip}
+            onEnter={cancelHide}
+            onLeave={scheduleHide}
+          />
         )}
       </AnimatePresence>
     </div>
   )
 }
+
+/* ─── Repo card ────────────────────────────────────────────────────── */
 
 function RepoCard({ repo }: { repo: GitHubRepo }) {
   return (
@@ -239,6 +311,8 @@ function RepoCard({ repo }: { repo: GitHubRepo }) {
     </a>
   )
 }
+
+/* ─── Main section ─────────────────────────────────────────────────── */
 
 export default function GitHubSection({ compact = false }: { compact?: boolean }) {
   const [profile, setProfile] = useState<GitHubProfile | null>(null)
