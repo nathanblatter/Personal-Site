@@ -31,7 +31,6 @@ const LEVEL_COLORS = [
 ]
 
 function ContributionGraph({ data }: { data: GitHubContributions }) {
-  const containerRef = useRef<HTMLDivElement>(null)
   const [tooltip, setTooltip] = useState<{
     x: number
     y: number
@@ -46,7 +45,7 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
     weeks.push(data.days.slice(i, i + 7))
   }
 
-  // Month labels positioned above the grid
+  // Figure out which weeks start a new month
   const monthLabels: { text: string; weekIndex: number }[] = []
   let lastMonth = -1
   for (let wi = 0; wi < weeks.length; wi++) {
@@ -67,14 +66,13 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
       weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
     })
 
+  // Use fixed (viewport) positioning so scroll doesn't break it
   const showTooltip = (e: React.MouseEvent, day: { date: string; level: number }) => {
     clearTimeout(tooltipTimeout.current)
     const rect = e.currentTarget.getBoundingClientRect()
-    const container = containerRef.current?.getBoundingClientRect()
-    if (!container) return
     setTooltip({
-      x: rect.left - container.left + rect.width / 2,
-      y: rect.top - container.top,
+      x: rect.left + rect.width / 2,
+      y: rect.top,
       date: day.date,
       level: day.level,
       repos: data.activity?.[day.date] || [],
@@ -87,8 +85,13 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
 
   const keepTooltip = () => clearTimeout(tooltipTimeout.current)
 
+  // cell size + gap
+  const CELL = 11
+  const GAP = 3
+  const COL = CELL + GAP  // 14px per week column
+
   return (
-    <div ref={containerRef} className="relative">
+    <div>
       <div className="flex items-center gap-6 mb-4">
         <div className="font-mono text-xs text-steel">
           <span className="text-ink font-semibold text-sm">{data.total.toLocaleString()}</span> contributions in the last year
@@ -100,61 +103,69 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
         )}
       </div>
 
-      {/* Month labels */}
-      <div className="flex mb-1 ml-[30px]">
-        {monthLabels.map((m, i) => {
-          const nextWeek = monthLabels[i + 1]?.weekIndex ?? weeks.length
-          const span = nextWeek - m.weekIndex
-          return (
-            <div
-              key={i}
-              className="font-mono text-[10px] text-steel shrink-0"
-              style={{ width: span * 14 }}
-            >
-              {m.text}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Grid with day labels */}
-      <div className="flex">
-        <div className="flex flex-col gap-[3px] mr-1.5 pt-0">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
-            <div
-              key={d}
-              className="h-[11px] font-mono text-[9px] text-steel leading-[11px] text-right"
-              style={{ visibility: i % 2 === 1 ? 'visible' : 'hidden' }}
-            >
-              {d}
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-[3px] overflow-x-auto pb-1">
-          {weeks.map((week, wi) => (
-            <div key={wi} className="flex flex-col gap-[3px]">
-              {week.map((day, di) => (
+      {/* Single scrollable area for month labels + day labels + grid */}
+      <div className="overflow-x-auto pb-1">
+        <div style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 'max-content' }}>
+          {/* Month labels row — sits above the grid, offset by day-label width */}
+          <div className="flex h-4 mb-1" style={{ paddingLeft: 32 }}>
+            {weeks.map((_, wi) => {
+              const label = monthLabels.find(m => m.weekIndex === wi)
+              return (
                 <div
-                  key={di}
-                  className={`w-[11px] h-[11px] rounded-[2px] ${LEVEL_COLORS[day.level]} cursor-pointer hover:ring-1 hover:ring-ink/40 transition-shadow`}
-                  onMouseEnter={(e) => showTooltip(e, day)}
-                  onMouseLeave={hideTooltip}
-                />
+                  key={wi}
+                  className="shrink-0 font-mono text-[10px] text-steel"
+                  style={{ width: COL }}
+                >
+                  {label ? label.text : ''}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Day labels + cells */}
+          <div className="flex">
+            {/* Day-of-week labels */}
+            <div className="flex flex-col shrink-0" style={{ width: 28, gap: GAP, marginRight: 4 }}>
+              {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((d, i) => (
+                <div
+                  key={i}
+                  className="font-mono text-[9px] text-steel text-right"
+                  style={{ height: CELL, lineHeight: `${CELL}px` }}
+                >
+                  {d}
+                </div>
               ))}
             </div>
-          ))}
+
+            {/* Grid cells */}
+            <div className="flex" style={{ gap: GAP }}>
+              {weeks.map((week, wi) => (
+                <div key={wi} className="flex flex-col" style={{ gap: GAP }}>
+                  {week.map((day, di) => (
+                    <div
+                      key={di}
+                      className={`rounded-[2px] ${LEVEL_COLORS[day.level]} cursor-pointer hover:ring-1 hover:ring-ink/40 transition-shadow`}
+                      style={{ width: CELL, height: CELL }}
+                      onMouseEnter={(e) => showTooltip(e, day)}
+                      onMouseLeave={hideTooltip}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Tooltip */}
+      {/* Fixed-position tooltip (uses viewport coords, immune to scroll) */}
       <AnimatePresence>
         {tooltip && (
           <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.12 }}
-            className="absolute z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.1 }}
+            className="fixed z-50"
             style={{ left: tooltip.x, top: tooltip.y - 8, transform: 'translate(-50%, -100%)' }}
             onMouseEnter={keepTooltip}
             onMouseLeave={hideTooltip}
@@ -181,7 +192,6 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
               ) : (
                 <div className="text-white/60">Active</div>
               )}
-              {/* Arrow */}
               <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[5px] border-r-[5px] border-t-[5px] border-l-transparent border-r-transparent border-t-ink" />
             </div>
           </motion.div>
