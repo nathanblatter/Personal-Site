@@ -287,8 +287,8 @@ SOCIALS = [
     {
         "icon": "Github",
         "label": "GitHub",
-        "handle": "@nathanzbl",
-        "href": "https://github.com/nathanzbl",
+        "handle": "@nathanblatter",
+        "href": "https://github.com/nathanblatter",
         "sort_order": 0,
     },
     {

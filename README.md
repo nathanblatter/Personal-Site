@@ -280,7 +280,7 @@ PUT requests are **partial** — only the fields you send are changed.
 
 ### Social
 ```json
-{ "id": 1, "icon": "Github", "label": "GitHub", "handle": "@nathanzbl", "href": "https://github.com/nathanzbl", "sort_order": 0 }
+{ "id": 1, "icon": "Github", "label": "GitHub", "handle": "@nathanblatter", "href": "https://github.com/nathanblatter", "sort_order": 0 }
 ```
 
 ### Contact Meta (singleton)

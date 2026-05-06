@@ -87,7 +87,7 @@ export default function Resume() {
           <div className="text-center mb-1">
             <h1 className="text-[20px] font-bold tracking-wide">Nathan Blatter</h1>
             <p className="text-[10.5px] text-[#555] mt-0.5">
-              nzb22@byu.edu | nathanblatter.com | linkedin.com/in/nathanblatter | github.com/nathanzbl
+              nzb22@byu.edu | nathanblatter.com | linkedin.com/in/nathanblatter | github.com/nathanblatter
             </p>
           </div>
 
