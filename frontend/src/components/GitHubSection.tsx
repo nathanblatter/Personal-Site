@@ -37,7 +37,8 @@ const CELL = 11
 const GAP = 3
 
 interface TooltipData {
-  rect: DOMRect
+  x: number
+  y: number
   date: string
   level: number
   repos: { name: string; url: string }[]
@@ -52,9 +53,8 @@ function ContributionTooltip({ data, onEnter, onLeave }: {
     weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
   })
 
-  // Position above the cell using fixed (viewport) coords
-  const top = data.rect.top - 10
-  const left = data.rect.left + data.rect.width / 2
+  const top = data.y - 12
+  const left = data.x
 
   return createPortal(
     <motion.div
@@ -137,7 +137,8 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
   const show = useCallback((e: React.MouseEvent, day: { date: string; level: number }) => {
     clearTimeout(hideTimer.current)
     setTooltip({
-      rect: e.currentTarget.getBoundingClientRect(),
+      x: e.clientX,
+      y: e.clientY,
       date: day.date,
       level: day.level,
       repos: data.activity?.[day.date] || [],
