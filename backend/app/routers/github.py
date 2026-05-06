@@ -86,8 +86,34 @@ def github_contributions():
         elif streak > 0:
             break
 
+    # Fetch recent push events to map dates -> repos worked on
+    activity: dict[str, list[dict]] = {}
+    for page in range(1, 4):
+        try:
+            raw_events = _fetch_cached(
+                f"events_p{page}",
+                f"https://api.github.com/users/{GITHUB_USERNAME}/events?per_page=100&page={page}",
+                ttl=CACHE_TTL,
+            )
+            events = _json.loads(raw_events)
+            if not events:
+                break
+            for ev in events:
+                if ev["type"] != "PushEvent":
+                    continue
+                date = ev["created_at"][:10]
+                repo_name = ev["repo"]["name"].split("/")[-1]
+                repo_url = f"https://github.com/{ev['repo']['name']}"
+                if date not in activity:
+                    activity[date] = []
+                if not any(r["name"] == repo_name for r in activity[date]):
+                    activity[date].append({"name": repo_name, "url": repo_url})
+        except Exception:
+            break
+
     return {
         "total": total,
         "streak": streak,
         "days": [{"date": d, "level": int(l)} for d, l in days],
+        "activity": activity,
     }
