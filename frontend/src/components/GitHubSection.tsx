@@ -106,20 +106,17 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
       {/* Single scrollable area for month labels + day labels + grid */}
       <div className="overflow-x-auto pb-1">
         <div style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 'max-content' }}>
-          {/* Month labels row — sits above the grid, offset by day-label width */}
-          <div className="flex h-4 mb-1" style={{ paddingLeft: 32 }}>
-            {weeks.map((_, wi) => {
-              const label = monthLabels.find(m => m.weekIndex === wi)
-              return (
-                <div
-                  key={wi}
-                  className="shrink-0 font-mono text-[10px] text-steel"
-                  style={{ width: COL }}
-                >
-                  {label ? label.text : ''}
-                </div>
-              )
-            })}
+          {/* Month labels — absolutely positioned so text doesn't get clipped to 14px slots */}
+          <div className="relative h-4 mb-1" style={{ marginLeft: 32 }}>
+            {monthLabels.map((m, i) => (
+              <span
+                key={i}
+                className="absolute font-mono text-[10px] text-steel"
+                style={{ left: m.weekIndex * COL }}
+              >
+                {m.text}
+              </span>
+            ))}
           </div>
 
           {/* Day labels + cells */}
