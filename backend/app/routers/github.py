@@ -73,10 +73,31 @@ def github_contributions():
         f"https://github.com/users/{GITHUB_USERNAME}/contributions",
     )
 
-    days = re.findall(r'data-date="([^"]+)"[^>]*data-level="([^"]+)"', html)
+    raw_days = re.findall(r'data-date="([^"]+)"[^>]*data-level="([^"]+)"', html)
 
     total_match = re.search(r"(\d[\d,]*)\s+contributions?\s+in\s+the\s+last\s+year", html)
     total = int(total_match.group(1).replace(",", "")) if total_match else 0
+
+    # GitHub HTML is row-major (all Sundays, then all Mondays, etc.)
+    # Transpose to column-major (week-by-week: Sun0,Mon0,...,Sat0,Sun1,...)
+    # so the frontend can chunk by 7 for each week column.
+    num_weeks = len(raw_days) // 7
+    remainder = len(raw_days) % 7
+    # Build rows: rows[0] = all Sundays, rows[1] = all Mondays, ...
+    rows: list[list[tuple[str, str]]] = []
+    offset = 0
+    for r in range(7):
+        row_len = num_weeks + (1 if r < remainder else 0)
+        rows.append(raw_days[offset : offset + row_len])
+        offset += row_len
+
+    # Transpose: iterate by column (week), then by row (day-of-week)
+    days: list[tuple[str, str]] = []
+    max_cols = max(len(row) for row in rows)
+    for col in range(max_cols):
+        for row in rows:
+            if col < len(row):
+                days.append(row[col])
 
     # Current streak
     streak = 0
