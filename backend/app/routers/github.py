@@ -7,7 +7,8 @@ import json as _json
 
 router = APIRouter(prefix="/github", tags=["github"])
 
-GITHUB_USERNAME = os.getenv("GITHUB_USERNAME", "nathanblatter")
+GITHUB_USERNAME = os.getenv("GITHUB_USERNAME", "nathanzbl")
+GITHUB_ORG = os.getenv("GITHUB_ORG", "nathanblatter")
 CACHE_TTL = 3600  # 1 hour
 
 _cache: dict = {}
@@ -45,7 +46,7 @@ def github_profile():
 def github_repos():
     raw = _fetch_cached(
         "repos",
-        f"https://api.github.com/users/{GITHUB_USERNAME}/repos?sort=pushed&per_page=100",
+        f"https://api.github.com/orgs/{GITHUB_ORG}/repos?sort=pushed&per_page=100",
     )
     repos = _json.loads(raw)
     return [
