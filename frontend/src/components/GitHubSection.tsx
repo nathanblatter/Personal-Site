@@ -52,8 +52,8 @@ function ContributionTooltip({ data, onEnter, onLeave }: {
     weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
   })
 
-  // Position above the cell, centered horizontally
-  const top = data.rect.top + window.scrollY - 10
+  // Position above the cell using fixed (viewport) coords
+  const top = data.rect.top - 10
   const left = data.rect.left + data.rect.width / 2
 
   return createPortal(
@@ -62,7 +62,7 @@ function ContributionTooltip({ data, onEnter, onLeave }: {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 4 }}
       transition={{ duration: 0.12 }}
-      className="absolute z-[9999]"
+      className="fixed z-[9999]"
       style={{
         top,
         left,
@@ -225,7 +225,7 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
             week.map((day, di) => (
               <div
                 key={`${wi}-${di}`}
-                className="rounded-[2px] cursor-pointer transition-all duration-100 hover:scale-[1.3] hover:z-10 hover:shadow-sm"
+                className="rounded-[2px] cursor-pointer hover:brightness-125 hover:ring-1 hover:ring-ink/30"
                 style={{
                   gridColumn: wi + 2,
                   gridRow: di + 2,
