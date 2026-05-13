@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from sqlalchemy import select
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi
 from app.database import AsyncSessionLocal
 from app import models
 
@@ -53,6 +53,7 @@ app.include_router(github.router, prefix=API_PREFIX)
 app.include_router(analytics.router)
 app.include_router(links.router)
 app.include_router(seo.router)
+app.include_router(kpi.router, prefix=API_PREFIX)
 
 
 async def _blog_og_html(slug: str, index_html: str) -> str | None:
