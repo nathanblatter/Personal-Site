@@ -47,10 +47,14 @@ async def get_kpi(_=Depends(verify_kpi_key)):
     except Exception as e:
         print(f"Umami unavailable: {e}")
 
-    uniques = visitor_data.get("uniques", {}).get("value", 0)
-    pageviews = visitor_data.get("pageviews", {}).get("value", 0)
-    bounces = visitor_data.get("bounces", {}).get("value", 0)
-    total_time = visitor_data.get("totaltime", {}).get("value", 0)
+    def _val(d, key):
+        v = d.get(key, 0)
+        return v.get("value", 0) if isinstance(v, dict) else (v or 0)
+
+    uniques = _val(visitor_data, "uniques")
+    pageviews = _val(visitor_data, "pageviews")
+    bounces = _val(visitor_data, "bounces")
+    total_time = _val(visitor_data, "totaltime")
 
     return {
         "project": "personal_site",
