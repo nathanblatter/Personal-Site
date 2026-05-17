@@ -17,6 +17,7 @@ services:
       - "8000:8000"
     volumes:
       - ../frontend/dist:/dist:ro
+      - /Users/nathanblatter/.claude/projects:/claude_data:ro
     restart: unless-stopped
     networks:
       - portfolio

@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import SectionHeader from '../components/SectionHeader'
 import TimelineItem from '../components/TimelineItem'
 import GitHubSection from '../components/GitHubSection'
+import ClaudeSection from '../components/ClaudeSection'
 import { Quote } from 'lucide-react'
 import { api, type AboutResponse, type InterestResponse, type CourseworkResponse, type ExperienceResponse, type TestimonialResponse } from '../lib/api'
 import { getIcon } from '../lib/iconMap'
@@ -212,6 +213,18 @@ export default function About() {
             subtitle="Contributions and recent repositories."
           />
           <GitHubSection />
+        </div>
+      </section>
+
+      {/* Claude Code */}
+      <section className="py-16 md:py-28">
+        <div className="max-w-[1100px] w-full mx-auto px-6">
+          <SectionHeader
+            code="// CLAUDE"
+            title="Claude Code"
+            subtitle="AI-assisted development activity and cost."
+          />
+          <ClaudeSection />
         </div>
       </section>
 
