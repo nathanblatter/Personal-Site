@@ -1,5 +1,6 @@
 import os
 import re
+from contextlib import asynccontextmanager
 from html import escape
 from pathlib import Path
 from fastapi import FastAPI, Request
@@ -24,11 +25,19 @@ BOT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await kpi.init_kpi_db()
+    yield
+    await kpi.close_kpi_db()
+
+
 app = FastAPI(
     title="Portfolio API",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -54,6 +63,7 @@ app.include_router(analytics.router)
 app.include_router(links.router)
 app.include_router(seo.router)
 app.include_router(kpi.router, prefix=API_PREFIX)
+app.include_router(kpi.health_ingest_router, prefix="/api")
 app.include_router(claude_usage.router, prefix=API_PREFIX)
 
 

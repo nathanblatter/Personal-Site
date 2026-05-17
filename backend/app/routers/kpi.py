@@ -3,12 +3,177 @@
 import os
 import time
 import httpx
-from datetime import datetime, timezone
+import asyncpg
+from datetime import date as date_type, datetime, time as time_type, timezone
 from typing import Optional
+from urllib.parse import urlparse, urlunparse
 
 from fastapi import APIRouter, Depends, HTTPException, Header
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/kpi", tags=["kpi"])
+
+# ---------------------------------------------------------------------------
+# Health Ingest — separate router registered at /api (not /api/v1)
+# ---------------------------------------------------------------------------
+
+_KPI_POOL: asyncpg.Pool | None = None
+
+_ALLOWED_FIELDS = frozenset({
+    "resting_hr", "hrv_morning", "sleep_hrs", "sleep_bedtime",
+    "steps", "active_cal", "workout_type", "workout_duration_min",
+    "energy_am", "prayer_am", "prayer_pm", "scripture", "church",
+    "temple", "meaningful_convos", "new_people", "deep_work_hrs",
+    "ideas_count", "lc_solved", "github_commits", "github_prs",
+    "life_sat", "notes",
+})
+
+_CREATE_TABLE = """
+CREATE TABLE IF NOT EXISTS kpi_daily_log (
+    date                DATE PRIMARY KEY,
+    resting_hr          NUMERIC,
+    hrv_morning         NUMERIC,
+    sleep_hrs           NUMERIC,
+    sleep_bedtime       TIME,
+    steps               INTEGER,
+    active_cal          INTEGER,
+    workout_type        TEXT,
+    workout_duration_min INTEGER,
+    energy_am           SMALLINT CHECK (energy_am BETWEEN 1 AND 10),
+    prayer_am           BOOLEAN,
+    prayer_pm           BOOLEAN,
+    scripture           BOOLEAN,
+    church              BOOLEAN,
+    temple              BOOLEAN,
+    meaningful_convos   INTEGER,
+    new_people          INTEGER,
+    deep_work_hrs       NUMERIC,
+    ideas_count         INTEGER,
+    lc_solved           INTEGER,
+    github_commits      INTEGER,
+    github_prs          INTEGER,
+    life_sat            SMALLINT CHECK (life_sat BETWEEN 1 AND 10),
+    notes               TEXT,
+    created_at          TIMESTAMPTZ DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ DEFAULT NOW()
+);
+"""
+
+_CREATE_FUNCTION = """
+CREATE OR REPLACE FUNCTION update_kpi_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+"""
+
+_DROP_TRIGGER = "DROP TRIGGER IF EXISTS kpi_daily_log_updated_at ON kpi_daily_log;"
+
+_CREATE_TRIGGER = """
+CREATE TRIGGER kpi_daily_log_updated_at
+    BEFORE UPDATE ON kpi_daily_log
+    FOR EACH ROW EXECUTE FUNCTION update_kpi_updated_at();
+"""
+
+
+async def init_kpi_db() -> None:
+    global _KPI_POOL
+    kpi_url = os.getenv(
+        "DATABASE_URL_KPI",
+        "postgresql://postgres:postgres@host.docker.internal:5432/kpi",
+    )
+    # Connect to postgres DB to create kpi database if needed
+    parsed = urlparse(kpi_url)
+    admin_url = urlunparse(parsed._replace(path="/postgres"))
+    conn = await asyncpg.connect(admin_url)
+    try:
+        exists = await conn.fetchval("SELECT 1 FROM pg_database WHERE datname = 'kpi'")
+        if not exists:
+            await conn.execute("CREATE DATABASE kpi")
+    finally:
+        await conn.close()
+
+    _KPI_POOL = await asyncpg.create_pool(kpi_url)
+    async with _KPI_POOL.acquire() as conn:
+        await conn.execute(_CREATE_TABLE)
+        await conn.execute(_CREATE_FUNCTION)
+        await conn.execute(_DROP_TRIGGER)
+        await conn.execute(_CREATE_TRIGGER)
+
+
+async def close_kpi_db() -> None:
+    global _KPI_POOL
+    if _KPI_POOL:
+        await _KPI_POOL.close()
+        _KPI_POOL = None
+
+
+class HealthIngestRequest(BaseModel):
+    date: Optional[date_type] = None
+    resting_hr: Optional[float] = None
+    hrv_morning: Optional[float] = None
+    sleep_hrs: Optional[float] = None
+    sleep_bedtime: Optional[time_type] = None
+    steps: Optional[int] = None
+    active_cal: Optional[int] = None
+    workout_type: Optional[str] = None
+    workout_duration_min: Optional[int] = None
+    energy_am: Optional[int] = None
+    prayer_am: Optional[bool] = None
+    prayer_pm: Optional[bool] = None
+    scripture: Optional[bool] = None
+    church: Optional[bool] = None
+    temple: Optional[bool] = None
+    meaningful_convos: Optional[int] = None
+    new_people: Optional[int] = None
+    deep_work_hrs: Optional[float] = None
+    ideas_count: Optional[int] = None
+    lc_solved: Optional[int] = None
+    github_commits: Optional[int] = None
+    github_prs: Optional[int] = None
+    life_sat: Optional[int] = None
+    notes: Optional[str] = None
+
+
+health_ingest_router = APIRouter(tags=["kpi"])
+
+
+def _verify_health_ingest_key(x_api_key: Optional[str] = Header(None)) -> None:
+    if x_api_key != os.getenv("HEALTH_INGEST_API_KEY"):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+@health_ingest_router.post("/health-ingest")
+async def health_ingest(
+    body: HealthIngestRequest,
+    _: None = Depends(_verify_health_ingest_key),
+):
+    target_date = body.date or date_type.today()
+    payload = body.model_dump(exclude={"date"})
+    fields_to_update = {k: v for k, v in payload.items() if v is not None and k in _ALLOWED_FIELDS}
+
+    async with _KPI_POOL.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO kpi_daily_log (date) VALUES ($1) ON CONFLICT (date) DO NOTHING",
+            target_date,
+        )
+        if fields_to_update:
+            cols = list(fields_to_update.keys())
+            vals = list(fields_to_update.values())
+            set_clause = ", ".join(f"{col} = ${i + 2}" for i, col in enumerate(cols))
+            await conn.execute(
+                f"UPDATE kpi_daily_log SET {set_clause} WHERE date = $1",
+                target_date,
+                *vals,
+            )
+
+    return {
+        "status": "ok",
+        "date": target_date.isoformat(),
+        "fields_updated": list(fields_to_update.keys()),
+    }
 
 
 def verify_kpi_key(x_kpi_api_key: Optional[str] = Header(None)):
