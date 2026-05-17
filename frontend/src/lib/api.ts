@@ -245,6 +245,18 @@ export interface TrackedLinkResponse {
   clicks: number
 }
 
+// ── Claude Usage Types ────────────────────────────────────────────────────
+
+export interface ClaudeDay { date: string; tokens: number; cost_cents: number; sessions: number }
+export interface ClaudeModel { name: string; tokens: number; cost_cents: number }
+export interface ClaudeProject { name: string; tokens: number; cost_cents: number }
+export interface ClaudeUsage {
+  days: ClaudeDay[]
+  models: ClaudeModel[]
+  projects: ClaudeProject[]
+  summary: { total_tokens: number; total_cost_cents: number; total_sessions: number; active_days: number; streak: number }
+}
+
 // ── GitHub Types ──────────────────────────────────────────────────────────
 
 export interface GitHubProfile {
@@ -384,6 +396,10 @@ export const api = {
     profile: () => request<GitHubProfile>('GET', '/github/profile'),
     repos: () => request<GitHubRepo[]>('GET', '/github/repos'),
     contributions: () => request<GitHubContributions>('GET', '/github/contributions'),
+  },
+
+  claude: {
+    usage: () => request<ClaudeUsage>('GET', '/claude/usage'),
   },
 
   storage: {
