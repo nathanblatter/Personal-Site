@@ -9,6 +9,8 @@
         <string>/usr/bin/rsync</string>
         <string>-az</string>
         <string>--delete</string>
+        <string>-e</string>
+        <string>ssh -i /Users/nathanblatter/.ssh/id_claude_sync</string>
         <string>/Users/nathanblatter/.claude/projects/</string>
         <string>nathanblatter@100.79.61.79:/Users/nathanblatter/.claude-laptop/projects/</string>
     </array>
