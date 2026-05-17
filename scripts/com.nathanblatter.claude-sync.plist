@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nathanblatter.claude-sync</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/rsync</string>
+        <string>-az</string>
+        <string>--delete</string>
+        <string>/Users/nathanblatter/.claude/projects/</string>
+        <string>nathanblatter@100.79.61.79:/Users/nathanblatter/.claude-laptop/projects/</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>3600</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/claude-sync.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/claude-sync.log</string>
+</dict>
+</plist>

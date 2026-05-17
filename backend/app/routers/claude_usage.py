@@ -7,7 +7,10 @@ from fastapi import APIRouter
 
 router = APIRouter(prefix="/claude", tags=["claude"])
 
-CLAUDE_DATA_DIR = os.getenv("CLAUDE_DATA_DIR", "/claude_data")
+# Comma-separated list of data dirs (falls back to single CLAUDE_DATA_DIR for compat)
+_dirs_env = os.getenv("CLAUDE_DATA_DIRS") or os.getenv("CLAUDE_DATA_DIR", "/claude_data")
+CLAUDE_DATA_DIRS = [Path(p.strip()) for p in _dirs_env.split(",") if p.strip()]
+
 CACHE_TTL = 600  # 10 minutes
 
 _cache: dict = {}
@@ -50,14 +53,14 @@ def _compute_usage() -> dict:
     if cache_key in _cache and now - _cache[cache_key]["ts"] < CACHE_TTL:
         return _cache[cache_key]["data"]
 
-    data_dir = Path(CLAUDE_DATA_DIR)
-
     # Aggregations
     days: dict[str, dict] = {}       # date -> {tokens, cost_cents, sessions: set}
     models: dict[str, dict] = {}     # model -> {tokens, cost_cents}
     projects: dict[str, dict] = {}   # project -> {tokens, cost_cents}
 
-    if data_dir.exists():
+    for data_dir in CLAUDE_DATA_DIRS:
+        if not data_dir.exists():
+            continue
         for jsonl_file in data_dir.rglob("*.jsonl"):
             # Skip memory subdirs
             if "memory" in jsonl_file.parts:

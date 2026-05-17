@@ -13,11 +13,13 @@ services:
       REDIS_URL: redis://host.docker.internal:6379
       MINIO_ENDPOINT: docker-services-minio-1:9000
       MINIO_BUCKET: portfolio
+      CLAUDE_DATA_DIRS: /claude_data_mini,/claude_data_laptop
     ports:
       - "8000:8000"
     volumes:
       - ../frontend/dist:/dist:ro
-      - /Users/nathanblatter/.claude/projects:/claude_data:ro
+      - /Users/nathanblatter/.claude/projects:/claude_data_mini:ro
+      - /Users/nathanblatter/.claude-laptop/projects:/claude_data_laptop:ro
     restart: unless-stopped
     networks:
       - portfolio
