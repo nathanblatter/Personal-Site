@@ -12,6 +12,13 @@ from app.routers import projects, skills, experience, about, contact, auth, blog
 from app.database import AsyncSessionLocal
 from app import models
 
+# Resolve static files directory: env var → frontend/dist/ at repo root
+STATIC_DIR = Path(
+    os.getenv("STATIC_DIR", str(Path(__file__).parent.parent.parent / "frontend" / "dist"))
+)
+
+DOMAIN = "https://nathanblatter.com"
+
 # index.html in-memory cache: {"content": str, "mtime": float}
 _index_cache: dict = {}
 
@@ -50,13 +57,6 @@ _STATIC_OG: dict[str, dict[str, str]] = {
 }
 
 _SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude"})
-
-# Resolve static files directory: env var → frontend/dist/ at repo root
-STATIC_DIR = Path(
-    os.getenv("STATIC_DIR", str(Path(__file__).parent.parent.parent / "frontend" / "dist"))
-)
-
-DOMAIN = "https://nathanblatter.com"
 
 # Known bot user-agent patterns for OG tag injection
 BOT_PATTERN = re.compile(
