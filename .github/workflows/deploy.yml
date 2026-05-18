@@ -11,6 +11,10 @@ jobs:
         run: |
           cd /Users/nathanblatter/Desktop/Personal-Site/backend
           git -C .. pull origin main
+          cd /Users/nathanblatter/Desktop/Personal-Site/frontend
+          npm ci
+          npm run build
+          cd /Users/nathanblatter/Desktop/Personal-Site/backend
           DOCKER_BUILDKIT=0 docker build --pull=false -t backend-api:latest .
           docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-recreate
           sleep 8
