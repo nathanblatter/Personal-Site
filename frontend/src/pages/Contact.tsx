@@ -16,6 +16,7 @@ export default function Contact() {
   useEffect(() => {
     Promise.all([api.socials.list(), api.contact.get()])
       .then(([s, m]) => { setSocials(s); setMeta(m) })
+      .catch(() => {})
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,7 +115,7 @@ export default function Contact() {
                 <h3 className="font-sans font-semibold text-ink text-xl mb-2">Message sent!</h3>
                 <p className="text-steel text-sm">Thanks for reaching out. I'll get back to you soon.</p>
                 <button
-                  onClick={() => { setSubmitted(false); setFormData({ name: '', email: '', message: '' }); setError(null); }}
+                  onClick={() => { setSubmitted(false); setFormData({ name: '', email: '', message: '', honeypot: '' }); setError(null); }}
                   className="mt-6 font-mono text-xs text-steel hover:text-blue transition-colors"
                 >
                   Send another message
