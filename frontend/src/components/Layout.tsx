@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, Sun, Moon } from 'lucide-react'
+import { useTheme } from '../lib/useTheme'
+import CookieBanner from './CookieBanner'
 
 const navLinks = [
   { to: '/', label: 'Home', code: '00' },
@@ -14,6 +16,7 @@ const navLinks = [
 export default function Layout() {
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { theme, toggle } = useTheme()
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -54,19 +57,39 @@ export default function Layout() {
             })}
           </div>
 
-          {/* Status indicator */}
-          <div className="hidden md:flex items-center gap-2.5">
-            <div className="w-2 h-2 rounded-full bg-teal animate-pulse" />
-            <span className="font-mono text-xs text-steel">Available for work</span>
+          <div className="hidden md:flex items-center gap-3">
+            {/* Status indicator */}
+            <div className="flex items-center gap-2.5">
+              <div className="w-2 h-2 rounded-full bg-teal animate-pulse" />
+              <span className="font-mono text-xs text-steel">Available for work</span>
+            </div>
+
+            {/* Theme toggle */}
+            <button
+              onClick={toggle}
+              className="p-2 rounded-lg text-steel hover:text-ink hover:bg-cloud transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
           </div>
 
-          {/* Mobile toggle */}
-          <button
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden text-ink p-2"
-          >
-            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+          {/* Mobile controls */}
+          <div className="md:hidden flex items-center gap-2">
+            <button
+              onClick={toggle}
+              className="p-2 rounded-lg text-steel hover:text-ink transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="text-ink p-2"
+            >
+              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -139,12 +162,20 @@ export default function Layout() {
                 {link.label}
               </Link>
             ))}
+            <Link
+              to="/privacy"
+              className="font-mono text-xs text-steel hover:text-blue transition-colors"
+            >
+              Privacy
+            </Link>
           </div>
           <div className="font-mono text-xs text-silver">
             Built with React + Tailwind
           </div>
         </div>
       </footer>
+
+      <CookieBanner />
     </div>
   )
 }
