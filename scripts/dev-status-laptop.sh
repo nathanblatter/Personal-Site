@@ -10,14 +10,20 @@ if [ -z "$DEV_STATUS_API_KEY" ]; then
   exit 1
 fi
 
-# Screen is locked/sleeping if ScreenSaverEngine is running
-if pgrep -x "ScreenSaverEngine" > /dev/null 2>&1; then
-  active=false
-  type="none"
-else
-  active=true
-  type="laptop"
-fi
+# Active if a coding app was in the foreground in the last 60s
+# Uses osascript to get the frontmost app name
+frontmost=$(osascript -e 'tell application "System Events" to get name of first process where it is frontmost' 2>/dev/null)
+
+case "$frontmost" in
+  Terminal|iTerm2|iTerm|Cursor|"Code"|"Visual Studio Code"|Warp|Alacritty|Ghostty)
+    active=true
+    type="laptop"
+    ;;
+  *)
+    active=false
+    type="none"
+    ;;
+esac
 
 payload="{\"active\": $active, \"type\": \"$type\", \"source\": \"laptop\"}"
 
