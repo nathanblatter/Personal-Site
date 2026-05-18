@@ -23,7 +23,6 @@ class DevStatusPayload(BaseModel):
 @router.post("/dev", status_code=204)
 def update_dev_status(
     payload: DevStatusPayload,
-    _: None = Header(None, alias="x-api-key"),
     x_api_key: Optional[str] = Header(None),
 ):
     _verify_dev_status_key(x_api_key)
