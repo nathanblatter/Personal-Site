@@ -35,7 +35,7 @@ else
   active=false
 fi
 
-payload="{\"active\": $active, \"type\": \"$type\"}"
+payload="{\"active\": $active, \"type\": \"$type\", \"source\": \"mini\"}"
 
 http_code=$(curl -s -o /dev/null -w "%{http_code}" \
   -X POST "$API_URL" \

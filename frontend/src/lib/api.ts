@@ -278,7 +278,7 @@ export interface AboutPageResponse {
 
 export interface DevStatusResponse {
   dev_active: boolean
-  dev_type: 'ssh' | 'vnc' | 'both' | 'none'
+  dev_type: 'ssh' | 'vnc' | 'both' | 'laptop' | 'none'
   stale: boolean
 }
 
