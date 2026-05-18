@@ -21,6 +21,7 @@ function devTypeLabel(type: DevStatusResponse['dev_type']): string {
   if (type === 'ssh') return 'SSH session active'
   if (type === 'vnc') return 'Screen Sharing active'
   if (type === 'both') return 'SSH + Screen Sharing'
+  if (type === 'laptop') return 'On laptop'
   return ''
 }
 
