@@ -169,9 +169,6 @@ export default function Layout() {
               Privacy
             </Link>
           </div>
-          <div className="font-mono text-xs text-silver">
-            Built with React + Tailwind
-          </div>
         </div>
       </footer>
 
