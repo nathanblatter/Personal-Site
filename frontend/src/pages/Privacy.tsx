@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 export default function Privacy() {
   return (
     <section className="py-16 md:py-24 min-h-screen">
@@ -140,10 +142,11 @@ export default function Privacy() {
           <section className="space-y-3">
             <h2 className="font-sans font-semibold text-ink text-xl">Contact</h2>
             <p>
-              Questions about this policy:{' '}
-              <a href="mailto:nzb22@byu.edu" className="text-blue hover:underline">
-                nzb22@byu.edu
-              </a>
+              Questions about this policy?{' '}
+              <Link to="/contact" className="text-blue hover:underline">
+                Get in touch
+              </Link>
+              .
             </p>
           </section>
 
