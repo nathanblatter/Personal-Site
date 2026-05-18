@@ -7,6 +7,7 @@ import ProjectCard from '../components/ProjectCard'
 import SkillBar from '../components/SkillBar'
 import TimelineItem from '../components/TimelineItem'
 import GitHubSection from '../components/GitHubSection'
+import Skeleton from '../components/Skeleton'
 import { api, type ProjectResponse, type SkillResponse, type ExperienceResponse, type AboutResponse } from '../lib/api'
 
 export default function Home() {
@@ -14,11 +15,12 @@ export default function Home() {
   const [skills, setSkills] = useState<SkillResponse[]>([])
   const [experience, setExperience] = useState<ExperienceResponse[]>([])
   const [about, setAbout] = useState<AboutResponse | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     api.home.get().then(({ projects: p, skills: s, experience: e, about: a }) => {
       setProjects(p); setSkills(s); setExperience(e); setAbout(a)
-    })
+    }).finally(() => setLoading(false))
   }, [])
 
   const featuredProjects = projects.slice(0, 3)
@@ -123,9 +125,28 @@ export default function Home() {
             subtitle="Selected work from research, coursework, and real-world clients."
           />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-7">
-            {featuredProjects.map((project, i) => (
-              <ProjectCard key={project.id} project={project} index={i} />
-            ))}
+            {loading
+              ? Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="rounded-xl border border-mist bg-white overflow-hidden">
+                    <Skeleton className="h-1.5 w-full rounded-none" />
+                    <div className="p-7 space-y-4">
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-3 w-5/6" />
+                      <Skeleton className="h-3 w-2/3" />
+                      <div className="flex gap-2 pt-2">
+                        <Skeleton className="h-6 w-14 rounded-full" />
+                        <Skeleton className="h-6 w-14 rounded-full" />
+                        <Skeleton className="h-6 w-14 rounded-full" />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              : featuredProjects.map((project, i) => (
+                  <ProjectCard key={project.id} project={project} index={i} />
+                ))
+            }
           </div>
           <motion.div
             initial={{ opacity: 0 }}
@@ -153,9 +174,17 @@ export default function Home() {
             subtitle="Languages, frameworks, and tools I work with."
           />
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {skills.map((skill, i) => (
-              <SkillBar key={skill.id} {...skill} index={i} />
-            ))}
+            {loading
+              ? Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="px-4 py-3 rounded-xl border border-mist bg-snow space-y-2">
+                    <Skeleton className="h-2 w-12" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                ))
+              : skills.map((skill, i) => (
+                  <SkillBar key={skill.id} {...skill} index={i} />
+                ))
+            }
           </div>
         </div>
       </section>
@@ -181,9 +210,22 @@ export default function Home() {
             subtitle="Education and experience so far."
           />
           <div>
-            {experience.filter(e => e.active).map((item, i) => (
-              <TimelineItem key={item.id} {...item} index={i} />
-            ))}
+            {loading
+              ? Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="relative pl-10 md:pl-14 pb-14 last:pb-0">
+                    <div className="absolute left-0 top-0 bottom-0 w-px bg-mist" />
+                    <div className="absolute left-0 top-2 w-3 h-3 rounded-full -translate-x-1/2 border-2 bg-white border-silver" />
+                    <Skeleton className="h-3 w-16 mb-3" />
+                    <Skeleton className="h-5 w-48 mb-2" />
+                    <Skeleton className="h-3 w-32 mb-4" />
+                    <Skeleton className="h-3 w-full mb-1" />
+                    <Skeleton className="h-3 w-5/6" />
+                  </div>
+                ))
+              : experience.filter(e => e.active).map((item, i) => (
+                  <TimelineItem key={item.id} {...item} index={i} />
+                ))
+            }
           </div>
         </div>
       </section>

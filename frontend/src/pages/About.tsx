@@ -4,6 +4,7 @@ import SectionHeader from '../components/SectionHeader'
 import TimelineItem from '../components/TimelineItem'
 import GitHubSection from '../components/GitHubSection'
 import ClaudeSection from '../components/ClaudeSection'
+import Skeleton from '../components/Skeleton'
 import { Quote } from 'lucide-react'
 import { api, type AboutResponse, type InterestResponse, type CourseworkResponse, type ExperienceResponse, type TestimonialResponse } from '../lib/api'
 import { getIcon } from '../lib/iconMap'
@@ -14,21 +15,16 @@ export default function About() {
   const [coursework, setCoursework] = useState<CourseworkResponse[]>([])
   const [experience, setExperience] = useState<ExperienceResponse[]>([])
   const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
-      api.about.get(),
-      api.interests.list(),
-      api.coursework.list(),
-      api.experience.list(),
-      api.testimonials.list(),
-    ]).then(([ab, intr, cw, ex, test]) => {
+    api.aboutPage.get().then(({ about: ab, interests: intr, coursework: cw, experience: ex, testimonials: test }) => {
       setAbout(ab)
       setInterests(intr)
       setCoursework(cw)
       setExperience(ex)
       setTestimonials(test)
-    })
+    }).finally(() => setLoading(false))
   }, [])
 
   return (
@@ -45,6 +41,27 @@ export default function About() {
               transition={{ delay: 0.3 }}
               className="md:col-span-3 space-y-6"
             >
+              {loading ? (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-5/6" />
+                  </div>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-4/5" />
+                  </div>
+                  <div className="pt-6 grid grid-cols-2 gap-3 md:gap-4">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-3 p-3 md:p-4 rounded-xl border border-mist bg-snow">
+                        <Skeleton className="h-4 w-4 shrink-0" />
+                        <Skeleton className="h-3 w-28" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {about?.bio_paragraphs[0] && (
                 <p className="text-base md:text-lg text-ink leading-relaxed">
                   {about.bio_paragraphs[0]}
@@ -92,7 +109,7 @@ export default function About() {
                 <picture>
                   {!about?.headshot_url && <source srcSet="/headshot.webp" type="image/webp" />}
                   <img
-                    src={about?.headshot_url ?? '/headshot.jpg'}
+                    src={about?.headshot_url ?? '/headshot.webp'}
                     alt="Nathan Blatter"
                     width={800}
                     height={1200}
@@ -165,6 +182,16 @@ export default function About() {
             subtitle="Areas I'm most passionate about."
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-5">
+            {loading
+              ? Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="p-5 md:p-6 rounded-xl border border-mist bg-white space-y-3">
+                    <Skeleton className="h-5 w-5" />
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-4/5" />
+                  </div>
+                ))
+              : null}
             {interests.map((item, i) => {
               const Icon = getIcon(item.icon)
               return (
@@ -195,6 +222,11 @@ export default function About() {
             subtitle="Key courses shaping my technical foundation at BYU."
           />
           <div className="flex flex-wrap justify-center gap-3">
+            {loading
+              ? Array.from({ length: 10 }).map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-28 rounded-xl" />
+                ))
+              : null}
             {coursework.map((course, i) => (
               <motion.span
                 key={course.id}

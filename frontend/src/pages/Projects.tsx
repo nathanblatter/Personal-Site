@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import SectionHeader from '../components/SectionHeader'
 import ProjectCard from '../components/ProjectCard'
 import ProjectModal from '../components/ProjectModal'
+import Skeleton from '../components/Skeleton'
 import { api, type ProjectResponse } from '../lib/api'
 import type { Project } from '../components/ProjectCard'
 
@@ -12,9 +13,10 @@ export default function Projects() {
   const [allProjects, setAllProjects] = useState<ProjectResponse[]>([])
   const [filter, setFilter] = useState('All')
   const [selected, setSelected] = useState<Project | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.projects.list().then(setAllProjects)
+    api.projects.list().then(setAllProjects).finally(() => setLoading(false))
   }, [])
 
   const filtered =
@@ -58,12 +60,31 @@ export default function Projects() {
         </motion.div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-7">
-          {filtered.map((project, i) => (
-            <ProjectCard key={project.id} project={project} index={i} onSelect={setSelected} />
-          ))}
+          {loading
+            ? Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="rounded-xl border border-mist bg-white overflow-hidden">
+                  <Skeleton className="h-1.5 w-full rounded-none" />
+                  <div className="p-7 space-y-4">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-5/6" />
+                    <Skeleton className="h-3 w-2/3" />
+                    <div className="flex gap-2 pt-2">
+                      <Skeleton className="h-6 w-14 rounded-full" />
+                      <Skeleton className="h-6 w-14 rounded-full" />
+                      <Skeleton className="h-6 w-14 rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              ))
+            : filtered.map((project, i) => (
+                <ProjectCard key={project.id} project={project} index={i} onSelect={setSelected} />
+              ))
+          }
         </div>
 
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <div className="text-center py-24">
             <p className="font-mono text-sm text-steel">No projects in this category yet.</p>
           </div>

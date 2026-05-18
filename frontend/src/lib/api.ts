@@ -1,13 +1,11 @@
 const API_BASE = '/api/v1'
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const opts: RequestInit = { method }
+  const opts: RequestInit = { method, credentials: 'include' }
   if (body !== undefined) {
     opts.headers = { 'Content-Type': 'application/json' }
     opts.body = JSON.stringify(body)
   }
-  const token = localStorage.getItem('admin_token')
-  if (token) opts.headers = { ...opts.headers, Authorization: `Bearer ${token}` }
   const res = await fetch(`${API_BASE}${path}`, opts)
   if (!res.ok) throw new Error(`${method} ${path} → ${res.status}`)
   if (res.status === 204) return undefined as T
@@ -266,6 +264,16 @@ export interface HomeResponse {
   about: AboutResponse
 }
 
+// ── About Page Types ──────────────────────────────────────────────────────────
+
+export interface AboutPageResponse {
+  about: AboutResponse
+  interests: InterestResponse[]
+  coursework: CourseworkResponse[]
+  experience: ExperienceResponse[]
+  testimonials: TestimonialResponse[]
+}
+
 // ── GitHub Types ──────────────────────────────────────────────────────────
 
 export interface GitHubProfile {
@@ -389,7 +397,13 @@ export const api = {
 
   auth: {
     login: (username: string, password: string) =>
-      request<{ access_token: string }>('POST', '/auth/login', { username, password }),
+      request<void>('POST', '/auth/login', { username, password }),
+    logout: () => request<void>('POST', '/auth/logout'),
+    verify: () => request<void>('GET', '/auth/verify'),
+  },
+
+  aboutPage: {
+    get: () => request<AboutPageResponse>('GET', '/about-page'),
   },
 
   links: {

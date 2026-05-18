@@ -8,12 +8,48 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from sqlalchemy import select
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page
 from app.database import AsyncSessionLocal
 from app import models
 
 # index.html in-memory cache: {"content": str, "mtime": float}
 _index_cache: dict = {}
+
+# Per-route OG metadata for social crawler injection
+_STATIC_OG: dict[str, dict[str, str]] = {
+    "": {
+        "title": "Nathan Blatter — Portfolio",
+        "description": "IS student at BYU building full-stack applications, AI systems, and research tools.",
+        "url": f"{DOMAIN}/",
+    },
+    "about": {
+        "title": "About — Nathan Blatter",
+        "description": "Information Systems student at BYU. Full-stack engineer, AI developer, and data analyst.",
+        "url": f"{DOMAIN}/about",
+    },
+    "projects": {
+        "title": "Projects — Nathan Blatter",
+        "description": "Selected work from research, coursework, and real-world clients.",
+        "url": f"{DOMAIN}/projects",
+    },
+    "contact": {
+        "title": "Contact — Nathan Blatter",
+        "description": "Open to internships, collaborations, and interesting projects.",
+        "url": f"{DOMAIN}/contact",
+    },
+    "resume": {
+        "title": "Résumé — Nathan Blatter",
+        "description": "Full-stack engineer skilled in Python, React, SQL, and AI systems.",
+        "url": f"{DOMAIN}/resume",
+    },
+    "blog": {
+        "title": "Blog — Nathan Blatter",
+        "description": "Technical writing on software engineering, AI, and data systems.",
+        "url": f"{DOMAIN}/blog",
+    },
+}
+
+_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude"})
 
 # Resolve static files directory: env var → frontend/dist/ at repo root
 STATIC_DIR = Path(
@@ -51,6 +87,36 @@ async def lifespan(app: FastAPI):
     await kpi.close_kpi_db()
 
 
+def _static_og_html(route: str, index_html: str) -> str | None:
+    og = _STATIC_OG.get(route)
+    if og is None:
+        return None
+    title = escape(og["title"])
+    desc = escape(og["description"])
+    url = og["url"]
+    image = f"{DOMAIN}/headshot.webp"
+    og_tags = (
+        f'<meta property="og:title" content="{title}" />\n'
+        f'    <meta property="og:description" content="{desc}" />\n'
+        f'    <meta property="og:image" content="{image}" />\n'
+        f'    <meta property="og:url" content="{url}" />\n'
+        f'    <meta property="og:type" content="website" />\n'
+        f'    <meta name="twitter:card" content="summary_large_image" />\n'
+        f'    <meta name="twitter:title" content="{title}" />\n'
+        f'    <meta name="twitter:description" content="{desc}" />\n'
+        f'    <meta name="twitter:image" content="{image}" />\n'
+        f'    <title>{title}</title>'
+    )
+    html = re.sub(r'<title>[^<]*</title>', '', index_html, count=1)
+    html = re.sub(
+        r'<!-- Open Graph -->.*?<!-- Twitter Card -->.*?<meta name="twitter:image"[^>]*/>',
+        og_tags,
+        html,
+        flags=re.DOTALL,
+    )
+    return html
+
+
 app = FastAPI(
     title="Portfolio API",
     docs_url="/api/docs",
@@ -66,6 +132,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_public_cache_control(request: Request, call_next):
+    response = await call_next(request)
+    if (
+        request.method == "GET"
+        and request.url.path.startswith("/api/v1/")
+        and response.status_code == 200
+        and not any(seg in request.url.path for seg in _SKIP_CACHE)
+    ):
+        response.headers.setdefault("Cache-Control", "public, max-age=60")
+    return response
 
 API_PREFIX = "/api/v1"
 app.include_router(auth.router, prefix=API_PREFIX)
@@ -85,6 +164,7 @@ app.include_router(kpi.router, prefix=API_PREFIX)
 app.include_router(kpi.health_ingest_router, prefix="/api")
 app.include_router(claude_usage.router, prefix=API_PREFIX)
 app.include_router(home.router, prefix=API_PREFIX)
+app.include_router(about_page.router, prefix=API_PREFIX)
 
 
 async def _blog_og_html(slug: str, index_html: str) -> str | None:
@@ -146,15 +226,19 @@ async def serve_spa(full_path: str = "", request: Request = None):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         return response
 
-    # For blog post URLs from social crawlers, inject per-post OG tags
-    if request and full_path.startswith("blog/"):
-        ua = request.headers.get("user-agent", "")
-        if BOT_PATTERN.search(ua):
-            slug = full_path.removeprefix("blog/").rstrip("/")
+    # For social crawlers, inject per-route OG tags
+    if request and BOT_PATTERN.search(request.headers.get("user-agent", "")):
+        route = full_path.rstrip("/")
+        if route.startswith("blog/"):
+            slug = route.removeprefix("blog/")
             if slug:
                 modified = await _blog_og_html(slug, index_html)
                 if modified:
                     return HTMLResponse(modified)
+        else:
+            modified = _static_og_html(route, index_html)
+            if modified:
+                return HTMLResponse(modified)
 
     # All other paths → SPA entry point
     return FileResponse(str(STATIC_DIR / "index.html"))
