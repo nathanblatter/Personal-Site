@@ -9,12 +9,12 @@ if [ -z "$DEV_STATUS_API_KEY" ]; then
   exit 1
 fi
 
-# Count non-console SSH sessions (each active login shows up in `who`)
-ssh_count=$(who 2>/dev/null | grep -vE "console" | wc -l | tr -d ' ')
+# SSH: remote sessions appear as pts/* with a remote IP in parentheses
+ssh_count=$(who 2>/dev/null | awk '$2 ~ /^pts\// && $NF ~ /\(.*[0-9].*\)/' | wc -l | tr -d ' ')
 
-# Count established VNC/Screen Sharing connections on port 5900
-vnc_count=$(lsof -i :5900 2>/dev/null | grep -c "ESTABLISHED" 2>/dev/null; true)
-vnc_count="${vnc_count:-0}"
+# VNC/Screen Sharing: ScreensharingAgent only exists during an active session
+vnc_count=0
+pgrep -x ScreensharingAgent > /dev/null 2>&1 && vnc_count=1
 
 has_ssh=false
 has_vnc=false

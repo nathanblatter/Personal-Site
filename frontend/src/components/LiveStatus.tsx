@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Clock, GitCommit } from 'lucide-react'
-import { api, type DevStatusResponse, type GitHubRepo, type GitHubContributions } from '../lib/api'
+import { api, type DevStatusResponse, type GitHubRepo } from '../lib/api'
 
 function relativeTime(dateStr: string): string {
   const diffMs = Date.now() - new Date(dateStr).getTime()
@@ -42,7 +42,7 @@ export default function LiveStatus() {
         if (repos && repos.length > 0) {
           const latest = repos.reduce<GitHubRepo>((best, r) =>
             new Date(r.updated_at) > new Date(best.updated_at) ? r : best
-          )
+          , repos[0])
           setLastPush(latest.updated_at)
         }
         if (contributions) setStreak(contributions.streak)
