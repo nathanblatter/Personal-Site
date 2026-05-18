@@ -24,6 +24,21 @@
   --color-violet: #7c5cf5;
 }
 
+/* ── Dark mode overrides ─────────────────────────────────────────────────── */
+html.dark {
+  background-color: #0d1117;
+
+  --color-white: #161b22;
+  --color-snow: #0d1117;
+  --color-cloud: #1c2128;
+  --color-mist: #30363d;
+  --color-silver: #484f58;
+  --color-steel: #8b949e;
+  --color-slate: #b1bac4;
+  --color-ink: #e6edf3;
+  --color-blue-wash: #162032;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;

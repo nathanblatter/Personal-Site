@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import NotFound from './pages/NotFound'
+const Privacy = lazy(() => import('./pages/Privacy'))
 
 const Projects = lazy(() => import('./pages/Projects'))
 const About = lazy(() => import('./pages/About'))
@@ -33,6 +34,7 @@ function App() {
           <Route path="/resume" element={<Suspense fallback={null}><Resume /></Suspense>} />
           <Route path="/blog" element={<Suspense fallback={null}><Blog /></Suspense>} />
           <Route path="/blog/:slug" element={<Suspense fallback={null}><BlogPost /></Suspense>} />
+          <Route path="/privacy" element={<Suspense fallback={null}><Privacy /></Suspense>} />
           <Route path="*" element={<NotFound />} />
         </Route>
         <Route path="/admin" element={<Suspense fallback={null}><Admin /></Suspense>} />
