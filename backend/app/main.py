@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 from contextlib import asynccontextmanager
@@ -79,8 +80,8 @@ def _read_index_html() -> str | None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await kpi.init_kpi_db()
-    # Pre-warm GitHub cache so the first visitor doesn't trigger blocking fetches
-    await github.warmup()
+    # Warm GitHub cache in the background so it doesn't delay startup
+    asyncio.create_task(github.warmup())
     # Prime index.html cache
     _read_index_html()
     yield
