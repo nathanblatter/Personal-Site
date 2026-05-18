@@ -257,6 +257,15 @@ export interface ClaudeUsage {
   summary: { total_tokens: number; total_cost_cents: number; total_sessions: number; active_days: number; streak: number }
 }
 
+// ── Home Types ────────────────────────────────────────────────────────────────
+
+export interface HomeResponse {
+  projects: ProjectResponse[]
+  skills: SkillResponse[]
+  experience: ExperienceResponse[]
+  about: AboutResponse
+}
+
 // ── GitHub Types ──────────────────────────────────────────────────────────
 
 export interface GitHubProfile {
@@ -390,6 +399,10 @@ export const api = {
     update: (id: number, data: Partial<Omit<TrackedLinkResponse, 'id' | 'clicks'>>) =>
       request<TrackedLinkResponse>('PUT', `/links/${id}`, data),
     delete: (id: number) => request<void>('DELETE', `/links/${id}`),
+  },
+
+  home: {
+    get: () => request<HomeResponse>('GET', '/home'),
   },
 
   github: {

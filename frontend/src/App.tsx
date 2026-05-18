@@ -3,14 +3,14 @@ import { Routes, Route, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import Layout from './components/Layout'
 import Home from './pages/Home'
-import Projects from './pages/Projects'
-import About from './pages/About'
-import Contact from './pages/Contact'
-import Blog from './pages/Blog'
-const BlogPost = lazy(() => import('./pages/BlogPost'))
-import Resume from './pages/Resume'
 import NotFound from './pages/NotFound'
 
+const Projects = lazy(() => import('./pages/Projects'))
+const About = lazy(() => import('./pages/About'))
+const Contact = lazy(() => import('./pages/Contact'))
+const Blog = lazy(() => import('./pages/Blog'))
+const BlogPost = lazy(() => import('./pages/BlogPost'))
+const Resume = lazy(() => import('./pages/Resume'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Login = lazy(() => import('./pages/Login'))
 
@@ -27,11 +27,11 @@ function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/resume" element={<Resume />} />
-          <Route path="/blog" element={<Blog />} />
+          <Route path="/projects" element={<Suspense fallback={null}><Projects /></Suspense>} />
+          <Route path="/about" element={<Suspense fallback={null}><About /></Suspense>} />
+          <Route path="/contact" element={<Suspense fallback={null}><Contact /></Suspense>} />
+          <Route path="/resume" element={<Suspense fallback={null}><Resume /></Suspense>} />
+          <Route path="/blog" element={<Suspense fallback={null}><Blog /></Suspense>} />
           <Route path="/blog/:slug" element={<Suspense fallback={null}><BlogPost /></Suspense>} />
           <Route path="*" element={<NotFound />} />
         </Route>
