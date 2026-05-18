@@ -21,7 +21,7 @@ class DevStatusPayload(BaseModel):
 
 
 @router.post("/dev", status_code=204)
-def update_dev_status(
+async def update_dev_status(
     payload: DevStatusPayload,
     x_api_key: Optional[str] = Header(None),
 ):
@@ -33,7 +33,7 @@ def update_dev_status(
 
 
 @router.get("")
-def get_status():
+async def get_status():
     last = _dev_status["last_ping"]
     stale = last is None or (time.monotonic() - last) > STALE_AFTER
     return {
