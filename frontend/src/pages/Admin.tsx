@@ -304,8 +304,7 @@ export default function Admin() {
 
   // ── Initial data load ────────────────────────────────────────────────────
   useEffect(() => {
-    const token = localStorage.getItem('admin_token')
-    if (!token) { navigate('/admin/login'); return }
+    api.auth.verify().catch(() => { navigate('/admin/login'); return })
 
     Promise.all([
       api.projects.list(),
@@ -2587,7 +2586,7 @@ export default function Admin() {
             <Eye size={14} /> View Live Site
           </a>
           <button
-            onClick={() => { localStorage.removeItem('admin_token'); navigate('/admin/login') }}
+            onClick={() => api.auth.logout().then(() => navigate('/admin/login'))}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm text-steel hover:text-ember hover:bg-ember/5 transition-all"
           >
             <LogOut size={14} /> Logout
