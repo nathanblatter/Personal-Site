@@ -89,24 +89,31 @@ export default function About() {
               className="md:col-span-2"
             >
               <div className="aspect-[3/4] rounded-2xl border border-mist bg-cloud overflow-hidden relative">
-                <img
-                  src={about?.headshot_url ?? '/headshot.jpg'}
-                  alt="Nathan Blatter"
-                  className="w-full h-full object-cover object-top"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.style.display = 'none'
-                    target.parentElement!.innerHTML = `
-                      <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue/5 to-violet/5">
-                        <div class="text-center">
-                          <div class="w-20 h-20 rounded-full bg-white border-2 border-mist mx-auto mb-4 flex items-center justify-center shadow-sm">
-                            <span style="font-family: var(--font-serif); font-size: 2rem; font-style: italic; color: var(--color-blue);">N</span>
+                <picture>
+                  {!about?.headshot_url && <source srcSet="/headshot.webp" type="image/webp" />}
+                  <img
+                    src={about?.headshot_url ?? '/headshot.jpg'}
+                    alt="Nathan Blatter"
+                    width={800}
+                    height={1200}
+                    loading="eager"
+                    decoding="async"
+                    className="w-full h-full object-cover object-top"
+                      onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.style.display = 'none'
+                      target.parentElement!.innerHTML = `
+                        <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue/5 to-violet/5">
+                          <div class="text-center">
+                            <div class="w-20 h-20 rounded-full bg-white border-2 border-mist mx-auto mb-4 flex items-center justify-center shadow-sm">
+                              <span style="font-family: var(--font-serif); font-size: 2rem; font-style: italic; color: var(--color-blue);">N</span>
+                            </div>
+                            <p style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-steel);">Photo coming soon</p>
                           </div>
-                          <p style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-steel);">Photo coming soon</p>
-                        </div>
-                      </div>`
-                  }}
-                />
+                        </div>`
+                    }}
+                  />
+                </picture>
               </div>
             </motion.div>
           </div>

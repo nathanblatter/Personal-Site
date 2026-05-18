@@ -16,8 +16,9 @@ export default function Home() {
   const [about, setAbout] = useState<AboutResponse | null>(null)
 
   useEffect(() => {
-    Promise.all([api.projects.list(), api.skills.list(), api.experience.list(), api.about.get()])
-      .then(([p, s, e, a]) => { setProjects(p); setSkills(s); setExperience(e); setAbout(a) })
+    api.home.get().then(({ projects: p, skills: s, experience: e, about: a }) => {
+      setProjects(p); setSkills(s); setExperience(e); setAbout(a)
+    })
   }, [])
 
   const featuredProjects = projects.slice(0, 3)

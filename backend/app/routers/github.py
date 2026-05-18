@@ -1,9 +1,10 @@
+import asyncio
 import os
 import re
 import time
-from urllib.request import urlopen, Request
+
+import httpx
 from fastapi import APIRouter
-import json as _json
 
 router = APIRouter(prefix="/github", tags=["github"])
 
@@ -12,25 +13,49 @@ GITHUB_ORG = os.getenv("GITHUB_ORG", "nathanblatter")
 CACHE_TTL = 3600  # 1 hour
 
 _cache: dict = {}
+_client = httpx.AsyncClient(
+    headers={"User-Agent": "PortfolioSite/1.0"},
+    timeout=10.0,
+)
 
 
-def _fetch_cached(key: str, url: str, headers: dict | None = None, ttl: int = CACHE_TTL):
+async def _fetch_cached(key: str, url: str, ttl: int = CACHE_TTL) -> str:
     now = time.time()
     if key in _cache and now - _cache[key]["ts"] < ttl:
         return _cache[key]["data"]
 
-    req = Request(url, headers=headers or {"User-Agent": "PortfolioSite/1.0"})
-    with urlopen(req, timeout=10) as resp:
-        data = resp.read().decode()
+    resp = await _client.get(url)
+    resp.raise_for_status()
+    data = resp.text
 
     _cache[key] = {"data": data, "ts": now}
     return data
 
 
+async def warmup():
+    """Pre-warm all GitHub cache entries at startup."""
+    try:
+        await asyncio.gather(
+            _fetch_cached("profile", f"https://api.github.com/users/{GITHUB_USERNAME}"),
+            _fetch_cached("repos", f"https://api.github.com/orgs/{GITHUB_ORG}/repos?sort=pushed&per_page=100"),
+            _fetch_cached("contributions", f"https://github.com/users/{GITHUB_USERNAME}/contributions"),
+            *[
+                _fetch_cached(
+                    f"events_p{page}",
+                    f"https://api.github.com/users/{GITHUB_USERNAME}/events?per_page=100&page={page}",
+                )
+                for page in range(1, 4)
+            ],
+        )
+    except Exception:
+        pass  # warmup failure is non-fatal; cache will fill on first request
+
+
 @router.get("/profile")
-def github_profile():
-    raw = _fetch_cached("profile", f"https://api.github.com/users/{GITHUB_USERNAME}")
-    d = _json.loads(raw)
+async def github_profile():
+    raw = await _fetch_cached("profile", f"https://api.github.com/users/{GITHUB_USERNAME}")
+    import json
+    d = json.loads(raw)
     return {
         "username": d["login"],
         "name": d.get("name"),
@@ -43,12 +68,13 @@ def github_profile():
 
 
 @router.get("/repos")
-def github_repos():
-    raw = _fetch_cached(
+async def github_repos():
+    import json
+    raw = await _fetch_cached(
         "repos",
         f"https://api.github.com/orgs/{GITHUB_ORG}/repos?sort=pushed&per_page=100",
     )
-    repos = _json.loads(raw)
+    repos = json.loads(raw)
     return [
         {
             "name": r["name"],
@@ -67,8 +93,10 @@ def github_repos():
 
 
 @router.get("/contributions")
-def github_contributions():
-    html = _fetch_cached(
+async def github_contributions():
+    import json
+
+    html = await _fetch_cached(
         "contributions",
         f"https://github.com/users/{GITHUB_USERNAME}/contributions",
     )
@@ -83,7 +111,6 @@ def github_contributions():
     # so the frontend can chunk by 7 for each week column.
     num_weeks = len(raw_days) // 7
     remainder = len(raw_days) % 7
-    # Build rows: rows[0] = all Sundays, rows[1] = all Mondays, ...
     rows: list[list[tuple[str, str]]] = []
     offset = 0
     for r in range(7):
@@ -91,7 +118,6 @@ def github_contributions():
         rows.append(raw_days[offset : offset + row_len])
         offset += row_len
 
-    # Transpose: iterate by column (week), then by row (day-of-week)
     days: list[tuple[str, str]] = []
     max_cols = max(len(row) for row in rows)
     for col in range(max_cols):
@@ -107,30 +133,35 @@ def github_contributions():
         elif streak > 0:
             break
 
-    # Fetch recent push events to map dates -> repos worked on
-    activity: dict[str, list[dict]] = {}
-    for page in range(1, 4):
-        try:
-            raw_events = _fetch_cached(
+    # Fetch all 3 event pages in parallel
+    pages_raw = await asyncio.gather(
+        *[
+            _fetch_cached(
                 f"events_p{page}",
                 f"https://api.github.com/users/{GITHUB_USERNAME}/events?per_page=100&page={page}",
-                ttl=CACHE_TTL,
             )
-            events = _json.loads(raw_events)
-            if not events:
-                break
-            for ev in events:
-                if ev["type"] != "PushEvent":
-                    continue
-                date = ev["created_at"][:10]
-                repo_name = ev["repo"]["name"].split("/")[-1]
-                repo_url = f"https://github.com/{ev['repo']['name']}"
-                if date not in activity:
-                    activity[date] = []
-                if not any(r["name"] == repo_name for r in activity[date]):
-                    activity[date].append({"name": repo_name, "url": repo_url})
-        except Exception:
+            for page in range(1, 4)
+        ],
+        return_exceptions=True,
+    )
+
+    activity: dict[str, list[dict]] = {}
+    for raw_events in pages_raw:
+        if isinstance(raw_events, Exception):
+            continue
+        events = json.loads(raw_events)
+        if not events:
             break
+        for ev in events:
+            if ev["type"] != "PushEvent":
+                continue
+            date = ev["created_at"][:10]
+            repo_name = ev["repo"]["name"].split("/")[-1]
+            repo_url = f"https://github.com/{ev['repo']['name']}"
+            if date not in activity:
+                activity[date] = []
+            if not any(r["name"] == repo_name for r in activity[date]):
+                activity[date].append({"name": repo_name, "url": repo_url})
 
     return {
         "total": total,

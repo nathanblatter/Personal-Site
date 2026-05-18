@@ -8,9 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from sqlalchemy import select
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home
 from app.database import AsyncSessionLocal
 from app import models
+
+# index.html in-memory cache: {"content": str, "mtime": float}
+_index_cache: dict = {}
 
 # Resolve static files directory: env var → frontend/dist/ at repo root
 STATIC_DIR = Path(
@@ -25,9 +28,25 @@ BOT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+def _read_index_html() -> str | None:
+    """Return index.html contents, re-reading from disk only when the file has changed."""
+    index_path = STATIC_DIR / "index.html"
+    if not index_path.is_file():
+        return None
+    mtime = index_path.stat().st_mtime
+    if _index_cache.get("mtime") != mtime:
+        _index_cache["content"] = index_path.read_text()
+        _index_cache["mtime"] = mtime
+    return _index_cache["content"]
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await kpi.init_kpi_db()
+    # Pre-warm GitHub cache so the first visitor doesn't trigger blocking fetches
+    await github.warmup()
+    # Prime index.html cache
+    _read_index_html()
     yield
     await kpi.close_kpi_db()
 
@@ -65,6 +84,7 @@ app.include_router(seo.router)
 app.include_router(kpi.router, prefix=API_PREFIX)
 app.include_router(kpi.health_ingest_router, prefix="/api")
 app.include_router(claude_usage.router, prefix=API_PREFIX)
+app.include_router(home.router, prefix=API_PREFIX)
 
 
 async def _blog_og_html(slug: str, index_html: str) -> str | None:
@@ -108,9 +128,9 @@ async def _blog_og_html(slug: str, index_html: str) -> str | None:
 
 @app.get("/{full_path:path}", include_in_schema=False)
 async def serve_spa(full_path: str = "", request: Request = None):
-    index_path = STATIC_DIR / "index.html"
+    index_html = _read_index_html()
 
-    if not index_path.is_file():
+    if index_html is None:
         return JSONResponse(
             {"message": "Portfolio API is running. Frontend not built yet."},
             status_code=200,
@@ -119,7 +139,12 @@ async def serve_spa(full_path: str = "", request: Request = None):
     # Serve real files (JS, CSS, images, etc.) directly
     candidate = STATIC_DIR / full_path
     if full_path and candidate.is_file():
-        return FileResponse(str(candidate))
+        response = FileResponse(str(candidate))
+        # Vite writes content-hashed filenames (e.g. index-DwP6FtY2.js).
+        # These are safe to cache forever; the hash changes when content does.
+        if re.search(r'-[A-Za-z0-9]{8}\.(js|css)$', full_path):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
 
     # For blog post URLs from social crawlers, inject per-post OG tags
     if request and full_path.startswith("blog/"):
@@ -127,10 +152,9 @@ async def serve_spa(full_path: str = "", request: Request = None):
         if BOT_PATTERN.search(ua):
             slug = full_path.removeprefix("blog/").rstrip("/")
             if slug:
-                index_html = index_path.read_text()
                 modified = await _blog_og_html(slug, index_html)
                 if modified:
                     return HTMLResponse(modified)
 
     # All other paths → SPA entry point
-    return FileResponse(str(index_path))
+    return FileResponse(str(STATIC_DIR / "index.html"))
