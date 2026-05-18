@@ -274,6 +274,14 @@ export interface AboutPageResponse {
   testimonials: TestimonialResponse[]
 }
 
+// ── Dev Status Types ──────────────────────────────────────────────────────
+
+export interface DevStatusResponse {
+  dev_active: boolean
+  dev_type: 'ssh' | 'vnc' | 'both' | 'none'
+  stale: boolean
+}
+
 // ── GitHub Types ──────────────────────────────────────────────────────────
 
 export interface GitHubProfile {
@@ -427,6 +435,10 @@ export const api = {
 
   claude: {
     usage: () => request<ClaudeUsage>('GET', '/claude/usage'),
+  },
+
+  status: {
+    get: () => request<DevStatusResponse>('GET', '/status'),
   },
 
   storage: {

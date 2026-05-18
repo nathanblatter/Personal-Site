@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.nathanblatter.dev-status</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/nathanblatter/bin/dev-status-sync.sh</string>
+  </array>
+
+  <key>StartInterval</key>
+  <integer>60</integer>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>DEV_STATUS_API_KEY</key>
+    <string>2cf12b5ac60ed539eb0e38fa70b9d71dfaacfe3454ee7628de1283c993b1a0b4</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/dev-status.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/dev-status.log</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>

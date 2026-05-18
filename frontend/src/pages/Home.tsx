@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { motion } from 'motion/react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, ArrowUpRight, MapPin, GraduationCap } from 'lucide-react'
@@ -9,6 +9,8 @@ import TimelineItem from '../components/TimelineItem'
 import GitHubSection from '../components/GitHubSection'
 import Skeleton from '../components/Skeleton'
 import { api, type ProjectResponse, type SkillResponse, type ExperienceResponse, type AboutResponse } from '../lib/api'
+
+const LiveStatus = lazy(() => import('../components/LiveStatus'))
 
 export default function Home() {
   const [projects, setProjects] = useState<ProjectResponse[]>([])
@@ -113,6 +115,15 @@ export default function Home() {
               </div>
             )}
           </motion.div>
+        </div>
+      </section>
+
+      {/* ═══ LIVE STATUS ═══ */}
+      <section className="py-8 md:py-12">
+        <div className="max-w-[700px] w-full mx-auto px-6">
+          <Suspense fallback={null}>
+            <LiveStatus />
+          </Suspense>
         </div>
       </section>
 
