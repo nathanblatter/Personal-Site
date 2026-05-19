@@ -58,7 +58,6 @@ import {
   type StorageFile,
   type TestimonialResponse,
   type TrackedLinkResponse,
-  type PortfolioCtx,
 } from '../lib/api'
 
 /* ═══════════════════════════════════════════════
@@ -2039,7 +2038,7 @@ export default function Admin() {
                               const next = selected
                                 ? ids.filter(id => id !== p.project_id)
                                 : count < 3 ? [...ids, p.project_id] : ids
-                              return { ...l, portfolio_ctx: { featured_project_ids: [], highlight_skill_ids: [], ...(l.portfolio_ctx ?? {}), featured_project_ids: next } }
+                              return { ...l, portfolio_ctx: { highlight_skill_ids: [], ...(l.portfolio_ctx ?? {}), featured_project_ids: next } }
                             }))
                           }}
                           className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-colors ${selected ? 'bg-blue text-white' : 'bg-white border border-mist text-steel hover:border-blue/40'}`}
@@ -2063,7 +2062,7 @@ export default function Admin() {
                               if (l.id !== link.id) return l
                               const ids = l.portfolio_ctx?.highlight_skill_ids ?? []
                               const next = selected ? ids.filter(id => id !== s.id) : [...ids, s.id]
-                              return { ...l, portfolio_ctx: { featured_project_ids: [], highlight_skill_ids: [], ...(l.portfolio_ctx ?? {}), highlight_skill_ids: next } }
+                              return { ...l, portfolio_ctx: { featured_project_ids: [], ...(l.portfolio_ctx ?? {}), highlight_skill_ids: next } }
                             }))
                           }}
                           className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-colors ${selected ? 'bg-blue text-white' : 'bg-white border border-mist text-steel hover:border-blue/40'}`}
