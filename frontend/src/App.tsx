@@ -1,14 +1,7 @@
-import { lazy, Suspense, useEffect, useLayoutEffect } from 'react'
+import { lazy, Suspense } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import Layout from './components/Layout'
-import { api } from './lib/api'
-
-const SOLAR_KEY = 'solar_cache'
-const SOLAR_TTL = 30 * 60 * 1000 // 30 min
-
-function applyMode(mode: 'light' | 'dark') {
-  document.documentElement.classList.toggle('dark', mode === 'dark')
-}
 import Home from './pages/Home'
 import NotFound from './pages/NotFound'
 const Privacy = lazy(() => import('./pages/Privacy'))
@@ -28,29 +21,7 @@ function ScrollToTop() {
   return null
 }
 
-function useSolarTheme() {
-  // Apply cached mode before first paint to avoid flash
-  useLayoutEffect(() => {
-    try {
-      const raw = localStorage.getItem(SOLAR_KEY)
-      if (raw) {
-        const { mode, expires } = JSON.parse(raw)
-        if (Date.now() < expires) applyMode(mode)
-      }
-    } catch {}
-  }, [])
-
-  // Fetch fresh mode from backend
-  useEffect(() => {
-    api.solar.get().then(({ mode }) => {
-      applyMode(mode)
-      localStorage.setItem(SOLAR_KEY, JSON.stringify({ mode, expires: Date.now() + SOLAR_TTL }))
-    }).catch(() => {})
-  }, [])
-}
-
 function App() {
-  useSolarTheme()
   return (
     <div>
       <ScrollToTop />
