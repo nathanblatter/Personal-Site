@@ -274,6 +274,14 @@ export interface AboutPageResponse {
   testimonials: TestimonialResponse[]
 }
 
+// ── Solar Types ───────────────────────────────────────────────────────────
+
+export interface SolarResponse {
+  mode: 'light' | 'dark'
+  sunrise: string  // "HH:MM" local time
+  sunset: string
+}
+
 // ── Dev Status Types ──────────────────────────────────────────────────────
 
 export interface DevStatusResponse {
@@ -439,6 +447,10 @@ export const api = {
 
   status: {
     get: () => request<DevStatusResponse>('GET', '/status'),
+  },
+
+  solar: {
+    get: () => request<SolarResponse>('GET', '/solar'),
   },
 
   storage: {

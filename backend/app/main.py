@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from sqlalchemy import select
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, status
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, status, solar
 from app.database import AsyncSessionLocal
 from app import models
 
@@ -57,7 +57,7 @@ _STATIC_OG: dict[str, dict[str, str]] = {
     },
 }
 
-_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude", "/status"})
+_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude", "/status", "/solar"})
 
 # Known bot user-agent patterns for OG tag injection
 BOT_PATTERN = re.compile(
@@ -167,6 +167,7 @@ app.include_router(claude_usage.router, prefix=API_PREFIX)
 app.include_router(home.router, prefix=API_PREFIX)
 app.include_router(about_page.router, prefix=API_PREFIX)
 app.include_router(status.router, prefix=f"{API_PREFIX}/status")
+app.include_router(solar.router, prefix=f"{API_PREFIX}/solar")
 
 
 async def _blog_og_html(slug: str, index_html: str) -> str | None:
