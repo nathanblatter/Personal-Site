@@ -184,6 +184,27 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
+function VisibilityToggle({ value = 'show', onChange }: { value?: string; onChange: (v: string) => void }) {
+  const opts = [
+    { key: 'show', active: 'bg-steel/80 text-white' },
+    { key: 'highlight', active: 'bg-blue text-white' },
+    { key: 'hide', active: 'bg-ember/15 text-ember' },
+  ]
+  return (
+    <div className="inline-flex rounded-lg border border-mist overflow-hidden shrink-0">
+      {opts.map(({ key, active }) => (
+        <button
+          key={key}
+          onClick={() => onChange(key)}
+          className={`px-2.5 py-1 font-mono text-[9px] uppercase tracking-wide transition-colors border-r border-mist last:border-r-0 ${value === key ? active : 'text-silver hover:text-steel hover:bg-cloud'}`}
+        >
+          {key}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function SectionCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={`bg-snow border border-mist rounded-xl p-6 ${className}`}>
@@ -267,6 +288,7 @@ export default function Admin() {
   const [trackedLinks, setTrackedLinks] = useState<TrackedLinkResponse[]>([])
   const [linksLoaded, setLinksLoaded] = useState(false)
   const [expandedCtx, setExpandedCtx] = useState<number | null>(null)
+  const [ctxTab, setCtxTab] = useState('hero')
 
   // ── Files state ───────────────────────────────────────────────────────────
   const [files, setFiles] = useState<StorageFile[]>([])
@@ -1999,91 +2021,286 @@ export default function Admin() {
                 <Trash2 size={13} />
               </button>
             </div>
-            {expandedCtx === link.id && (
-              <div className="px-6 py-5 border-b border-mist bg-cloud/20 space-y-4">
-                <p className="font-mono text-[10px] text-steel uppercase tracking-wider mb-3">Portfolio Customization</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <AdminInput
-                    label="Company Name"
-                    value={link.portfolio_ctx?.company ?? ''}
-                    onChange={v => setTrackedLinks(prev => prev.map(l => l.id === link.id ? {
-                      ...l,
-                      portfolio_ctx: { featured_project_ids: [], highlight_skill_ids: [], ...(l.portfolio_ctx ?? {}), company: v || undefined },
-                    } : l))}
-                    placeholder="Stripe"
-                  />
-                  <AdminInput
-                    label="Custom Tagline"
-                    value={link.portfolio_ctx?.tagline ?? ''}
-                    onChange={v => setTrackedLinks(prev => prev.map(l => l.id === link.id ? {
-                      ...l,
-                      portfolio_ctx: { featured_project_ids: [], highlight_skill_ids: [], ...(l.portfolio_ctx ?? {}), tagline: v || undefined },
-                    } : l))}
-                    placeholder="Full-stack engineer with fintech experience…"
-                  />
-                </div>
-                <div>
-                  <label className="block font-mono text-[11px] text-steel mb-2 tracking-wider uppercase">Featured Projects <span className="text-silver normal-case">(max 3, drag order = display order)</span></label>
-                  <div className="flex flex-wrap gap-2">
-                    {projects.map(p => {
-                      const selected = link.portfolio_ctx?.featured_project_ids?.includes(p.project_id) ?? false
-                      const count = link.portfolio_ctx?.featured_project_ids?.length ?? 0
-                      return (
-                        <button
-                          key={p.project_id}
-                          onClick={() => {
-                            setTrackedLinks(prev => prev.map(l => {
-                              if (l.id !== link.id) return l
-                              const ids = l.portfolio_ctx?.featured_project_ids ?? []
-                              const next = selected
-                                ? ids.filter(id => id !== p.project_id)
-                                : count < 3 ? [...ids, p.project_id] : ids
-                              return { ...l, portfolio_ctx: { highlight_skill_ids: [], ...(l.portfolio_ctx ?? {}), featured_project_ids: next } }
-                            }))
-                          }}
-                          className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-colors ${selected ? 'bg-blue text-white' : 'bg-white border border-mist text-steel hover:border-blue/40'}`}
-                        >
-                          {p.title}
-                        </button>
-                      )
-                    })}
+            {expandedCtx === link.id && (() => {
+              const patchCtx = (patch: Partial<NonNullable<TrackedLinkResponse['portfolio_ctx']>>) => {
+                setTrackedLinks(prev => prev.map(l => l.id !== link.id ? l : {
+                  ...l,
+                  portfolio_ctx: { projects: {}, skills: {}, experience: {}, interests: {}, testimonials: {}, ...(l.portfolio_ctx ?? {}), ...patch },
+                }))
+              }
+              const patchAbout = (patch: Record<string, unknown>) => {
+                setTrackedLinks(prev => prev.map(l => l.id !== link.id ? l : {
+                  ...l,
+                  portfolio_ctx: {
+                    projects: {}, skills: {}, experience: {}, interests: {}, testimonials: {},
+                    ...(l.portfolio_ctx ?? {}),
+                    about: { ...(l.portfolio_ctx?.about ?? {}), ...patch },
+                  },
+                }))
+              }
+              const tabs = ['hero', 'projects', 'skills', 'journey', 'about', 'interests', 'testimonials']
+              return (
+                <div className="border-b border-mist bg-cloud/20">
+                  {/* Tab bar */}
+                  <div className="flex gap-0.5 px-6 pt-4 pb-0 border-b border-mist">
+                    {tabs.map(tab => (
+                      <button
+                        key={tab}
+                        onClick={() => setCtxTab(tab)}
+                        className={`px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider rounded-t transition-colors ${ctxTab === tab ? 'bg-white border border-b-white border-mist text-blue -mb-px' : 'text-steel hover:text-ink'}`}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="px-6 py-5 space-y-4">
+                    {/* ── Hero ── */}
+                    {ctxTab === 'hero' && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <AdminInput label="Company Name" value={link.portfolio_ctx?.company ?? ''} placeholder="Stripe"
+                          onChange={v => patchCtx({ company: v || undefined })} />
+                        <AdminInput label="Hero Tagline" value={link.portfolio_ctx?.tagline ?? ''} placeholder="Custom subtitle for this company…"
+                          onChange={v => patchCtx({ tagline: v || undefined })} />
+                      </div>
+                    )}
+
+                    {/* ── Projects ── */}
+                    {ctxTab === 'projects' && (
+                      <div className="space-y-1">
+                        {projects.map(p => (
+                          <div key={p.project_id} className="flex items-center justify-between py-2 border-b border-mist/50 last:border-0">
+                            <div>
+                              <span className="text-sm text-ink">{p.title}</span>
+                              <span className="ml-2 font-mono text-[10px] text-silver">{p.year}</span>
+                            </div>
+                            <VisibilityToggle
+                              value={link.portfolio_ctx?.projects?.[p.project_id]?.visibility ?? 'show'}
+                              onChange={v => patchCtx({ projects: { ...(link.portfolio_ctx?.projects ?? {}), [p.project_id]: { visibility: v as 'show' | 'highlight' | 'hide' } } })}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ── Skills ── */}
+                    {ctxTab === 'skills' && (
+                      <div className="space-y-1">
+                        {skills.map(s => (
+                          <div key={s.id} className="flex items-center justify-between py-2 border-b border-mist/50 last:border-0">
+                            <div>
+                              <span className="text-sm text-ink">{s.name}</span>
+                              <span className="ml-2 font-mono text-[10px] text-silver">{s.category}</span>
+                            </div>
+                            <VisibilityToggle
+                              value={link.portfolio_ctx?.skills?.[String(s.id)]?.visibility ?? 'show'}
+                              onChange={v => patchCtx({ skills: { ...(link.portfolio_ctx?.skills ?? {}), [String(s.id)]: { visibility: v as 'show' | 'highlight' | 'hide' } } })}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ── Journey ── */}
+                    {ctxTab === 'journey' && (
+                      <div className="space-y-3">
+                        {experience.map(item => {
+                          const expCtx = link.portfolio_ctx?.experience?.[String(item.id)]
+                          return (
+                            <div key={item.id} className="border border-mist rounded-xl p-4 bg-white space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <span className="text-sm font-medium text-ink">{item.title}</span>
+                                  <span className="ml-2 font-mono text-[10px] text-steel">{item.year}</span>
+                                </div>
+                                <VisibilityToggle
+                                  value={expCtx?.visibility ?? 'show'}
+                                  onChange={v => patchCtx({ experience: { ...(link.portfolio_ctx?.experience ?? {}), [String(item.id)]: { ...(expCtx ?? {}), visibility: v as 'show' | 'highlight' | 'hide' } } })}
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <AdminInput label="Title override" value={expCtx?.title ?? ''} placeholder={item.title}
+                                  onChange={v => patchCtx({ experience: { ...(link.portfolio_ctx?.experience ?? {}), [String(item.id)]: { ...(expCtx ?? { visibility: 'show' as const }), title: v || undefined } } })} />
+                                <AdminInput label="Subtitle override" value={expCtx?.subtitle ?? ''} placeholder={item.subtitle}
+                                  onChange={v => patchCtx({ experience: { ...(link.portfolio_ctx?.experience ?? {}), [String(item.id)]: { ...(expCtx ?? { visibility: 'show' as const }), subtitle: v || undefined } } })} />
+                              </div>
+                              <AdminTextarea label="Description override" value={expCtx?.description ?? ''} rows={2}
+                                onChange={v => patchCtx({ experience: { ...(link.portfolio_ctx?.experience ?? {}), [String(item.id)]: { ...(expCtx ?? { visibility: 'show' as const }), description: v || undefined } } })} />
+                              <AdminTextarea label="Additional note (shown below description)" value={expCtx?.note ?? ''} rows={2}
+                                onChange={v => patchCtx({ experience: { ...(link.portfolio_ctx?.experience ?? {}), [String(item.id)]: { ...(expCtx ?? { visibility: 'show' as const }), note: v || undefined } } })} />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* ── About ── */}
+                    {ctxTab === 'about' && (
+                      <div className="space-y-4">
+                        <div className="space-y-3">
+                          <label className="block font-mono text-[11px] text-steel tracking-wider uppercase">Bio Paragraphs</label>
+                          {[0, 1, 2].map(i => (
+                            <AdminTextarea key={i} label={`Paragraph ${i + 1}`} rows={3}
+                              value={link.portfolio_ctx?.about?.bio_paragraphs?.[i] ?? ''}
+                              onChange={v => {
+                                const cur = link.portfolio_ctx?.about?.bio_paragraphs ?? ['', '', '']
+                                const next = [...cur] as string[]
+                                while (next.length < 3) next.push('')
+                                next[i] = v
+                                patchAbout({ bio_paragraphs: next.every(s => !s) ? undefined : next })
+                              }}
+                            />
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <AdminInput label="Status Text" value={link.portfolio_ctx?.about?.status_text ?? ''} placeholder="Open to opportunities"
+                            onChange={v => patchAbout({ status_text: v || undefined })} />
+                          <AdminInput label="GPA Override" value={link.portfolio_ctx?.about?.gpa ?? ''} placeholder="3.95"
+                            onChange={v => patchAbout({ gpa: v || undefined })} />
+                        </div>
+                        <AdminInput label="Headshot URL override" value={link.portfolio_ctx?.about?.headshot_url ?? ''} placeholder="https://…"
+                          onChange={v => patchAbout({ headshot_url: v || undefined })} />
+
+                        {/* Looking For */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="font-mono text-[11px] text-steel tracking-wider uppercase">What I'm Looking For</label>
+                            {!link.portfolio_ctx?.about?.looking_for ? (
+                              <button onClick={() => patchAbout({ looking_for: (about?.looking_for ?? []).map(x => ({ ...x })) })}
+                                className="font-mono text-[10px] text-blue hover:underline">Copy from default</button>
+                            ) : (
+                              <button onClick={() => patchAbout({ looking_for: undefined })}
+                                className="font-mono text-[10px] text-steel hover:text-ember">Use default</button>
+                            )}
+                          </div>
+                          {link.portfolio_ctx?.about?.looking_for ? (
+                            <div className="space-y-2">
+                              {link.portfolio_ctx.about.looking_for.map((item, i) => (
+                                <div key={i} className="border border-mist rounded-lg p-3 bg-white space-y-2">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <AdminInput label="Role" value={item.role ?? ''} onChange={v => {
+                                      const arr = [...link.portfolio_ctx!.about!.looking_for!]
+                                      arr[i] = { ...arr[i], role: v }
+                                      patchAbout({ looking_for: arr })
+                                    }} />
+                                    <AdminInput label="Location" value={item.location ?? ''} onChange={v => {
+                                      const arr = [...link.portfolio_ctx!.about!.looking_for!]
+                                      arr[i] = { ...arr[i], location: v }
+                                      patchAbout({ looking_for: arr })
+                                    }} />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <AdminInput label="Timeline" value={item.timeline ?? ''} onChange={v => {
+                                      const arr = [...link.portfolio_ctx!.about!.looking_for!]
+                                      arr[i] = { ...arr[i], timeline: v }
+                                      patchAbout({ looking_for: arr })
+                                    }} />
+                                    <div className="flex items-end gap-2">
+                                      <div className="flex-1">
+                                        <AdminInput label="Detail" value={item.detail ?? ''} onChange={v => {
+                                          const arr = [...link.portfolio_ctx!.about!.looking_for!]
+                                          arr[i] = { ...arr[i], detail: v }
+                                          patchAbout({ looking_for: arr })
+                                        }} />
+                                      </div>
+                                      <button onClick={() => patchAbout({ looking_for: link.portfolio_ctx!.about!.looking_for!.filter((_, j) => j !== i) })}
+                                        className="pb-2 text-steel hover:text-ember transition-colors"><Trash2 size={13} /></button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              <button onClick={() => patchAbout({ looking_for: [...(link.portfolio_ctx?.about?.looking_for ?? []), { role: '', location: '', timeline: '', detail: '' }] })}
+                                className="font-mono text-[11px] text-steel hover:text-blue transition-colors">+ Add item</button>
+                            </div>
+                          ) : (
+                            <p className="font-mono text-[11px] text-silver">Using default values</p>
+                          )}
+                        </div>
+
+                        {/* Info Fields */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="font-mono text-[11px] text-steel tracking-wider uppercase">Info Fields</label>
+                            {!link.portfolio_ctx?.about?.info_fields ? (
+                              <button onClick={() => patchAbout({ info_fields: (about?.info_fields ?? []).map(x => ({ ...x })) })}
+                                className="font-mono text-[10px] text-blue hover:underline">Copy from default</button>
+                            ) : (
+                              <button onClick={() => patchAbout({ info_fields: undefined })}
+                                className="font-mono text-[10px] text-steel hover:text-ember">Use default</button>
+                            )}
+                          </div>
+                          {link.portfolio_ctx?.about?.info_fields ? (
+                            <div className="space-y-2">
+                              {link.portfolio_ctx.about.info_fields.map((field, i) => (
+                                <div key={i} className="flex items-end gap-2">
+                                  <div className="flex-1"><AdminInput label="Label" value={field.label ?? ''} onChange={v => {
+                                    const arr = [...link.portfolio_ctx!.about!.info_fields!]
+                                    arr[i] = { ...arr[i], label: v }
+                                    patchAbout({ info_fields: arr })
+                                  }} /></div>
+                                  <div className="flex-1"><AdminInput label="Value" value={field.value ?? ''} onChange={v => {
+                                    const arr = [...link.portfolio_ctx!.about!.info_fields!]
+                                    arr[i] = { ...arr[i], value: v }
+                                    patchAbout({ info_fields: arr })
+                                  }} /></div>
+                                  <button onClick={() => patchAbout({ info_fields: link.portfolio_ctx!.about!.info_fields!.filter((_, j) => j !== i) })}
+                                    className="pb-2 text-steel hover:text-ember transition-colors"><Trash2 size={13} /></button>
+                                </div>
+                              ))}
+                              <button onClick={() => patchAbout({ info_fields: [...(link.portfolio_ctx?.about?.info_fields ?? []), { label: '', value: '' }] })}
+                                className="font-mono text-[11px] text-steel hover:text-blue transition-colors">+ Add field</button>
+                            </div>
+                          ) : (
+                            <p className="font-mono text-[11px] text-silver">Using default values</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Interests ── */}
+                    {ctxTab === 'interests' && (
+                      <div className="space-y-1">
+                        {interests.map(item => (
+                          <div key={item.id} className="flex items-center justify-between py-2 border-b border-mist/50 last:border-0">
+                            <span className="text-sm text-ink">{item.label}</span>
+                            <VisibilityToggle
+                              value={link.portfolio_ctx?.interests?.[String(item.id)]?.visibility ?? 'show'}
+                              onChange={v => patchCtx({ interests: { ...(link.portfolio_ctx?.interests ?? {}), [String(item.id)]: { visibility: v as 'show' | 'highlight' | 'hide' } } })}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ── Testimonials ── */}
+                    {ctxTab === 'testimonials' && (
+                      <div className="space-y-1">
+                        {testimonials.map(t => (
+                          <div key={t.id} className="flex items-center justify-between py-2 border-b border-mist/50 last:border-0">
+                            <div>
+                              <span className="text-sm text-ink">{t.name}</span>
+                              <span className="ml-2 font-mono text-[10px] text-silver">{t.role}</span>
+                            </div>
+                            <VisibilityToggle
+                              value={link.portfolio_ctx?.testimonials?.[String(t.id)]?.visibility ?? 'show'}
+                              onChange={v => patchCtx({ testimonials: { ...(link.portfolio_ctx?.testimonials ?? {}), [String(t.id)]: { visibility: v as 'show' | 'highlight' | 'hide' } } })}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t border-mist">
+                      <button onClick={() => setTrackedLinks(prev => prev.map(l => l.id === link.id ? { ...l, portfolio_ctx: null } : l))}
+                        className="font-mono text-[11px] text-steel hover:text-ember transition-colors">
+                        Clear all customization
+                      </button>
+                      <span className="font-mono text-[10px] text-silver">Save using the row save button →</span>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label className="block font-mono text-[11px] text-steel mb-2 tracking-wider uppercase">Highlight Skills</label>
-                  <div className="flex flex-wrap gap-2">
-                    {skills.map(s => {
-                      const selected = link.portfolio_ctx?.highlight_skill_ids?.includes(s.id) ?? false
-                      return (
-                        <button
-                          key={s.id}
-                          onClick={() => {
-                            setTrackedLinks(prev => prev.map(l => {
-                              if (l.id !== link.id) return l
-                              const ids = l.portfolio_ctx?.highlight_skill_ids ?? []
-                              const next = selected ? ids.filter(id => id !== s.id) : [...ids, s.id]
-                              return { ...l, portfolio_ctx: { featured_project_ids: [], ...(l.portfolio_ctx ?? {}), highlight_skill_ids: next } }
-                            }))
-                          }}
-                          className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-colors ${selected ? 'bg-blue text-white' : 'bg-white border border-mist text-steel hover:border-blue/40'}`}
-                        >
-                          {s.name}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between pt-1">
-                  <button
-                    onClick={() => setTrackedLinks(prev => prev.map(l => l.id === link.id ? { ...l, portfolio_ctx: null } : l))}
-                    className="font-mono text-[11px] text-steel hover:text-ember transition-colors"
-                  >
-                    Clear customization
-                  </button>
-                  <span className="font-mono text-[10px] text-silver">Save using the row save button →</span>
-                </div>
-              </div>
-            )}
+              )
+            })()}
           </div>
         ))}
       </SectionCard>

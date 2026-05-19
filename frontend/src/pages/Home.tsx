@@ -27,15 +27,20 @@ export default function Home() {
     }).finally(() => setLoading(false))
   }, [])
 
-  const featuredProjects = portfolioCtx?.featured_project_ids?.length
-    ? projects
-        .filter(p => portfolioCtx.featured_project_ids.includes(p.project_id))
-        .sort((a, b) =>
-          portfolioCtx.featured_project_ids.indexOf(a.project_id) -
-          portfolioCtx.featured_project_ids.indexOf(b.project_id)
-        )
-        .slice(0, 3)
-    : projects.slice(0, 3)
+  const visibleProjects = portfolioCtx
+    ? projects.filter(p => (portfolioCtx.projects?.[p.project_id]?.visibility ?? 'show') !== 'hide')
+    : projects
+  const featuredProjects = visibleProjects.slice(0, 3)
+
+  const visibleSkills = portfolioCtx
+    ? skills.filter(s => (portfolioCtx.skills?.[String(s.id)]?.visibility ?? 'show') !== 'hide')
+    : skills
+
+  const visibleExperience = experience.filter(e => {
+    if (!e.active) return false
+    if (!portfolioCtx) return true
+    return (portfolioCtx.experience?.[String(e.id)]?.visibility ?? 'show') !== 'hide'
+  })
 
 
   return (
@@ -215,12 +220,12 @@ export default function Home() {
                     <Skeleton className="h-4 w-20" />
                   </div>
                 ))
-              : skills.map((skill, i) => (
+              : visibleSkills.map((skill, i) => (
                   <SkillBar
                     key={skill.id}
                     {...skill}
                     index={i}
-                    highlighted={portfolioCtx?.highlight_skill_ids?.includes(skill.id) ?? false}
+                    highlighted={(portfolioCtx?.skills?.[String(skill.id)]?.visibility ?? 'show') === 'highlight'}
                   />
                 ))
             }
@@ -261,9 +266,21 @@ export default function Home() {
                     <Skeleton className="h-3 w-5/6" />
                   </div>
                 ))
-              : experience.filter(e => e.active).map((item, i) => (
-                  <TimelineItem key={item.id} {...item} index={i} />
-                ))
+              : visibleExperience.map((item, i) => {
+                  const expCtx = portfolioCtx?.experience?.[String(item.id)]
+                  return (
+                    <TimelineItem
+                      key={item.id}
+                      {...item}
+                      title={expCtx?.title ?? item.title}
+                      subtitle={expCtx?.subtitle ?? item.subtitle}
+                      description={expCtx?.description ?? item.description}
+                      note={expCtx?.note}
+                      highlighted={(expCtx?.visibility ?? 'show') === 'highlight'}
+                      index={i}
+                    />
+                  )
+                })
             }
           </div>
         </div>

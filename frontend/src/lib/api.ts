@@ -235,11 +235,27 @@ export interface UploadResponse {
 
 // ── Tracked Links Types ───────────────────────────────────────────────────
 
+export type CtxVisibility = 'show' | 'highlight' | 'hide'
+
+export interface AboutCtx {
+  bio_paragraphs?: string[]
+  status_text?: string
+  gpa?: string
+  looking_for?: { role: string; location: string; timeline: string; detail: string }[]
+  info_fields?: { label: string; value: string }[]
+  headshot_url?: string
+  facts?: { icon: string; text: string }[]
+}
+
 export interface PortfolioCtx {
   company?: string
   tagline?: string
-  featured_project_ids: string[]
-  highlight_skill_ids: number[]
+  projects: Record<string, { visibility: CtxVisibility }>
+  skills: Record<string, { visibility: CtxVisibility }>
+  experience: Record<string, { visibility: CtxVisibility; title?: string; subtitle?: string; description?: string; note?: string }>
+  interests: Record<string, { visibility: CtxVisibility }>
+  testimonials: Record<string, { visibility: CtxVisibility }>
+  about?: AboutCtx | null
 }
 
 export interface TrackedLinkResponse {

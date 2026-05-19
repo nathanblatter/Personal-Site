@@ -7,6 +7,7 @@ import ClaudeSection from '../components/ClaudeSection'
 import Skeleton from '../components/Skeleton'
 import { Quote } from 'lucide-react'
 import { api, type AboutResponse, type InterestResponse, type CourseworkResponse, type ExperienceResponse, type TestimonialResponse } from '../lib/api'
+import { usePortfolioCtx } from '../lib/usePortfolioCtx'
 import { getIcon } from '../lib/iconMap'
 
 export default function About() {
@@ -16,6 +17,7 @@ export default function About() {
   const [experience, setExperience] = useState<ExperienceResponse[]>([])
   const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
   const [loading, setLoading] = useState(true)
+  const portfolioCtx = usePortfolioCtx()
 
   useEffect(() => {
     api.aboutPage.get().then(({ about: ab, interests: intr, coursework: cw, experience: ex, testimonials: test }) => {
@@ -26,6 +28,29 @@ export default function About() {
       setTestimonials(test)
     }).finally(() => setLoading(false))
   }, [])
+
+  const displayAbout: AboutResponse | null = about ? {
+    ...about,
+    bio_paragraphs: portfolioCtx?.about?.bio_paragraphs ?? about.bio_paragraphs,
+    status_text: portfolioCtx?.about?.status_text ?? about.status_text,
+    gpa: portfolioCtx?.about?.gpa ?? about.gpa,
+    looking_for: (portfolioCtx?.about?.looking_for ?? about.looking_for) as AboutResponse['looking_for'],
+    info_fields: (portfolioCtx?.about?.info_fields ?? about.info_fields) as AboutResponse['info_fields'],
+    headshot_url: portfolioCtx?.about?.headshot_url ?? about.headshot_url,
+    facts: (portfolioCtx?.about?.facts ?? about.facts) as AboutResponse['facts'],
+  } : null
+
+  const displayInterests = portfolioCtx
+    ? interests.filter(i => (portfolioCtx.interests?.[String(i.id)]?.visibility ?? 'show') !== 'hide')
+    : interests
+
+  const displayTestimonials = portfolioCtx
+    ? testimonials.filter(t => (portfolioCtx.testimonials?.[String(t.id)]?.visibility ?? 'show') !== 'hide')
+    : testimonials
+
+  const displayExperience = portfolioCtx
+    ? experience.filter(e => (portfolioCtx.experience?.[String(e.id)]?.visibility ?? 'show') !== 'hide')
+    : experience
 
   return (
     <>
@@ -62,25 +87,25 @@ export default function About() {
                   </div>
                 </div>
               ) : null}
-              {about?.bio_paragraphs[0] && (
+              {displayAbout?.bio_paragraphs[0] && (
                 <p className="text-base md:text-lg text-ink leading-relaxed">
-                  {about.bio_paragraphs[0]}
+                  {displayAbout.bio_paragraphs[0]}
                 </p>
               )}
-              {about?.bio_paragraphs[1] && (
+              {displayAbout?.bio_paragraphs[1] && (
                 <p className="text-slate leading-relaxed">
-                  {about.bio_paragraphs[1]}
+                  {displayAbout.bio_paragraphs[1]}
                 </p>
               )}
-              {about?.bio_paragraphs[2] && (
+              {displayAbout?.bio_paragraphs[2] && (
                 <p className="text-slate leading-relaxed">
-                  {about.bio_paragraphs[2]}
+                  {displayAbout.bio_paragraphs[2]}
                 </p>
               )}
 
-              {about?.facts && about.facts.length > 0 && (
+              {displayAbout?.facts && displayAbout.facts.length > 0 && (
                 <div className="pt-6 grid grid-cols-2 gap-3 md:gap-4">
-                  {about.facts.map((fact, i) => {
+                  {displayAbout!.facts!.map((fact, i) => {
                     const Icon = getIcon(fact.icon)
                     return (
                       <motion.div
@@ -109,7 +134,7 @@ export default function About() {
                 <picture>
                   {!about?.headshot_url && <source srcSet="/headshot.webp" type="image/webp" />}
                   <img
-                    src={about?.headshot_url ?? '/headshot.webp'}
+                    src={displayAbout?.headshot_url ?? '/headshot.webp'}
                     alt="Nathan Blatter"
                     width={800}
                     height={1200}
@@ -138,7 +163,7 @@ export default function About() {
       </section>
 
       {/* What I'm Looking For */}
-      {about?.looking_for && about.looking_for.length > 0 && (
+      {displayAbout?.looking_for && displayAbout.looking_for.length > 0 && (
         <section className="py-16 md:py-28 bg-snow">
           <div className="max-w-[900px] w-full mx-auto px-6">
             <SectionHeader
@@ -147,7 +172,7 @@ export default function About() {
               subtitle="Roles and opportunities I'm excited about."
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {about.looking_for.map((item, i) => (
+              {displayAbout.looking_for.map((item, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, y: 20 }}
@@ -192,8 +217,9 @@ export default function About() {
                   </div>
                 ))
               : null}
-            {interests.map((item, i) => {
+            {displayInterests.map((item, i) => {
               const Icon = getIcon(item.icon)
+              const isHighlighted = (portfolioCtx?.interests?.[String(item.id)]?.visibility ?? 'show') === 'highlight'
               return (
                 <motion.div
                   key={item.id}
@@ -201,7 +227,7 @@ export default function About() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.08 }}
-                  className="group p-5 md:p-6 rounded-xl border border-mist bg-white hover:border-blue/30 hover:shadow-lg hover:shadow-blue/5 transition-all"
+                  className={`group p-5 md:p-6 rounded-xl border bg-white hover:border-blue/30 hover:shadow-lg hover:shadow-blue/5 transition-all ${isHighlighted ? 'border-blue/40 ring-2 ring-blue/20' : 'border-mist'}`}
                 >
                   <Icon size={20} className="text-blue mb-4 group-hover:scale-110 transition-transform" />
                   <h4 className="font-sans font-semibold text-ink mb-1">{item.label}</h4>
@@ -268,7 +294,7 @@ export default function About() {
       </section>
 
       {/* Testimonials */}
-      {testimonials.length > 0 && (
+      {displayTestimonials.length > 0 && (
         <section className="py-16 md:py-28 bg-snow">
           <div className="max-w-[900px] w-full mx-auto px-6">
             <SectionHeader
@@ -277,14 +303,16 @@ export default function About() {
               subtitle="From professors, managers, and teammates."
             />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {testimonials.map((t, i) => (
+              {displayTestimonials.map((t, i) => {
+                const isHighlighted = (portfolioCtx?.testimonials?.[String(t.id)]?.visibility ?? 'show') === 'highlight'
+                return (
                 <motion.div
                   key={t.id}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
-                  className="p-6 rounded-xl border border-mist bg-white"
+                  className={`p-6 rounded-xl border bg-white ${isHighlighted ? 'border-blue/40 ring-2 ring-blue/20' : 'border-mist'}`}
                 >
                   <Quote size={20} className="text-blue/30 mb-3" />
                   <p className="text-ink/80 text-sm leading-relaxed mb-5 italic">
@@ -304,7 +332,8 @@ export default function About() {
                     </div>
                   </div>
                 </motion.div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </section>
@@ -319,9 +348,21 @@ export default function About() {
             subtitle="Where I've been and what I've done."
           />
           <div>
-            {experience.map((item, i) => (
-              <TimelineItem key={item.id} {...item} index={i} />
-            ))}
+            {displayExperience.map((item, i) => {
+              const expCtx = portfolioCtx?.experience?.[String(item.id)]
+              return (
+                <TimelineItem
+                  key={item.id}
+                  {...item}
+                  title={expCtx?.title ?? item.title}
+                  subtitle={expCtx?.subtitle ?? item.subtitle}
+                  description={expCtx?.description ?? item.description}
+                  note={expCtx?.note}
+                  highlighted={(expCtx?.visibility ?? 'show') === 'highlight'}
+                  index={i}
+                />
+              )
+            })}
           </div>
         </div>
       </section>
