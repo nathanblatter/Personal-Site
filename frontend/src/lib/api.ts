@@ -267,6 +267,26 @@ export interface TrackedLinkResponse {
   portfolio_ctx?: PortfolioCtx | null
 }
 
+// ── Testimonial Request Types ─────────────────────────────────────────────
+
+export interface TestimonialRequestResponse {
+  id: number
+  slug: string
+  requester_name: string
+  requester_email?: string
+  requester_role?: string
+  personal_message?: string
+  status: 'pending' | 'sent' | 'submitted' | 'approved' | 'rejected'
+  submitted_name?: string
+  submitted_role?: string
+  submitted_quote?: string
+  submitted_avatar_url?: string
+  created_at: string
+  submitted_at?: string
+  reviewed_at?: string
+  testimonial_id?: number
+}
+
 // ── Claude Usage Types ────────────────────────────────────────────────────
 
 export interface ClaudeDay { date: string; tokens: number; cost_cents: number; sessions: number }
@@ -454,6 +474,16 @@ export const api = {
       request<TrackedLinkResponse>('PUT', `/links/${id}`, data),
     delete: (id: number) => request<void>('DELETE', `/links/${id}`),
     getCtx: (slug: string) => request<PortfolioCtx>('GET', `/links/ctx/${slug}`),
+  },
+
+  testimonialRequests: {
+    list: () => request<TestimonialRequestResponse[]>('GET', '/testimonial-requests'),
+    create: (data: { slug: string; requester_name: string; requester_email?: string; requester_role?: string; personal_message?: string }) =>
+      request<TestimonialRequestResponse>('POST', '/testimonial-requests', data),
+    sendEmail: (id: number) => request<{ ok: boolean }>('POST', `/testimonial-requests/${id}/send-email`),
+    approve: (id: number) => request<TestimonialRequestResponse>('POST', `/testimonial-requests/${id}/approve`),
+    reject: (id: number) => request<TestimonialRequestResponse>('POST', `/testimonial-requests/${id}/reject`),
+    delete: (id: number) => request<void>('DELETE', `/testimonial-requests/${id}`),
   },
 
   home: {

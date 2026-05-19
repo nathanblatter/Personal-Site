@@ -53,6 +53,28 @@ class TrackedLink(Base):
     portfolio_ctx = Column(JSON, nullable=True)
 
 
+class TestimonialRequest(Base):
+    __tablename__ = "testimonial_requests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    slug = Column(String, unique=True, index=True, nullable=False)
+    requester_name = Column(String, nullable=False)
+    requester_email = Column(String, nullable=True)
+    requester_role = Column(String, nullable=True)
+    personal_message = Column(Text, nullable=True)
+    status = Column(String, nullable=False, default="pending")
+
+    submitted_name = Column(String, nullable=True)
+    submitted_role = Column(String, nullable=True)
+    submitted_quote = Column(Text, nullable=True)
+    submitted_avatar_url = Column(String, nullable=True)
+
+    created_at = Column(String, nullable=False)
+    submitted_at = Column(String, nullable=True)
+    reviewed_at = Column(String, nullable=True)
+    testimonial_id = Column(Integer, ForeignKey("testimonials.id"), nullable=True)
+
+
 class Skill(Base):
     __tablename__ = "skills"
 

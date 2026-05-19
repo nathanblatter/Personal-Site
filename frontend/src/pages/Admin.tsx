@@ -58,6 +58,7 @@ import {
   type StorageFile,
   type TestimonialResponse,
   type TrackedLinkResponse,
+  type TestimonialRequestResponse,
 } from '../lib/api'
 
 /* ═══════════════════════════════════════════════
@@ -284,6 +285,13 @@ export default function Admin() {
   const [blogDraft, setBlogDraft] = useState<Partial<BlogPostResponse>>({})
   const [showBlogPreview, setShowBlogPreview] = useState(false)
 
+  // ── Testimonial requests state ────────────────────────────────────────────
+  const [testimonialReqs, setTestimonialReqs] = useState<TestimonialRequestResponse[]>([])
+  const [tReqsLoaded, setTReqsLoaded] = useState(false)
+  const [newReqForm, setNewReqForm] = useState({ slug: '', requester_name: '', requester_email: '', requester_role: '', personal_message: '' })
+  const [showNewReqForm, setShowNewReqForm] = useState(false)
+  const [expandedReq, setExpandedReq] = useState<number | null>(null)
+
   // ── Links state ───────────────────────────────────────────────────────────
   const [trackedLinks, setTrackedLinks] = useState<TrackedLinkResponse[]>([])
   const [linksLoaded, setLinksLoaded] = useState(false)
@@ -363,6 +371,9 @@ export default function Admin() {
 
   // ── Lazy-load internship data when section is activated ─────────────────
   useEffect(() => {
+    if (activeSection === 'about' && !tReqsLoaded) {
+      api.testimonialRequests.list().then(r => { setTestimonialReqs(r); setTReqsLoaded(true) }).catch(err => showError((err as Error).message))
+    }
     if (activeSection === 'links' && !linksLoaded) {
       api.links.list().then(l => { setTrackedLinks(l); setLinksLoaded(true) }).catch(err => showError((err as Error).message))
     }
@@ -385,7 +396,7 @@ export default function Admin() {
       setIntTags(tags)
       setIntLoaded(true)
     }).catch(err => showError((err as Error).message))
-  }, [activeSection, intLoaded, filesLoaded, filesPrefix, linksLoaded])
+  }, [activeSection, intLoaded, filesLoaded, filesPrefix, linksLoaded, tReqsLoaded])
 
   const refreshInternships = async () => {
     try {
@@ -1379,6 +1390,250 @@ export default function Admin() {
           ))}
           {testimonials.length === 0 && (
             <p className="text-center text-steel text-sm py-4 font-mono">No testimonials yet.</p>
+          )}
+        </div>
+      </SectionCard>
+
+      {/* Testimonial Requests */}
+      <SectionCard>
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="font-sans font-semibold text-ink">Testimonial Requests</h3>
+            <p className="text-xs text-steel font-mono mt-0.5">Send personalized request links and approve submissions</p>
+          </div>
+          <button
+            onClick={() => setShowNewReqForm(v => !v)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-blue bg-blue-wash rounded-lg hover:bg-blue/10 transition-colors"
+          >
+            <Plus size={12} /> New Request
+          </button>
+        </div>
+
+        {/* Create form */}
+        {showNewReqForm && (
+          <div className="mb-5 p-4 rounded-xl bg-snow border border-mist space-y-3">
+            <p className="font-mono text-xs text-blue uppercase tracking-wider">New testimonial request</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-mono text-[10px] text-silver uppercase tracking-wider mb-1">Slug (URL)</label>
+                <input
+                  value={newReqForm.slug}
+                  onChange={e => setNewReqForm(f => ({ ...f, slug: e.target.value }))}
+                  placeholder="jamesgaskin"
+                  className="w-full text-sm text-ink font-mono bg-white border border-mist rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue/20"
+                />
+                <p className="text-[10px] text-silver font-mono mt-1">→ /go/{newReqForm.slug || 'slug'}</p>
+              </div>
+              <div>
+                <label className="block font-mono text-[10px] text-silver uppercase tracking-wider mb-1">Full name</label>
+                <input
+                  value={newReqForm.requester_name}
+                  onChange={e => setNewReqForm(f => ({ ...f, requester_name: e.target.value }))}
+                  placeholder="James Gaskin"
+                  className="w-full text-sm text-ink bg-white border border-mist rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue/20"
+                />
+              </div>
+              <div>
+                <label className="block font-mono text-[10px] text-silver uppercase tracking-wider mb-1">Email (optional)</label>
+                <input
+                  value={newReqForm.requester_email}
+                  onChange={e => setNewReqForm(f => ({ ...f, requester_email: e.target.value }))}
+                  placeholder="james@example.com"
+                  type="email"
+                  className="w-full text-sm text-ink bg-white border border-mist rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue/20"
+                />
+              </div>
+              <div>
+                <label className="block font-mono text-[10px] text-silver uppercase tracking-wider mb-1">Their role (optional)</label>
+                <input
+                  value={newReqForm.requester_role}
+                  onChange={e => setNewReqForm(f => ({ ...f, requester_role: e.target.value }))}
+                  placeholder="Professor at BYU"
+                  className="w-full text-sm text-ink bg-white border border-mist rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue/20"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block font-mono text-[10px] text-silver uppercase tracking-wider mb-1">Personal message (optional)</label>
+              <textarea
+                value={newReqForm.personal_message}
+                onChange={e => setNewReqForm(f => ({ ...f, personal_message: e.target.value }))}
+                rows={2}
+                placeholder="Appears in the email and on the form — personalize it."
+                className="w-full text-sm text-ink bg-white border border-mist rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue/20 resize-none"
+              />
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={async () => {
+                  if (!newReqForm.slug || !newReqForm.requester_name) { showError('Slug and name are required'); return }
+                  try {
+                    const created = await api.testimonialRequests.create({
+                      slug: newReqForm.slug,
+                      requester_name: newReqForm.requester_name,
+                      requester_email: newReqForm.requester_email || undefined,
+                      requester_role: newReqForm.requester_role || undefined,
+                      personal_message: newReqForm.personal_message || undefined,
+                    })
+                    setTestimonialReqs(prev => [created, ...prev])
+                    setNewReqForm({ slug: '', requester_name: '', requester_email: '', requester_role: '', personal_message: '' })
+                    setShowNewReqForm(false)
+                    showToast('Request created')
+                  } catch (err) { showError((err as Error).message) }
+                }}
+                className="px-4 py-2 bg-blue text-white font-mono text-xs font-semibold rounded-lg hover:bg-blue-dim transition-colors"
+              >
+                Create
+              </button>
+              <button
+                onClick={() => setShowNewReqForm(false)}
+                className="px-4 py-2 text-steel font-mono text-xs rounded-lg hover:bg-mist transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Request list */}
+        <div className="space-y-2">
+          {testimonialReqs.map(req => {
+            const statusColors: Record<string, string> = {
+              pending: 'bg-silver/10 text-silver',
+              sent: 'bg-blue-wash text-blue',
+              submitted: 'bg-amber-50 text-amber-600 border border-amber-200',
+              approved: 'bg-emerald-50 text-emerald-600 border border-emerald-200',
+              rejected: 'bg-ember/10 text-ember',
+            }
+            const isExpanded = expandedReq === req.id
+            return (
+              <div key={req.id} className="rounded-xl border border-mist bg-white overflow-hidden">
+                {/* Row */}
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm text-ink">{req.requester_name}</span>
+                      {req.requester_role && <span className="text-xs text-steel">{req.requester_role}</span>}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wide ${statusColors[req.status] ?? 'bg-mist text-steel'}`}>
+                        {req.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-silver font-mono mt-0.5">/go/{req.slug}</p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* Copy link */}
+                    <button
+                      title="Copy link"
+                      onClick={() => { navigator.clipboard.writeText(`https://nathanblatter.com/go/${req.slug}`); showToast('Link copied') }}
+                      className="p-1.5 text-silver hover:text-blue transition-colors"
+                    >
+                      <Copy size={13} />
+                    </button>
+
+                    {/* Send / resend email */}
+                    {req.requester_email && req.status !== 'approved' && req.status !== 'rejected' && (
+                      <button
+                        title={req.status === 'sent' ? 'Resend email' : 'Send email'}
+                        onClick={async () => {
+                          try {
+                            await api.testimonialRequests.sendEmail(req.id)
+                            setTestimonialReqs(prev => prev.map(r => r.id === req.id ? { ...r, status: r.status === 'pending' ? 'sent' : r.status } : r))
+                            showToast('Email sent')
+                          } catch (err) { showError((err as Error).message) }
+                        }}
+                        className="p-1.5 text-silver hover:text-blue transition-colors"
+                      >
+                        <ExternalLink size={13} />
+                      </button>
+                    )}
+
+                    {/* Expand to see submission */}
+                    {req.status === 'submitted' && (
+                      <button
+                        title="View submission"
+                        onClick={() => setExpandedReq(isExpanded ? null : req.id)}
+                        className="p-1.5 text-silver hover:text-blue transition-colors"
+                      >
+                        <Eye size={13} />
+                      </button>
+                    )}
+
+                    {/* Approve */}
+                    {req.status === 'submitted' && (
+                      <button
+                        title="Approve"
+                        onClick={async () => {
+                          try {
+                            const updated = await api.testimonialRequests.approve(req.id)
+                            setTestimonialReqs(prev => prev.map(r => r.id === req.id ? updated : r))
+                            showToast('Approved — testimonial created')
+                          } catch (err) { showError((err as Error).message) }
+                        }}
+                        className="p-1.5 text-silver hover:text-emerald-600 transition-colors"
+                      >
+                        <Check size={13} />
+                      </button>
+                    )}
+
+                    {/* Reject */}
+                    {['submitted', 'sent', 'pending'].includes(req.status) && (
+                      <button
+                        title="Reject"
+                        onClick={async () => {
+                          try {
+                            const updated = await api.testimonialRequests.reject(req.id)
+                            setTestimonialReqs(prev => prev.map(r => r.id === req.id ? updated : r))
+                            showToast('Rejected')
+                          } catch (err) { showError((err as Error).message) }
+                        }}
+                        className="p-1.5 text-silver hover:text-ember transition-colors"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+
+                    {/* Delete */}
+                    <button
+                      title="Delete"
+                      onClick={async () => {
+                        try {
+                          await api.testimonialRequests.delete(req.id)
+                          setTestimonialReqs(prev => prev.filter(r => r.id !== req.id))
+                          showToast('Deleted')
+                        } catch (err) { showError((err as Error).message) }
+                      }}
+                      className="p-1.5 text-silver hover:text-ember transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Expanded submission content */}
+                {isExpanded && req.submitted_quote && (
+                  <div className="px-4 pb-4 pt-1 border-t border-mist bg-snow space-y-2">
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="font-medium text-ink">{req.submitted_name}</span>
+                      {req.submitted_role && <span className="text-steel">{req.submitted_role}</span>}
+                      {req.submitted_avatar_url && (
+                        <img src={req.submitted_avatar_url} alt="" className="w-6 h-6 rounded-full object-cover border border-mist" />
+                      )}
+                    </div>
+                    <blockquote className="text-sm text-ink/80 italic leading-relaxed pl-3 border-l-2 border-blue/30">
+                      &ldquo;{req.submitted_quote}&rdquo;
+                    </blockquote>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {testimonialReqs.length === 0 && tReqsLoaded && (
+            <p className="text-center text-steel text-sm py-4 font-mono">No requests yet. Create one above.</p>
+          )}
+          {!tReqsLoaded && (
+            <p className="text-center text-steel text-sm py-4 font-mono">Loading…</p>
           )}
         </div>
       </SectionCard>
