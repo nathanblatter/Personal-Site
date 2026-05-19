@@ -19,7 +19,7 @@ def _now() -> str:
 
 # ── Public ────────────────────────────────────────────────────────────────────
 
-@router.get("/testimonial/{slug}", response_model=schemas.TestimonialRequestPublic)
+@router.get("/api/v1/testimonial/{slug}", response_model=schemas.TestimonialRequestPublic)
 async def get_request_public(slug: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(models.TestimonialRequest).where(models.TestimonialRequest.slug == slug)
@@ -30,7 +30,7 @@ async def get_request_public(slug: str, db: AsyncSession = Depends(get_db)):
     return req
 
 
-@router.post("/testimonial/{slug}/submit")
+@router.post("/api/v1/testimonial/{slug}/submit")
 async def submit_testimonial(slug: str, payload: schemas.TestimonialSubmit, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(models.TestimonialRequest).where(models.TestimonialRequest.slug == slug)
