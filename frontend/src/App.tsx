@@ -14,6 +14,7 @@ const BlogPost = lazy(() => import('./pages/BlogPost'))
 const Resume = lazy(() => import('./pages/Resume'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Login = lazy(() => import('./pages/Login'))
+const TestimonialForm = lazy(() => import('./pages/TestimonialForm'))
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -39,6 +40,7 @@ function App() {
         </Route>
         <Route path="/admin" element={<Suspense fallback={null}><Admin /></Suspense>} />
         <Route path="/admin/login" element={<Suspense fallback={null}><Login /></Suspense>} />
+        <Route path="/testimonial/:slug" element={<Suspense fallback={null}><TestimonialForm /></Suspense>} />
       </Routes>
     </div>
   )

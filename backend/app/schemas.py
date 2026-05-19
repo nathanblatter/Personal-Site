@@ -83,6 +83,53 @@ class TestimonialResponse(TestimonialBase):
     model_config = {"from_attributes": True}
 
 
+# ── Testimonial Requests ───────────────────────────────────────────────────────
+
+class TestimonialRequestCreate(BaseModel):
+    slug: str
+    requester_name: str
+    requester_email: Optional[str] = None
+    requester_role: Optional[str] = None
+    personal_message: Optional[str] = None
+
+
+class TestimonialSubmit(BaseModel):
+    name: str
+    role: str
+    quote: str = Field(min_length=10, max_length=2000)
+    avatar_url: Optional[str] = None
+
+
+class TestimonialRequestPublic(BaseModel):
+    slug: str
+    requester_name: str
+    requester_role: Optional[str] = None
+    personal_message: Optional[str] = None
+    status: str
+
+    model_config = {"from_attributes": True}
+
+
+class TestimonialRequestResponse(BaseModel):
+    id: int
+    slug: str
+    requester_name: str
+    requester_email: Optional[str] = None
+    requester_role: Optional[str] = None
+    personal_message: Optional[str] = None
+    status: str
+    submitted_name: Optional[str] = None
+    submitted_role: Optional[str] = None
+    submitted_quote: Optional[str] = None
+    submitted_avatar_url: Optional[str] = None
+    created_at: str
+    submitted_at: Optional[str] = None
+    reviewed_at: Optional[str] = None
+    testimonial_id: Optional[int] = None
+
+    model_config = {"from_attributes": True}
+
+
 # ── Tracked Links ─────────────────────────────────────────────────────────────
 
 class ProjectCtx(BaseModel):

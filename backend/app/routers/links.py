@@ -78,6 +78,12 @@ async def redirect_link(slug: str, request: FastAPIRequest, db: AsyncSession = D
     result = await db.execute(select(models.TrackedLink).where(models.TrackedLink.slug == slug))
     link = result.scalar_one_or_none()
     if not link:
+        treq_result = await db.execute(
+            select(models.TestimonialRequest).where(models.TestimonialRequest.slug == slug)
+        )
+        treq = treq_result.scalar_one_or_none()
+        if treq and treq.status not in ("approved", "rejected"):
+            return RedirectResponse(url=f"/testimonial/{treq.slug}", status_code=302)
         raise HTTPException(status_code=404, detail="Link not found")
 
     link.clicks += 1
