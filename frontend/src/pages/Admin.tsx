@@ -38,6 +38,7 @@ import {
   File,
   Download,
   Copy,
+  Settings,
 } from 'lucide-react'
 import {
   api,
@@ -57,6 +58,7 @@ import {
   type StorageFile,
   type TestimonialResponse,
   type TrackedLinkResponse,
+  type PortfolioCtx,
 } from '../lib/api'
 
 /* ═══════════════════════════════════════════════
@@ -265,6 +267,7 @@ export default function Admin() {
   // ── Links state ───────────────────────────────────────────────────────────
   const [trackedLinks, setTrackedLinks] = useState<TrackedLinkResponse[]>([])
   const [linksLoaded, setLinksLoaded] = useState(false)
+  const [expandedCtx, setExpandedCtx] = useState<number | null>(null)
 
   // ── Files state ───────────────────────────────────────────────────────────
   const [files, setFiles] = useState<StorageFile[]>([])
@@ -1908,7 +1911,12 @@ export default function Admin() {
 
   const saveLink = async (link: TrackedLinkResponse) => {
     try {
-      await api.links.update(link.id, { slug: link.slug, destination_url: link.destination_url, label: link.label })
+      await api.links.update(link.id, {
+        slug: link.slug,
+        destination_url: link.destination_url,
+        label: link.label,
+        portfolio_ctx: link.portfolio_ctx,
+      })
       showToast('Link saved')
     } catch (err) { showError((err as Error).message) }
   }
@@ -1934,10 +1942,11 @@ export default function Admin() {
       </div>
 
       <SectionCard className="!p-0 overflow-hidden">
-        <div className="grid grid-cols-[1fr_1fr_auto_auto_auto] gap-0 text-[11px] font-mono text-steel tracking-wider uppercase px-6 py-3 border-b border-mist bg-cloud/50">
+        <div className="grid grid-cols-[1fr_1fr_auto_auto_auto_auto] gap-0 text-[11px] font-mono text-steel tracking-wider uppercase px-6 py-3 border-b border-mist bg-cloud/50">
           <span>Label / Slug</span>
           <span>Destination</span>
           <span className="w-16 text-center">Clicks</span>
+          <span className="w-8"></span>
           <span className="w-8"></span>
           <span className="w-8"></span>
         </div>
@@ -1945,43 +1954,137 @@ export default function Admin() {
           <p className="text-center text-steel text-sm py-8 font-mono">No links yet.</p>
         )}
         {trackedLinks.map(link => (
-          <div key={link.id} className="grid grid-cols-[1fr_1fr_auto_auto_auto] gap-0 items-center px-6 py-3.5 border-b border-mist last:border-b-0 hover:bg-cloud/30 transition-colors">
-            <div>
-              <input
-                value={link.label}
-                onChange={e => setTrackedLinks(prev => prev.map(l => l.id === link.id ? { ...l, label: e.target.value } : l))}
-                className="text-sm text-ink font-medium bg-transparent focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue/10 rounded px-2 py-1 -ml-2 transition-all w-full"
-                placeholder="Label"
-              />
-              <div className="flex items-center gap-1 ml-0">
-                <span className="font-mono text-[10px] text-silver">/go/</span>
+          <div key={link.id}>
+            <div className="grid grid-cols-[1fr_1fr_auto_auto_auto_auto] gap-0 items-center px-6 py-3.5 border-b border-mist last:border-b-0 hover:bg-cloud/30 transition-colors">
+              <div>
                 <input
-                  value={link.slug}
-                  onChange={e => setTrackedLinks(prev => prev.map(l => l.id === link.id ? { ...l, slug: e.target.value } : l))}
-                  className="font-mono text-[11px] text-steel bg-transparent focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue/10 rounded px-1 py-0.5 transition-all"
-                  placeholder="slug"
+                  value={link.label}
+                  onChange={e => setTrackedLinks(prev => prev.map(l => l.id === link.id ? { ...l, label: e.target.value } : l))}
+                  className="text-sm text-ink font-medium bg-transparent focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue/10 rounded px-2 py-1 -ml-2 transition-all w-full"
+                  placeholder="Label"
                 />
-                <button
-                  onClick={() => { navigator.clipboard.writeText(`https://nathanblatter.com/go/${link.slug}`); showToast('Copied') }}
-                  className="p-1 text-silver hover:text-blue transition-colors"
-                >
-                  <Copy size={10} />
-                </button>
+                <div className="flex items-center gap-1 ml-0">
+                  <span className="font-mono text-[10px] text-silver">/go/</span>
+                  <input
+                    value={link.slug}
+                    onChange={e => setTrackedLinks(prev => prev.map(l => l.id === link.id ? { ...l, slug: e.target.value } : l))}
+                    className="font-mono text-[11px] text-steel bg-transparent focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue/10 rounded px-1 py-0.5 transition-all"
+                    placeholder="slug"
+                  />
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(`https://nathanblatter.com/go/${link.slug}`); showToast('Copied') }}
+                    className="p-1 text-silver hover:text-blue transition-colors"
+                  >
+                    <Copy size={10} />
+                  </button>
+                </div>
               </div>
+              <input
+                value={link.destination_url}
+                onChange={e => setTrackedLinks(prev => prev.map(l => l.id === link.id ? { ...l, destination_url: e.target.value } : l))}
+                className="font-mono text-xs text-steel bg-transparent focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue/10 rounded px-2 py-1 transition-all truncate"
+                placeholder="https://..."
+              />
+              <span className="w-16 text-center font-mono text-sm font-semibold text-ink">{link.clicks}</span>
+              <button
+                onClick={() => setExpandedCtx(expandedCtx === link.id ? null : link.id)}
+                className={`p-1.5 transition-colors ${link.portfolio_ctx ? 'text-blue' : 'text-steel hover:text-blue'}`}
+                title="Customize portfolio view"
+              >
+                <Settings size={13} />
+              </button>
+              <button onClick={() => saveLink(link)} className="p-1.5 text-steel hover:text-blue transition-colors">
+                <Save size={13} />
+              </button>
+              <button onClick={() => removeLink(link.id)} className="p-1.5 text-steel hover:text-ember transition-colors">
+                <Trash2 size={13} />
+              </button>
             </div>
-            <input
-              value={link.destination_url}
-              onChange={e => setTrackedLinks(prev => prev.map(l => l.id === link.id ? { ...l, destination_url: e.target.value } : l))}
-              className="font-mono text-xs text-steel bg-transparent focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue/10 rounded px-2 py-1 transition-all truncate"
-              placeholder="https://..."
-            />
-            <span className="w-16 text-center font-mono text-sm font-semibold text-ink">{link.clicks}</span>
-            <button onClick={() => saveLink(link)} className="p-1.5 text-steel hover:text-blue transition-colors">
-              <Save size={13} />
-            </button>
-            <button onClick={() => removeLink(link.id)} className="p-1.5 text-steel hover:text-ember transition-colors">
-              <Trash2 size={13} />
-            </button>
+            {expandedCtx === link.id && (
+              <div className="px-6 py-5 border-b border-mist bg-cloud/20 space-y-4">
+                <p className="font-mono text-[10px] text-steel uppercase tracking-wider mb-3">Portfolio Customization</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <AdminInput
+                    label="Company Name"
+                    value={link.portfolio_ctx?.company ?? ''}
+                    onChange={v => setTrackedLinks(prev => prev.map(l => l.id === link.id ? {
+                      ...l,
+                      portfolio_ctx: { featured_project_ids: [], highlight_skill_ids: [], ...(l.portfolio_ctx ?? {}), company: v || undefined },
+                    } : l))}
+                    placeholder="Stripe"
+                  />
+                  <AdminInput
+                    label="Custom Tagline"
+                    value={link.portfolio_ctx?.tagline ?? ''}
+                    onChange={v => setTrackedLinks(prev => prev.map(l => l.id === link.id ? {
+                      ...l,
+                      portfolio_ctx: { featured_project_ids: [], highlight_skill_ids: [], ...(l.portfolio_ctx ?? {}), tagline: v || undefined },
+                    } : l))}
+                    placeholder="Full-stack engineer with fintech experience…"
+                  />
+                </div>
+                <div>
+                  <label className="block font-mono text-[11px] text-steel mb-2 tracking-wider uppercase">Featured Projects <span className="text-silver normal-case">(max 3, drag order = display order)</span></label>
+                  <div className="flex flex-wrap gap-2">
+                    {projects.map(p => {
+                      const selected = link.portfolio_ctx?.featured_project_ids?.includes(p.project_id) ?? false
+                      const count = link.portfolio_ctx?.featured_project_ids?.length ?? 0
+                      return (
+                        <button
+                          key={p.project_id}
+                          onClick={() => {
+                            setTrackedLinks(prev => prev.map(l => {
+                              if (l.id !== link.id) return l
+                              const ids = l.portfolio_ctx?.featured_project_ids ?? []
+                              const next = selected
+                                ? ids.filter(id => id !== p.project_id)
+                                : count < 3 ? [...ids, p.project_id] : ids
+                              return { ...l, portfolio_ctx: { featured_project_ids: [], highlight_skill_ids: [], ...(l.portfolio_ctx ?? {}), featured_project_ids: next } }
+                            }))
+                          }}
+                          className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-colors ${selected ? 'bg-blue text-white' : 'bg-white border border-mist text-steel hover:border-blue/40'}`}
+                        >
+                          {p.title}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <label className="block font-mono text-[11px] text-steel mb-2 tracking-wider uppercase">Highlight Skills</label>
+                  <div className="flex flex-wrap gap-2">
+                    {skills.map(s => {
+                      const selected = link.portfolio_ctx?.highlight_skill_ids?.includes(s.id) ?? false
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => {
+                            setTrackedLinks(prev => prev.map(l => {
+                              if (l.id !== link.id) return l
+                              const ids = l.portfolio_ctx?.highlight_skill_ids ?? []
+                              const next = selected ? ids.filter(id => id !== s.id) : [...ids, s.id]
+                              return { ...l, portfolio_ctx: { featured_project_ids: [], highlight_skill_ids: [], ...(l.portfolio_ctx ?? {}), highlight_skill_ids: next } }
+                            }))
+                          }}
+                          className={`px-2.5 py-1 rounded-full font-mono text-[11px] transition-colors ${selected ? 'bg-blue text-white' : 'bg-white border border-mist text-steel hover:border-blue/40'}`}
+                        >
+                          {s.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    onClick={() => setTrackedLinks(prev => prev.map(l => l.id === link.id ? { ...l, portfolio_ctx: null } : l))}
+                    className="font-mono text-[11px] text-steel hover:text-ember transition-colors"
+                  >
+                    Clear customization
+                  </button>
+                  <span className="font-mono text-[10px] text-silver">Save using the row save button →</span>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </SectionCard>

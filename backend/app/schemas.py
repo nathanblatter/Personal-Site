@@ -85,10 +85,18 @@ class TestimonialResponse(TestimonialBase):
 
 # ── Tracked Links ─────────────────────────────────────────────────────────────
 
+class PortfolioCtx(BaseModel):
+    company: Optional[str] = None
+    tagline: Optional[str] = None
+    featured_project_ids: List[str] = []
+    highlight_skill_ids: List[int] = []
+
+
 class TrackedLinkBase(BaseModel):
     slug: str
     destination_url: str
     label: str
+    portfolio_ctx: Optional[PortfolioCtx] = None
 
 
 class TrackedLinkCreate(TrackedLinkBase):
@@ -99,6 +107,7 @@ class TrackedLinkUpdate(BaseModel):
     slug: Optional[str] = None
     destination_url: Optional[str] = None
     label: Optional[str] = None
+    portfolio_ctx: Optional[PortfolioCtx] = None
 
 
 class TrackedLinkResponse(TrackedLinkBase):

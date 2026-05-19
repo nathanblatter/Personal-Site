@@ -9,6 +9,7 @@ import TimelineItem from '../components/TimelineItem'
 import GitHubSection from '../components/GitHubSection'
 import Skeleton from '../components/Skeleton'
 import { api, type ProjectResponse, type SkillResponse, type ExperienceResponse, type AboutResponse } from '../lib/api'
+import { usePortfolioCtx } from '../lib/usePortfolioCtx'
 
 const LiveStatus = lazy(() => import('../components/LiveStatus'))
 
@@ -18,6 +19,7 @@ export default function Home() {
   const [experience, setExperience] = useState<ExperienceResponse[]>([])
   const [about, setAbout] = useState<AboutResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const portfolioCtx = usePortfolioCtx()
 
   useEffect(() => {
     api.home.get().then(({ projects: p, skills: s, experience: e, about: a }) => {
@@ -25,10 +27,27 @@ export default function Home() {
     }).finally(() => setLoading(false))
   }, [])
 
-  const featuredProjects = projects.slice(0, 3)
+  const featuredProjects = portfolioCtx?.featured_project_ids?.length
+    ? projects
+        .filter(p => portfolioCtx.featured_project_ids.includes(p.project_id))
+        .sort((a, b) =>
+          portfolioCtx.featured_project_ids.indexOf(a.project_id) -
+          portfolioCtx.featured_project_ids.indexOf(b.project_id)
+        )
+        .slice(0, 3)
+    : projects.slice(0, 3)
+
 
   return (
     <>
+      {portfolioCtx?.company && (
+        <div className="bg-blue-wash border-b border-blue/10 py-2 text-center">
+          <span className="font-mono text-xs text-blue">
+            Hi {portfolioCtx.company} — thanks for taking a look
+          </span>
+        </div>
+      )}
+
       {/* ═══ HERO ═══ */}
       <section className="min-h-[85vh] flex items-center relative overflow-hidden">
         <div className="absolute inset-0 opacity-[0.35]" style={{
@@ -67,10 +86,14 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.6 }}
             className="text-base md:text-xl text-steel max-w-[560px] mx-auto leading-relaxed mb-8 md:mb-10"
           >
-            IS student skilled in full-stack engineering, AI-driven applications, and{' '}
-            <span className="text-ink font-medium">data analytics</span>. Translating{' '}
-            <span className="text-ink font-medium">business requirements</span> into
-            production-ready systems.
+            {portfolioCtx?.tagline ? portfolioCtx.tagline : (
+              <>
+                IS student skilled in full-stack engineering, AI-driven applications, and{' '}
+                <span className="text-ink font-medium">data analytics</span>. Translating{' '}
+                <span className="text-ink font-medium">business requirements</span> into
+                production-ready systems.
+              </>
+            )}
           </motion.p>
 
           <motion.div
@@ -193,7 +216,12 @@ export default function Home() {
                   </div>
                 ))
               : skills.map((skill, i) => (
-                  <SkillBar key={skill.id} {...skill} index={i} />
+                  <SkillBar
+                    key={skill.id}
+                    {...skill}
+                    index={i}
+                    highlighted={portfolioCtx?.highlight_skill_ids?.includes(skill.id) ?? false}
+                  />
                 ))
             }
           </div>

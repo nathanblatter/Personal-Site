@@ -50,6 +50,7 @@ class TrackedLink(Base):
     destination_url = Column(String, nullable=False)
     label = Column(String, nullable=False)
     clicks = Column(Integer, nullable=False, default=0)
+    portfolio_ctx = Column(JSON, nullable=True)
 
 
 class Skill(Base):

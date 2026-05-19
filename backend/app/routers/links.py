@@ -85,7 +85,20 @@ async def redirect_link(slug: str, request: FastAPIRequest, db: AsyncSession = D
 
     _fire_umami_event(request, link)
 
+    if link.portfolio_ctx is not None:
+        return RedirectResponse(url=f"/?ctx={link.slug}", status_code=302)
     return RedirectResponse(url=link.destination_url, status_code=302)
+
+
+# ── Public ctx endpoint ───────────────────────────────────────────────────────
+
+@router.get("/api/v1/links/ctx/{slug}", response_model=schemas.PortfolioCtx)
+async def get_portfolio_ctx(slug: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(models.TrackedLink).where(models.TrackedLink.slug == slug))
+    link = result.scalar_one_or_none()
+    if not link or link.portfolio_ctx is None:
+        raise HTTPException(status_code=404, detail="No portfolio context")
+    return link.portfolio_ctx
 
 
 # ── Admin CRUD ───────────────────────────────────────────────────────────────

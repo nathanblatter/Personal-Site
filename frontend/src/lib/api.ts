@@ -235,12 +235,20 @@ export interface UploadResponse {
 
 // ── Tracked Links Types ───────────────────────────────────────────────────
 
+export interface PortfolioCtx {
+  company?: string
+  tagline?: string
+  featured_project_ids: string[]
+  highlight_skill_ids: number[]
+}
+
 export interface TrackedLinkResponse {
   id: number
   slug: string
   destination_url: string
   label: string
   clicks: number
+  portfolio_ctx?: PortfolioCtx | null
 }
 
 // ── Claude Usage Types ────────────────────────────────────────────────────
@@ -429,6 +437,7 @@ export const api = {
     update: (id: number, data: Partial<Omit<TrackedLinkResponse, 'id' | 'clicks'>>) =>
       request<TrackedLinkResponse>('PUT', `/links/${id}`, data),
     delete: (id: number) => request<void>('DELETE', `/links/${id}`),
+    getCtx: (slug: string) => request<PortfolioCtx>('GET', `/links/ctx/${slug}`),
   },
 
   home: {
