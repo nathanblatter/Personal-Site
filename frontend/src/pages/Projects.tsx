@@ -5,6 +5,7 @@ import ProjectCard from '../components/ProjectCard'
 import ProjectModal from '../components/ProjectModal'
 import Skeleton from '../components/Skeleton'
 import { api, type ProjectResponse } from '../lib/api'
+import { usePortfolioCtx } from '../lib/usePortfolioCtx'
 import type { Project } from '../components/ProjectCard'
 
 const categories = ['All', 'Live', 'WIP', 'Archived']
@@ -14,15 +15,20 @@ export default function Projects() {
   const [filter, setFilter] = useState('All')
   const [selected, setSelected] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
+  const portfolioCtx = usePortfolioCtx()
 
   useEffect(() => {
     api.projects.list().then(setAllProjects).finally(() => setLoading(false))
   }, [])
 
+  const visibleProjects = portfolioCtx
+    ? allProjects.filter(p => (portfolioCtx.projects?.[p.project_id]?.visibility ?? 'show') !== 'hide')
+    : allProjects
+
   const filtered =
     filter === 'All'
-      ? allProjects
-      : allProjects.filter((p) => p.status === filter.toLowerCase())
+      ? visibleProjects
+      : visibleProjects.filter((p) => p.status === filter.toLowerCase())
 
   return (
     <section className="py-16 md:py-28 min-h-screen">
@@ -52,8 +58,8 @@ export default function Projects() {
               {cat}
               <span className="ml-2 text-silver">
                 {cat === 'All'
-                  ? allProjects.length
-                  : allProjects.filter((p) => p.status === cat.toLowerCase()).length}
+                  ? visibleProjects.length
+                  : visibleProjects.filter((p) => p.status === cat.toLowerCase()).length}
               </span>
             </button>
           ))}
@@ -79,7 +85,13 @@ export default function Projects() {
                 </div>
               ))
             : filtered.map((project, i) => (
-                <ProjectCard key={project.id} project={project} index={i} onSelect={setSelected} />
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  index={i}
+                  onSelect={setSelected}
+                  highlighted={(portfolioCtx?.projects?.[project.project_id]?.visibility ?? 'show') === 'highlight'}
+                />
               ))
           }
         </div>

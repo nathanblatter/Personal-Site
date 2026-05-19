@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -85,11 +85,49 @@ class TestimonialResponse(TestimonialBase):
 
 # ── Tracked Links ─────────────────────────────────────────────────────────────
 
+class ProjectCtx(BaseModel):
+    visibility: str = "show"
+
+
+class SkillCtx(BaseModel):
+    visibility: str = "show"
+
+
+class ExperienceCtx(BaseModel):
+    visibility: str = "show"
+    title: Optional[str] = None
+    subtitle: Optional[str] = None
+    description: Optional[str] = None
+    note: Optional[str] = None
+
+
+class InterestCtx(BaseModel):
+    visibility: str = "show"
+
+
+class TestimonialCtx(BaseModel):
+    visibility: str = "show"
+
+
+class AboutCtx(BaseModel):
+    bio_paragraphs: Optional[List[str]] = None
+    status_text: Optional[str] = None
+    gpa: Optional[str] = None
+    looking_for: Optional[List[Any]] = None
+    info_fields: Optional[List[Any]] = None
+    headshot_url: Optional[str] = None
+    facts: Optional[List[Any]] = None
+
+
 class PortfolioCtx(BaseModel):
     company: Optional[str] = None
     tagline: Optional[str] = None
-    featured_project_ids: List[str] = []
-    highlight_skill_ids: List[int] = []
+    projects: Dict[str, ProjectCtx] = {}
+    skills: Dict[str, SkillCtx] = {}
+    experience: Dict[str, ExperienceCtx] = {}
+    interests: Dict[str, InterestCtx] = {}
+    testimonials: Dict[str, TestimonialCtx] = {}
+    about: Optional[AboutCtx] = None
 
 
 class TrackedLinkBase(BaseModel):

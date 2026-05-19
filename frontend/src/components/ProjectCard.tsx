@@ -18,10 +18,12 @@ export default function ProjectCard({
   project,
   index,
   onSelect,
+  highlighted,
 }: {
   project: Project
   index: number
   onSelect?: (project: Project) => void
+  highlighted?: boolean
 }) {
   const statusColors = {
     live: 'bg-teal',
@@ -38,7 +40,7 @@ export default function ProjectCard({
       className="group relative cursor-pointer"
       onClick={() => onSelect?.(project)}
     >
-      <div className="relative overflow-hidden rounded-xl border border-mist bg-white hover:border-blue/30 transition-all duration-500 hover:shadow-lg hover:shadow-blue/5">
+      <div className={`relative overflow-hidden rounded-xl border bg-white hover:border-blue/30 transition-all duration-500 hover:shadow-lg hover:shadow-blue/5 ${highlighted ? 'border-blue/40 ring-2 ring-blue/20' : 'border-mist'}`}>
         {/* Colored accent bar */}
         <div className="h-1.5 w-full" style={{ background: project.color }} />
 
