@@ -11,11 +11,69 @@ jobs:
         run: |
           cd /Users/nathanblatter/Desktop/Personal-Site/backend
           git -C .. pull origin main
+
+          # Build frontend
           cd /Users/nathanblatter/Desktop/Personal-Site/frontend
           npm ci
           npm run build
+
+          # Build new backend image
           cd /Users/nathanblatter/Desktop/Personal-Site/backend
           DOCKER_BUILDKIT=0 docker build --pull=false -t backend-api:latest .
-          docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-recreate
-          sleep 8
-          docker compose -f docker-compose.prod.yml exec api python seed.py
+
+          # Get current running container ID
+          OLD_CONTAINER=$(docker compose -f docker-compose.prod.yml --env-file .env.prod ps -q api 2>/dev/null | head -1)
+
+          if [ -z "$OLD_CONTAINER" ]; then
+            echo "No existing container, starting fresh..."
+            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+            sleep 10
+            docker compose -f docker-compose.prod.yml --env-file .env.prod exec api python seed.py
+            exit 0
+          fi
+
+          # Scale up: start new container alongside old
+          echo "Scaling up to 2 replicas..."
+          docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --scale api=2 --no-recreate
+
+          # Identify new container
+          NEW_CONTAINER=$(docker compose -f docker-compose.prod.yml --env-file .env.prod ps -q api | grep -v "^${OLD_CONTAINER}$" | head -1)
+          if [ -z "$NEW_CONTAINER" ]; then
+            echo "ERROR: Could not identify new container"
+            exit 1
+          fi
+          echo "Old: $OLD_CONTAINER | New: $NEW_CONTAINER"
+
+          # Wait for health check to pass
+          echo "Waiting for new container to be healthy..."
+          HEALTHY=false
+          for i in $(seq 1 40); do
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$NEW_CONTAINER" 2>/dev/null)
+            if [ "$STATUS" = "healthy" ]; then
+              HEALTHY=true
+              echo "New container is healthy!"
+              break
+            elif [ "$STATUS" = "unhealthy" ]; then
+              echo "ERROR: New container is unhealthy, rolling back..."
+              docker stop "$NEW_CONTAINER" && docker rm "$NEW_CONTAINER"
+              exit 1
+            else
+              echo "  Status: ${STATUS:-starting} ($i/40)..."
+              sleep 5
+            fi
+          done
+
+          if [ "$HEALTHY" != "true" ]; then
+            echo "ERROR: Health check timed out, rolling back..."
+            docker stop "$NEW_CONTAINER" && docker rm "$NEW_CONTAINER"
+            exit 1
+          fi
+
+          # Stop old container
+          echo "Removing old container..."
+          docker stop "$OLD_CONTAINER" && docker rm "$OLD_CONTAINER"
+
+          # Run seed on new container
+          docker exec "$NEW_CONTAINER" python seed.py
+
+          echo "Zero-downtime deploy complete!"
