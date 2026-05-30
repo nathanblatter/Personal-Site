@@ -229,6 +229,7 @@ async def location_ingest(
     _: None = Depends(_verify_health_ingest_key),
 ):
     """Log a lat/lon ping. Called by phone Shortcut every 30 minutes."""
+    print(f"[location_ingest] received: {body.model_dump()}", flush=True)
     ts = body.ts or datetime.now(timezone.utc)
     async with _KPI_POOL.acquire() as conn:
         await conn.execute(
