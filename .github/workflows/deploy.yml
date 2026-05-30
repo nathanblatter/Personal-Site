@@ -12,8 +12,8 @@ jobs:
       - name: Deploy
         run: |
           PROD=/Users/nathanblatter/Desktop/Personal-Site
-          ENV_FILE=$PROD/backend/.env.prod
           COMPOSE=$GITHUB_WORKSPACE/backend/docker-compose.prod.yml
+          COMPOSE_ARGS="--project-directory $PROD/backend -f $COMPOSE"
 
           # Build image from repo root — frontend baked in via multi-stage Dockerfile
           cd $GITHUB_WORKSPACE
@@ -21,22 +21,22 @@ jobs:
 
           # Get current running container ID
           cd $GITHUB_WORKSPACE/backend
-          OLD_CONTAINER=$(docker compose -f $COMPOSE --env-file $ENV_FILE ps -q api 2>/dev/null | head -1)
+          OLD_CONTAINER=$(docker compose $COMPOSE_ARGS ps -q api 2>/dev/null | head -1)
 
           if [ -z "$OLD_CONTAINER" ]; then
             echo "No existing container, starting fresh..."
-            docker compose -f $COMPOSE --env-file $ENV_FILE up -d
+            docker compose $COMPOSE_ARGS up -d
             sleep 10
-            docker compose -f $COMPOSE --env-file $ENV_FILE exec api python seed.py
+            docker compose $COMPOSE_ARGS exec api python seed.py
             exit 0
           fi
 
           # Scale up: start new container alongside old
           echo "Scaling up to 2 replicas..."
-          docker compose -f $COMPOSE --env-file $ENV_FILE up -d --scale api=2 --no-recreate
+          docker compose $COMPOSE_ARGS up -d --scale api=2 --no-recreate
 
           # Identify new container
-          NEW_CONTAINER=$(docker compose -f $COMPOSE --env-file $ENV_FILE ps -q api | grep -v "^${OLD_CONTAINER}$" | head -1)
+          NEW_CONTAINER=$(docker compose $COMPOSE_ARGS ps -q api | grep -v "^${OLD_CONTAINER}$" | head -1)
           if [ -z "$NEW_CONTAINER" ]; then
             echo "ERROR: Could not identify new container"
             exit 1
