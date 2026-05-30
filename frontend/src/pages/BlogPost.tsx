@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { ArrowLeft, Calendar, Clock, Eye, Link2, Check } from 'lucide-react'
@@ -39,12 +39,26 @@ function headingId(node: unknown): string {
     .replace(/^-|-$/g, '')
 }
 
+interface TocItem { id: string; text: string; level: number }
+
+function extractHeadings(content: string): TocItem[] {
+  return content.split('\n').flatMap(line => {
+    const m = line.match(/^(#{2,3})\s+(.+)$/)
+    if (!m) return []
+    const text = m[2].replace(/[*`_~]/g, '').trim()
+    const id = text.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/^-|-$/g, '')
+    return [{ id, text, level: m[1].length }]
+  })
+}
+
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>()
   const [post, setPost] = useState<BlogPostResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [activeId, setActiveId] = useState<string>('')
+  const headingsRef = useRef<TocItem[]>([])
 
   useEffect(() => {
     if (!slug) return
@@ -54,6 +68,25 @@ export default function BlogPost() {
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
   }, [slug])
+
+  useEffect(() => {
+    if (!post) return
+    headingsRef.current = extractHeadings(post.content)
+    if (headingsRef.current.length === 0) return
+
+    const onScroll = () => {
+      let current = headingsRef.current[0]?.id ?? ''
+      for (const { id } of headingsRef.current) {
+        const el = document.getElementById(id)
+        if (el && el.getBoundingClientRect().top <= 120) current = id
+      }
+      setActiveId(current)
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [post])
 
   if (loading) {
     return (
@@ -75,8 +108,13 @@ export default function BlogPost() {
     )
   }
 
+  const toc = headingsRef.current
+
   return (
-    <div className="max-w-[720px] mx-auto px-6 py-16">
+    <div className="max-w-[720px] xl:max-w-[1060px] mx-auto px-6 py-16">
+      <div className="xl:grid xl:grid-cols-[1fr_200px] xl:gap-12 xl:items-start">
+        {/* Main column */}
+        <div>
       {/* Back */}
       <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="mb-12">
         <Link
@@ -330,6 +368,38 @@ export default function BlogPost() {
           Back to All Posts
         </Link>
       </motion.div>
+        </div>{/* end main column */}
+
+        {/* Table of Contents sidebar */}
+        {toc.length >= 2 && (
+          <aside className="hidden xl:block">
+            <div className="sticky top-24">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-silver mb-3">On this page</p>
+              <nav className="space-y-1">
+                {toc.map(({ id, text, level }) => (
+                  <a
+                    key={id}
+                    href={`#${id}`}
+                    onClick={e => {
+                      e.preventDefault()
+                      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+                    }}
+                    className={`block font-mono text-[11px] leading-snug transition-colors truncate ${
+                      level === 3 ? 'pl-3' : ''
+                    } ${
+                      activeId === id
+                        ? 'text-blue'
+                        : 'text-silver hover:text-steel'
+                    }`}
+                  >
+                    {text}
+                  </a>
+                ))}
+              </nav>
+            </div>
+          </aside>
+        )}
+      </div>{/* end grid */}
     </div>
   )
 }
