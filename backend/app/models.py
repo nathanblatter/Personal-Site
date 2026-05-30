@@ -397,3 +397,13 @@ class ApplicationTag(Base):
 
     application_id = Column(PgUUID(as_uuid=False), ForeignKey("application.id", ondelete="CASCADE"), primary_key=True)
     tag_id = Column(PgUUID(as_uuid=False), ForeignKey("tag.id", ondelete="CASCADE"), primary_key=True)
+
+
+class ClaudeUsageDay(Base):
+    __tablename__ = "claude_usage_days"
+
+    date = Column(String, primary_key=True)   # YYYY-MM-DD
+    tokens = Column(BigInteger, nullable=False, default=0)
+    cost_cents = Column(Integer, nullable=False, default=0)
+    sessions = Column(Integer, nullable=False, default=0)
+    snapshotted_at = Column(String, nullable=False)

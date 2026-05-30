@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from sqlalchemy import select
 
 from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, status, solar, testimonial_requests
+from app.routers.claude_usage import _do_snapshot as _claude_snapshot
 from app.database import AsyncSessionLocal
 from app import models
 
@@ -77,11 +78,26 @@ def _read_index_html() -> str | None:
     return _index_cache["content"]
 
 
+async def _periodic_claude_snapshot():
+    """Snapshot Claude JSONL data to DB once on startup, then every 24 h."""
+    import logging
+    log = logging.getLogger("claude_snapshot")
+    while True:
+        try:
+            n = await _claude_snapshot()
+            log.info("Claude snapshot: %d days upserted", n)
+        except Exception as exc:
+            log.warning("Claude snapshot failed: %s", exc)
+        await asyncio.sleep(86400)  # 24 hours
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await kpi.init_kpi_db()
     # Warm GitHub cache in the background so it doesn't delay startup
     asyncio.create_task(github.warmup())
+    # Persist Claude usage data to DB daily so history survives JSONL pruning
+    asyncio.create_task(_periodic_claude_snapshot())
     # Prime index.html cache
     _read_index_html()
     yield

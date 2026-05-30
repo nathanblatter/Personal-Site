@@ -3,7 +3,13 @@ import os
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy import select, delete
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+from app.database import AsyncSessionLocal
+from app import models
+from app.auth import require_auth
 
 router = APIRouter(prefix="/claude", tags=["claude"])
 
@@ -30,39 +36,25 @@ def _get_pricing(model: str) -> dict | None:
 
 
 def _project_name(jsonl_path: Path) -> str:
-    """Derive a human-readable project name from the grandparent directory."""
-    # Path: .../projects/-Users-nathanblatter-Desktop-Personal-Site/some-session.jsonl
-    # grandparent dir: -Users-nathanblatter-Desktop-Personal-Site
     dir_name = jsonl_path.parent.name
-    # Take the last dash-separated segment that looks like a project name
     parts = dir_name.split("-")
-    # Find the last meaningful segment (usually the project folder name)
-    # e.g. "-Users-nathanblatter-Desktop-Personal-Site" -> "Personal-Site"
-    # Heuristic: skip segments that are known path parts (Users, home dir, Desktop, etc.)
     skip = {"", "Users", "home", "Desktop", "Documents", "Projects", "code", "dev", "workspace"}
     meaningful = [p for p in parts if p and p not in skip]
     if not meaningful:
         return dir_name
-    # Return last 1-2 segments joined by dash
     return "-".join(meaningful[-2:]) if len(meaningful) >= 2 else meaningful[-1]
 
 
-def _compute_usage() -> dict:
-    now = time.time()
-    cache_key = "claude_usage"
-    if cache_key in _cache and now - _cache[cache_key]["ts"] < CACHE_TTL:
-        return _cache[cache_key]["data"]
-
-    # Aggregations
-    days: dict[str, dict] = {}       # date -> {tokens, cost_cents, sessions: set}
-    models: dict[str, dict] = {}     # model -> {tokens, cost_cents}
-    projects: dict[str, dict] = {}   # project -> {tokens, cost_cents}
+def _scan_jsonl() -> dict:
+    """Scan JSONL files and return raw aggregations (no DB, no cache)."""
+    days: dict[str, dict] = {}
+    models_agg: dict[str, dict] = {}
+    projects: dict[str, dict] = {}
 
     for data_dir in CLAUDE_DATA_DIRS:
         if not data_dir.exists():
             continue
         for jsonl_file in data_dir.rglob("*.jsonl"):
-            # Skip memory subdirs
             if "memory" in jsonl_file.parts:
                 continue
 
@@ -103,7 +95,6 @@ def _compute_usage() -> dict:
                         cache_read_t = usage.get("cache_read_input_tokens", 0) or 0
                         total_tokens = input_t + output_t + cache_create_t + cache_read_t
 
-                        # Cost in cents
                         rates = _get_pricing(model)
                         cost_cents = 0.0
                         if rates:
@@ -112,9 +103,8 @@ def _compute_usage() -> dict:
                                 + output_t * rates["output"] / 1_000_000
                                 + cache_create_t * rates["cache_create"] / 1_000_000
                                 + cache_read_t * rates["cache_read"] / 1_000_000
-                            ) * 100  # convert dollars to cents
+                            ) * 100
 
-                        # Aggregate by day
                         if day_str not in days:
                             days[day_str] = {"tokens": 0, "cost_cents": 0.0, "sessions": set()}
                         days[day_str]["tokens"] += total_tokens
@@ -122,13 +112,11 @@ def _compute_usage() -> dict:
                         if session_id:
                             days[day_str]["sessions"].add(session_id)
 
-                        # Aggregate by model
-                        if model not in models:
-                            models[model] = {"tokens": 0, "cost_cents": 0.0}
-                        models[model]["tokens"] += total_tokens
-                        models[model]["cost_cents"] += cost_cents
+                        if model not in models_agg:
+                            models_agg[model] = {"tokens": 0, "cost_cents": 0.0}
+                        models_agg[model]["tokens"] += total_tokens
+                        models_agg[model]["cost_cents"] += cost_cents
 
-                        # Aggregate by project
                         if project not in projects:
                             projects[project] = {"tokens": 0, "cost_cents": 0.0}
                         projects[project]["tokens"] += total_tokens
@@ -137,53 +125,53 @@ def _compute_usage() -> dict:
             except (OSError, PermissionError):
                 continue
 
-    # Build sorted days list
-    sorted_days = sorted(days.keys())
+    return {"days": days, "models": models_agg, "projects": projects}
+
+
+def _build_result(days: dict, models_agg: dict, projects: dict) -> dict:
+    """Convert raw aggregation dicts into the final API response shape."""
+    sorted_day_keys = sorted(days.keys())
     days_list = [
         {
             "date": d,
             "tokens": days[d]["tokens"],
             "cost_cents": round(days[d]["cost_cents"]),
-            "sessions": len(days[d]["sessions"]),
+            "sessions": len(days[d]["sessions"]) if isinstance(days[d]["sessions"], set) else days[d]["sessions"],
         }
-        for d in sorted_days
+        for d in sorted_day_keys
     ]
 
-    # Streak: consecutive days from today backward
     today = date.today().isoformat()
     streak = 0
     if days:
-        all_active = set(d for d, v in days.items() if v["tokens"] > 0)
-        check = today
         from datetime import timedelta
+        all_active = {d for d, v in days.items() if v["tokens"] > 0}
         current = date.today()
         while current.isoformat() in all_active:
             streak += 1
             current = current - timedelta(days=1)
 
-    # Summary
     total_tokens = sum(v["tokens"] for v in days.values())
     total_cost_cents = round(sum(v["cost_cents"] for v in days.values()))
-    total_sessions = len(set(
-        s for v in days.values() for s in v["sessions"]
-    )) if days else 0
+    total_sessions = sum(
+        len(v["sessions"]) if isinstance(v["sessions"], set) else v["sessions"]
+        for v in days.values()
+    )
     active_days = sum(1 for v in days.values() if v["tokens"] > 0)
 
-    # Models sorted by cost desc
     models_list = sorted(
-        [{"name": k, "tokens": v["tokens"], "cost_cents": round(v["cost_cents"])} for k, v in models.items()],
+        [{"name": k, "tokens": v["tokens"], "cost_cents": round(v["cost_cents"])} for k, v in models_agg.items()],
         key=lambda x: x["cost_cents"],
         reverse=True,
     )
 
-    # Top 6 projects by cost
     projects_list = sorted(
         [{"name": k, "tokens": v["tokens"], "cost_cents": round(v["cost_cents"])} for k, v in projects.items()],
         key=lambda x: x["cost_cents"],
         reverse=True,
     )[:6]
 
-    result = {
+    return {
         "days": days_list,
         "models": models_list,
         "projects": projects_list,
@@ -196,10 +184,80 @@ def _compute_usage() -> dict:
         },
     }
 
-    _cache[cache_key] = {"data": result, "ts": now}
-    return result
+
+async def _do_snapshot() -> int:
+    """Read JSONL data and upsert all days into DB. Returns number of days upserted."""
+    scan = _scan_jsonl()
+    days = scan["days"]
+    if not days:
+        return 0
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    rows = [
+        {
+            "date": d,
+            "tokens": v["tokens"],
+            "cost_cents": round(v["cost_cents"]),
+            "sessions": len(v["sessions"]) if isinstance(v["sessions"], set) else v["sessions"],
+            "snapshotted_at": now_iso,
+        }
+        for d, v in days.items()
+    ]
+
+    async with AsyncSessionLocal() as session:
+        stmt = pg_insert(models.ClaudeUsageDay).values(rows)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["date"],
+            set_={
+                "tokens": stmt.excluded.tokens,
+                "cost_cents": stmt.excluded.cost_cents,
+                "sessions": stmt.excluded.sessions,
+                "snapshotted_at": stmt.excluded.snapshotted_at,
+            },
+        )
+        await session.execute(stmt)
+        await session.commit()
+
+    # Bust cache so next GET reflects merged data
+    _cache.clear()
+    return len(rows)
 
 
 @router.get("/usage")
-def claude_usage():
-    return _compute_usage()
+async def claude_usage():
+    now = time.time()
+    cache_key = "claude_usage"
+    if cache_key in _cache and now - _cache[cache_key]["ts"] < CACHE_TTL:
+        return _cache[cache_key]["data"]
+
+    # Scan live JSONL files
+    scan = _scan_jsonl()
+    jsonl_days = scan["days"]           # date -> {tokens, cost_cents, sessions: set}
+    models_agg = scan["models"]
+    projects = scan["projects"]
+
+    # Pull DB-persisted days that aren't covered by current JSONL
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(models.ClaudeUsageDay))
+        db_rows = result.scalars().all()
+
+    merged_days = dict(jsonl_days)  # start with live data
+    for row in db_rows:
+        if row.date not in merged_days:
+            # Historical day no longer in JSONL — restore from DB
+            merged_days[row.date] = {
+                "tokens": row.tokens,
+                "cost_cents": row.cost_cents,
+                "sessions": row.sessions,  # int, not set
+            }
+
+    result_data = _build_result(merged_days, models_agg, projects)
+    _cache[cache_key] = {"data": result_data, "ts": now}
+    return result_data
+
+
+@router.post("/snapshot", dependencies=[Depends(require_auth)])
+async def claude_snapshot():
+    """Persist current JSONL usage data to DB so history survives JSONL pruning."""
+    count = await _do_snapshot()
+    return {"ok": True, "days_upserted": count}
