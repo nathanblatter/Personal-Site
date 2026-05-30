@@ -247,18 +247,19 @@ async def get_kpi(_=Depends(verify_kpi_key)):
     bounces = _val(visitor_data, "bounces")
     total_time = _val(visitor_data, "totaltime")
 
-    # Instagram pickup counts
-    ig_today = 0
-    ig_week = 0
+    # Instagram pickup counts — per-day series
+    ig_days = []
     try:
-        today = date_type.today()
         async with _KPI_POOL.acquire() as conn:
-            ig_today = await conn.fetchval(
-                "SELECT COALESCE(instagram_pickups, 0) FROM kpi_daily_log WHERE date = $1", today
-            ) or 0
-            ig_week = await conn.fetchval(
-                "SELECT COALESCE(SUM(instagram_pickups), 0) FROM kpi_daily_log WHERE date > CURRENT_DATE - 7"
-            ) or 0
+            rows = await conn.fetch(
+                """
+                SELECT date, COALESCE(instagram_pickups, 0) AS count
+                FROM kpi_daily_log
+                WHERE instagram_pickups > 0
+                ORDER BY date ASC
+                """
+            )
+            ig_days = [{"date": str(r["date"]), "count": r["count"]} for r in rows]
     except Exception as e:
         print(f"Instagram pickups unavailable: {e}")
 
@@ -291,14 +292,9 @@ async def get_kpi(_=Depends(verify_kpi_key)):
                 "label": "Pages per Session",
                 "unit": "pages",
             },
-            "instagram_pickups_today": {
-                "value": ig_today,
-                "label": "Instagram Pickups Today",
-                "unit": "opens",
-            },
-            "instagram_pickups_week": {
-                "value": int(ig_week),
-                "label": "Instagram Pickups (7d)",
+            "instagram_pickups": {
+                "value": ig_days,
+                "label": "Instagram Pickups per Day",
                 "unit": "opens",
             },
         },
