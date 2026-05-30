@@ -13,35 +13,11 @@ import { getIcon } from '../lib/iconMap'
 const CERTIFICATIONS = [
   {
     id: '32fb3752-e53f-4f0f-8699-0e4ac8c24897',
+    name: 'Professional Scrum Master I',
+    issuer: 'Scrum.org',
     verify_url: 'https://www.credly.com/badges/32fb3752-e53f-4f0f-8699-0e4ac8c24897/public_url',
   },
 ]
-
-interface CredlyBadge {
-  name: string
-  image_url: string
-  issuer: string
-  issued_at: string
-  verify_url: string
-}
-
-async function fetchCredlyBadge(id: string, verify_url: string): Promise<CredlyBadge | null> {
-  try {
-    const res = await fetch(`https://www.credly.com/badges/${id}.json`)
-    if (!res.ok) return null
-    const json = await res.json()
-    const d = json.data
-    return {
-      name: d.badge_template?.name ?? 'Certification',
-      image_url: d.badge_template?.image_url ?? '',
-      issuer: d.badge_template?.issuer?.entities?.[0]?.entity?.name ?? d.issuer ?? '',
-      issued_at: d.issued_at ?? '',
-      verify_url,
-    }
-  } catch {
-    return null
-  }
-}
 
 export default function About() {
   const [about, setAbout] = useState<AboutResponse | null>(null)
@@ -49,7 +25,6 @@ export default function About() {
   const [coursework, setCoursework] = useState<CourseworkResponse[]>([])
   const [experience, setExperience] = useState<ExperienceResponse[]>([])
   const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
-  const [certBadges, setCertBadges] = useState<(CredlyBadge | null)[]>([])
   const [loading, setLoading] = useState(true)
   const portfolioCtx = usePortfolioCtx()
 
@@ -61,9 +36,6 @@ export default function About() {
       setExperience(ex)
       setTestimonials(test)
     }).finally(() => setLoading(false))
-
-    Promise.all(CERTIFICATIONS.map(c => fetchCredlyBadge(c.id, c.verify_url)))
-      .then(setCertBadges)
   }, [])
 
   const displayAbout: AboutResponse | null = about ? {
@@ -307,54 +279,43 @@ export default function About() {
       </section>
 
       {/* Certifications */}
-      {certBadges.some(b => b !== null) && (
-        <section className="py-16 md:py-28">
-          <div className="max-w-[900px] w-full mx-auto px-6">
-            <SectionHeader
-              code="// CERTS"
-              title="Certifications"
-              subtitle="Verified credentials and professional certifications."
-            />
-            <div className="flex flex-wrap gap-5">
-              {certBadges.map((badge, i) => badge && (
-                <motion.a
-                  key={i}
-                  href={badge.verify_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.08 }}
-                  className="group flex items-center gap-5 p-5 rounded-xl border border-mist bg-white hover:border-blue/30 hover:shadow-lg hover:shadow-blue/5 transition-all max-w-sm"
-                >
-                  {badge.image_url && (
-                    <img
-                      src={badge.image_url}
-                      alt={badge.name}
-                      className="w-16 h-16 object-contain shrink-0"
-                    />
-                  )}
-                  <div className="min-w-0">
-                    <p className="font-sans font-semibold text-ink leading-snug mb-1">{badge.name}</p>
-                    {badge.issuer && (
-                      <p className="font-mono text-[11px] text-steel mb-2">{badge.issuer}</p>
-                    )}
-                    {badge.issued_at && (
-                      <p className="font-mono text-[10px] text-silver mb-2">
-                        Issued {new Date(badge.issued_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                      </p>
-                    )}
-                    <span className="inline-flex items-center gap-1 font-mono text-[11px] text-blue group-hover:underline">
-                      Verify <ExternalLink size={10} />
-                    </span>
-                  </div>
-                </motion.a>
-              ))}
-            </div>
+      <section className="py-16 md:py-28">
+        <div className="max-w-[900px] w-full mx-auto px-6">
+          <SectionHeader
+            code="// CERTS"
+            title="Certifications"
+            subtitle="Verified credentials and professional certifications."
+          />
+          <div className="flex flex-wrap gap-5">
+            {CERTIFICATIONS.map((cert, i) => (
+              <motion.a
+                key={cert.id}
+                href={cert.verify_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.08 }}
+                className="group flex items-center gap-5 p-5 rounded-xl border border-mist bg-white hover:border-blue/30 hover:shadow-lg hover:shadow-blue/5 transition-all max-w-sm"
+              >
+                <img
+                  src={`https://www.credly.com/badges/${cert.id}/image`}
+                  alt={cert.name}
+                  className="w-16 h-16 object-contain shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="font-sans font-semibold text-ink leading-snug mb-1">{cert.name}</p>
+                  <p className="font-mono text-[11px] text-steel mb-3">{cert.issuer}</p>
+                  <span className="inline-flex items-center gap-1 font-mono text-[11px] text-blue group-hover:underline">
+                    Verify <ExternalLink size={10} />
+                  </span>
+                </div>
+              </motion.a>
+            ))}
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {/* GitHub */}
       <section className="py-16 md:py-28 bg-snow">
