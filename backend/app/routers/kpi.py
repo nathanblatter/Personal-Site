@@ -117,6 +117,9 @@ async def init_kpi_db() -> None:
         await conn.execute(
             "CREATE INDEX IF NOT EXISTS location_log_ts_idx ON location_log (ts)"
         )
+        await conn.execute(
+            "ALTER TABLE location_log ADD COLUMN IF NOT EXISTS resolved_location TEXT"
+        )
 
 
 async def close_kpi_db() -> None:
@@ -216,6 +219,7 @@ async def instagram_pickup(_: None = Depends(_verify_health_ingest_key)):
 class LocationIngestRequest(BaseModel):
     lat: float
     lon: float
+    resolved_location: Optional[str] = None
     ts: Optional[datetime] = None
 
 
@@ -228,10 +232,16 @@ async def location_ingest(
     ts = body.ts or datetime.now(timezone.utc)
     async with _KPI_POOL.acquire() as conn:
         await conn.execute(
-            "INSERT INTO location_log (ts, lat, lon) VALUES ($1, $2, $3)",
-            ts, body.lat, body.lon,
+            "INSERT INTO location_log (ts, lat, lon, resolved_location) VALUES ($1, $2, $3, $4)",
+            ts, body.lat, body.lon, body.resolved_location,
         )
-    return {"status": "ok", "ts": ts.isoformat(), "lat": body.lat, "lon": body.lon}
+    return {
+        "status": "ok",
+        "ts": ts.isoformat(),
+        "lat": body.lat,
+        "lon": body.lon,
+        "resolved_location": body.resolved_location,
+    }
 
 
 def verify_kpi_key(x_kpi_api_key: Optional[str] = Header(None)):
