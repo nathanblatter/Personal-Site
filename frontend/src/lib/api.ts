@@ -123,6 +123,7 @@ export interface BlogPostResponse {
   published_at?: string
   created_at: string
   updated_at: string
+  view_count: number
 }
 
 export interface ContactSubmitRequest {
@@ -448,6 +449,7 @@ export const api = {
     list: () => request<BlogPostResponse[]>('GET', '/blog'),
     listAll: () => request<BlogPostResponse[]>('GET', '/blog/admin'),
     get: (slug: string) => request<BlogPostResponse>('GET', `/blog/${slug}`),
+    view: (slug: string) => request<void>('POST', `/blog/${slug}/view`),
     create: (data: Omit<BlogPostResponse, 'id' | 'created_at' | 'updated_at'>) =>
       request<BlogPostResponse>('POST', '/blog', data),
     update: (id: number, data: Partial<Omit<BlogPostResponse, 'id' | 'created_at' | 'updated_at'>>) =>

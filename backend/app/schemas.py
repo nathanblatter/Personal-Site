@@ -443,6 +443,7 @@ class BlogPostResponse(BlogPostBase):
     published_at: Optional[str] = None
     created_at: str
     updated_at: str
+    view_count: int = 0
 
     model_config = {"from_attributes": True}
 

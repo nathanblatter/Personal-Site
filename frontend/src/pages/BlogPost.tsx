@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { ArrowLeft, Calendar, Clock, Link2, Check } from 'lucide-react'
+import { ArrowLeft, Calendar, Clock, Eye, Link2, Check } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkFrontmatter from 'remark-frontmatter'
@@ -50,7 +50,7 @@ export default function BlogPost() {
     if (!slug) return
     api.blog
       .get(slug)
-      .then(setPost)
+      .then(post => { setPost(post); api.blog.view(slug).catch(() => {}) })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false))
   }, [slug])
@@ -127,6 +127,12 @@ export default function BlogPost() {
             <Clock size={12} />
             {readTime(post.content)} min read
           </span>
+          {post.view_count > 0 && (
+            <span className="flex items-center gap-1.5">
+              <Eye size={12} />
+              {post.view_count.toLocaleString()} views
+            </span>
+          )}
         </div>
       </motion.header>
 

@@ -164,6 +164,7 @@ class BlogPost(Base):
     published_at = Column(String, nullable=True)
     created_at = Column(String, nullable=False)
     updated_at = Column(String, nullable=False)
+    view_count = Column(Integer, nullable=False, default=0, server_default="0")
 
 
 # ── Internship Tracker Enums ─────────────────────────────────────────────────

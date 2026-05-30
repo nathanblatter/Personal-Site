@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Calendar, Clock, ArrowRight } from 'lucide-react'
+import { Calendar, Clock, Eye, ArrowRight } from 'lucide-react'
 import { api, type BlogPostResponse } from '../lib/api'
 
 function readTime(content: string): number {
@@ -116,6 +116,12 @@ export default function Blog() {
                         <Clock size={11} />
                         {readTime(post.content)} min read
                       </span>
+                      {post.view_count > 0 && (
+                        <span className="flex items-center gap-1.5">
+                          <Eye size={11} />
+                          {post.view_count.toLocaleString()}
+                        </span>
+                      )}
                       <span className="ml-auto flex items-center gap-1 text-blue opacity-0 group-hover:opacity-100 transition-opacity text-xs">
                         Read <ArrowRight size={11} />
                       </span>
