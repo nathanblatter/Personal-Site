@@ -127,10 +127,10 @@ export default function BlogPost() {
             <Clock size={12} />
             {readTime(post.content)} min read
           </span>
-          {post.view_count > 0 && (
+          {(post.view_count ?? 0) > 0 && (
             <span className="flex items-center gap-1.5">
               <Eye size={12} />
-              {post.view_count.toLocaleString()} views
+              {(post.view_count ?? 0).toLocaleString()} views
             </span>
           )}
         </div>
