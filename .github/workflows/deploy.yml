@@ -17,9 +17,19 @@ jobs:
           cd $GITHUB_WORKSPACE/frontend
           npm ci
           npm run build
-          # --whole-file skips delta algorithm so rsync never mmaps the destination.
-          # Needed because Docker's VirtioFS holds mmap locks on volume-mounted files.
-          rsync -a --delete --whole-file dist/ $PROD/frontend/dist/
+          # Copy dist via Python shutil (uses read/write, not mmap) to avoid
+          # EDEADLK from Docker VirtioFS holding mmap locks on volume-mounted files.
+          python3 - <<'PYEOF'
+import shutil, os
+src = os.environ['GITHUB_WORKSPACE'] + '/frontend/dist'
+prod = '/Users/nathanblatter/Desktop/Personal-Site'
+dst = prod + '/frontend/dist'
+tmp = dst + '.new'
+shutil.rmtree(tmp, ignore_errors=True)
+shutil.copytree(src, tmp)
+shutil.rmtree(dst, ignore_errors=True)
+os.rename(tmp, dst)
+PYEOF
 
           # Sync backend source to production path (preserve .env.prod)
           rsync -a --delete --exclude '.env.prod' \
