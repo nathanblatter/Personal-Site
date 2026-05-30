@@ -101,12 +101,18 @@ async def credly_badge_image(badge_id: str):
     if badge_id in _credly_cache:
         return Response(content=_credly_cache[badge_id], media_type="image/png",
                         headers={"Cache-Control": "public, max-age=604800"})
-    async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
-        r = await client.get(f"https://www.credly.com/badges/{badge_id}/image")
-    if r.status_code != 200:
+    headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+    async with httpx.AsyncClient(follow_redirects=True, timeout=10.0, headers=headers) as client:
+        # Fetch badge JSON to get the real CDN image URL
+        meta = await client.get(f"https://www.credly.com/badges/{badge_id}.json")
+        if meta.status_code != 200:
+            raise HTTPException(status_code=502, detail="Badge metadata unavailable")
+        image_url = meta.json()["data"]["badge_template"]["image_url"]
+        img_r = await client.get(image_url)
+    if img_r.status_code != 200:
         raise HTTPException(status_code=502, detail="Badge image unavailable")
-    _credly_cache[badge_id] = r.content
-    return Response(content=r.content, media_type=r.headers.get("content-type", "image/png"),
+    _credly_cache[badge_id] = img_r.content
+    return Response(content=img_r.content, media_type=img_r.headers.get("content-type", "image/png"),
                     headers={"Cache-Control": "public, max-age=604800"})
 
 
