@@ -132,6 +132,9 @@ async def init_kpi_db() -> None:
         await conn.execute(
             "ALTER TABLE location_log ADD COLUMN IF NOT EXISTS region TEXT"
         )
+        await conn.execute(
+            "ALTER TABLE location_log ADD COLUMN IF NOT EXISTS state TEXT"
+        )
 
 
 async def close_kpi_db() -> None:
@@ -234,6 +237,7 @@ class LocationIngestRequest(BaseModel):
     street: Optional[str] = None
     city: Optional[str] = None
     zip: Optional[str] = None
+    state: Optional[str] = None
     region: Optional[str] = None
     ts: Optional[datetime] = None
 
@@ -248,8 +252,8 @@ async def location_ingest(
     ts = body.ts or datetime.now(timezone.utc)
     async with _KPI_POOL.acquire() as conn:
         await conn.execute(
-            "INSERT INTO location_log (ts, lat, lon, street, city, zip, region) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-            ts, body.lat, body.lon, body.street, body.city, body.zip, body.region,
+            "INSERT INTO location_log (ts, lat, lon, street, city, zip, state, region) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+            ts, body.lat, body.lon, body.street, body.city, body.zip, body.state, body.region,
         )
     return {
         "status": "ok",
@@ -259,6 +263,7 @@ async def location_ingest(
         "street": body.street,
         "city": body.city,
         "zip": body.zip,
+        "state": body.state,
         "region": body.region,
     }
 
