@@ -7,10 +7,11 @@ from html import escape
 from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import select
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, status, solar, testimonial_requests
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, status, solar, testimonial_requests, rss
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
 from app.database import AsyncSessionLocal
 from app import models
@@ -143,6 +144,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://localhost:3000"],
@@ -186,6 +188,7 @@ app.include_router(about_page.router, prefix=API_PREFIX)
 app.include_router(status.router, prefix=f"{API_PREFIX}/status")
 app.include_router(solar.router, prefix=f"{API_PREFIX}/solar")
 app.include_router(testimonial_requests.router)
+app.include_router(rss.router)
 
 
 async def _blog_og_html(slug: str, index_html: str) -> str | None:

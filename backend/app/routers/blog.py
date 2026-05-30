@@ -99,3 +99,15 @@ async def get_post_by_slug(slug: str, db: AsyncSession = Depends(get_db)):
     if not post or not post.published:
         raise HTTPException(status_code=404, detail="Post not found")
     return post
+
+
+@router.post("/{slug}/view", status_code=status.HTTP_204_NO_CONTENT)
+async def increment_view(slug: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(models.BlogPost).where(models.BlogPost.slug == slug)
+    )
+    post = result.scalar_one_or_none()
+    if not post or not post.published:
+        raise HTTPException(status_code=404, detail="Post not found")
+    post.view_count = (post.view_count or 0) + 1
+    await db.commit()
