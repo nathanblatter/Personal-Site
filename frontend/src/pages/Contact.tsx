@@ -160,6 +160,7 @@ export default function Contact() {
                   <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase">Message</label>
                   <textarea
                     required
+                    minLength={10}
                     rows={5}
                     value={formData.message}
                     onChange={(e) => setFormData({ ...formData, message: e.target.value })}
