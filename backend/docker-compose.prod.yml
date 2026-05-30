@@ -16,7 +16,6 @@ services:
       MINIO_BUCKET: portfolio
       CLAUDE_DATA_DIRS: /claude_data_mini,/claude_data_laptop
     volumes:
-      - ../frontend/dist:/dist:ro
       - /Users/nathanblatter/.claude/projects:/claude_data_mini:ro
       - /Users/nathanblatter/.claude-laptop/projects:/claude_data_laptop:ro
     restart: unless-stopped

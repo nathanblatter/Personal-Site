@@ -12,50 +12,31 @@ jobs:
       - name: Deploy
         run: |
           PROD=/Users/nathanblatter/Desktop/Personal-Site
+          ENV_FILE=$PROD/backend/.env.prod
+          COMPOSE=$GITHUB_WORKSPACE/backend/docker-compose.prod.yml
 
-          # Build frontend from fresh checkout
-          cd $GITHUB_WORKSPACE/frontend
-          npm ci
-          npm run build
-          # Copy dist via Python shutil (uses read/write, not mmap) to avoid
-          # EDEADLK from Docker VirtioFS holding mmap locks on volume-mounted files.
-          python3 - <<'PYEOF'
-import shutil, os
-src = os.environ['GITHUB_WORKSPACE'] + '/frontend/dist'
-prod = '/Users/nathanblatter/Desktop/Personal-Site'
-dst = prod + '/frontend/dist'
-tmp = dst + '.new'
-shutil.rmtree(tmp, ignore_errors=True)
-shutil.copytree(src, tmp)
-shutil.rmtree(dst, ignore_errors=True)
-os.rename(tmp, dst)
-PYEOF
-
-          # Sync backend source to production path (preserve .env.prod)
-          rsync -a --delete --exclude '.env.prod' \
-            $GITHUB_WORKSPACE/backend/ $PROD/backend/
-
-          # Build new backend image
-          cd $PROD/backend
-          DOCKER_BUILDKIT=0 docker build --pull=false -t backend-api:latest .
+          # Build image from repo root — frontend baked in via multi-stage Dockerfile
+          cd $GITHUB_WORKSPACE
+          DOCKER_BUILDKIT=0 docker build --pull=false -f backend/Dockerfile -t backend-api:latest .
 
           # Get current running container ID
-          OLD_CONTAINER=$(docker compose -f docker-compose.prod.yml --env-file .env.prod ps -q api 2>/dev/null | head -1)
+          cd $GITHUB_WORKSPACE/backend
+          OLD_CONTAINER=$(docker compose -f $COMPOSE --env-file $ENV_FILE ps -q api 2>/dev/null | head -1)
 
           if [ -z "$OLD_CONTAINER" ]; then
             echo "No existing container, starting fresh..."
-            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+            docker compose -f $COMPOSE --env-file $ENV_FILE up -d
             sleep 10
-            docker compose -f docker-compose.prod.yml --env-file .env.prod exec api python seed.py
+            docker compose -f $COMPOSE --env-file $ENV_FILE exec api python seed.py
             exit 0
           fi
 
           # Scale up: start new container alongside old
           echo "Scaling up to 2 replicas..."
-          docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --scale api=2 --no-recreate
+          docker compose -f $COMPOSE --env-file $ENV_FILE up -d --scale api=2 --no-recreate
 
           # Identify new container
-          NEW_CONTAINER=$(docker compose -f docker-compose.prod.yml --env-file .env.prod ps -q api | grep -v "^${OLD_CONTAINER}$" | head -1)
+          NEW_CONTAINER=$(docker compose -f $COMPOSE --env-file $ENV_FILE ps -q api | grep -v "^${OLD_CONTAINER}$" | head -1)
           if [ -z "$NEW_CONTAINER" ]; then
             echo "ERROR: Could not identify new container"
             exit 1
