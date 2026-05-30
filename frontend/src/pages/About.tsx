@@ -15,6 +15,7 @@ const CERTIFICATIONS = [
     id: '32fb3752-e53f-4f0f-8699-0e4ac8c24897',
     name: 'Professional Scrum Master I',
     issuer: 'Scrum.org',
+    image: '/api/storage/download/certs/psm1.png',
     verify_url: 'https://www.credly.com/badges/32fb3752-e53f-4f0f-8699-0e4ac8c24897/public_url',
   },
 ]
@@ -300,7 +301,7 @@ export default function About() {
                 className="group flex items-center gap-5 p-5 rounded-xl border border-mist bg-white hover:border-blue/30 hover:shadow-lg hover:shadow-blue/5 transition-all max-w-sm"
               >
                 <img
-                  src={`/credly/badge/${cert.id}/image`}
+                  src={cert.image}
                   alt={cert.name}
                   className="w-16 h-16 object-contain shrink-0"
                 />
