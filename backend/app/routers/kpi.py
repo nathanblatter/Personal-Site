@@ -25,7 +25,7 @@ _ALLOWED_FIELDS = frozenset({
     "energy_am", "prayer_am", "prayer_pm", "scripture", "church",
     "temple", "meaningful_convos", "new_people", "deep_work_hrs",
     "ideas_count", "lc_solved", "github_commits", "github_prs",
-    "life_sat", "notes",
+    "life_sat", "notes", "instagram_pickups",
 })
 
 _CREATE_TABLE = """
@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS kpi_daily_log (
     github_prs          INTEGER,
     life_sat            SMALLINT CHECK (life_sat BETWEEN 1 AND 10),
     notes               TEXT,
+    instagram_pickups   INTEGER DEFAULT 0,
     created_at          TIMESTAMPTZ DEFAULT NOW(),
     updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
@@ -101,6 +102,10 @@ async def init_kpi_db() -> None:
         await conn.execute(_CREATE_FUNCTION)
         await conn.execute(_DROP_TRIGGER)
         await conn.execute(_CREATE_TRIGGER)
+        # Additive migrations for new columns
+        await conn.execute(
+            "ALTER TABLE kpi_daily_log ADD COLUMN IF NOT EXISTS instagram_pickups INTEGER DEFAULT 0"
+        )
 
 
 async def close_kpi_db() -> None:
@@ -135,6 +140,7 @@ class HealthIngestRequest(BaseModel):
     github_prs: Optional[int] = None
     life_sat: Optional[int] = None
     notes: Optional[str] = None
+    instagram_pickups: Optional[int] = None
 
 
 health_ingest_router = APIRouter(tags=["kpi"])
@@ -174,6 +180,26 @@ async def health_ingest(
         "date": target_date.isoformat(),
         "fields_updated": list(fields_to_update.keys()),
     }
+
+
+@health_ingest_router.post("/instagram-pickup")
+async def instagram_pickup(_: None = Depends(_verify_health_ingest_key)):
+    """Increment today's Instagram pickup count by 1. Called by phone Shortcut on app open."""
+    today = date_type.today()
+    async with _KPI_POOL.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO kpi_daily_log (date, instagram_pickups)
+            VALUES ($1, 1)
+            ON CONFLICT (date) DO UPDATE
+              SET instagram_pickups = COALESCE(kpi_daily_log.instagram_pickups, 0) + 1
+            """,
+            today,
+        )
+        count = await conn.fetchval(
+            "SELECT instagram_pickups FROM kpi_daily_log WHERE date = $1", today
+        )
+    return {"status": "ok", "date": today.isoformat(), "instagram_pickups_today": count}
 
 
 def verify_kpi_key(x_kpi_api_key: Optional[str] = Header(None)):
@@ -221,6 +247,21 @@ async def get_kpi(_=Depends(verify_kpi_key)):
     bounces = _val(visitor_data, "bounces")
     total_time = _val(visitor_data, "totaltime")
 
+    # Instagram pickup counts
+    ig_today = 0
+    ig_week = 0
+    try:
+        today = date_type.today()
+        async with _KPI_POOL.acquire() as conn:
+            ig_today = await conn.fetchval(
+                "SELECT COALESCE(instagram_pickups, 0) FROM kpi_daily_log WHERE date = $1", today
+            ) or 0
+            ig_week = await conn.fetchval(
+                "SELECT COALESCE(SUM(instagram_pickups), 0) FROM kpi_daily_log WHERE date > CURRENT_DATE - 7"
+            ) or 0
+    except Exception as e:
+        print(f"Instagram pickups unavailable: {e}")
+
     return {
         "project": "personal_site",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -249,6 +290,16 @@ async def get_kpi(_=Depends(verify_kpi_key)):
                 "value": round(pageviews / uniques, 2) if uniques > 0 else 0.0,
                 "label": "Pages per Session",
                 "unit": "pages",
+            },
+            "instagram_pickups_today": {
+                "value": ig_today,
+                "label": "Instagram Pickups Today",
+                "unit": "opens",
+            },
+            "instagram_pickups_week": {
+                "value": int(ig_week),
+                "label": "Instagram Pickups (7d)",
+                "unit": "opens",
             },
         },
     }
