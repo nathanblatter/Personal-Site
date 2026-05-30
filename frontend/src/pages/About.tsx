@@ -300,7 +300,7 @@ export default function About() {
                 className="group flex items-center gap-5 p-5 rounded-xl border border-mist bg-white hover:border-blue/30 hover:shadow-lg hover:shadow-blue/5 transition-all max-w-sm"
               >
                 <img
-                  src={`https://www.credly.com/badges/${cert.id}/image`}
+                  src={`/credly/badge/${cert.id}/image`}
                   alt={cert.name}
                   className="w-16 h-16 object-contain shrink-0"
                 />

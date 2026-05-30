@@ -6,6 +6,7 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from PIL import Image, ImageDraw, ImageFont
+import httpx
 
 from app.database import get_db
 from app import models
@@ -91,6 +92,22 @@ def _generate_og_image(title: str, tags: list[str], subtitle: str = "") -> bytes
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)
     return buf.getvalue()
+
+
+_credly_cache: dict[str, bytes] = {}
+
+@router.get("/credly/badge/{badge_id}/image", include_in_schema=False)
+async def credly_badge_image(badge_id: str):
+    if badge_id in _credly_cache:
+        return Response(content=_credly_cache[badge_id], media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=604800"})
+    async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
+        r = await client.get(f"https://www.credly.com/badges/{badge_id}/image")
+    if r.status_code != 200:
+        raise HTTPException(status_code=502, detail="Badge image unavailable")
+    _credly_cache[badge_id] = r.content
+    return Response(content=r.content, media_type=r.headers.get("content-type", "image/png"),
+                    headers={"Cache-Control": "public, max-age=604800"})
 
 
 @router.get("/og/{slug}.png", include_in_schema=False)
