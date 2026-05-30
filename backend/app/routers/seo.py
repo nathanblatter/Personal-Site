@@ -6,7 +6,6 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from PIL import Image, ImageDraw, ImageFont
-import httpx
 
 from app.database import get_db
 from app import models
@@ -93,27 +92,6 @@ def _generate_og_image(title: str, tags: list[str], subtitle: str = "") -> bytes
     img.save(buf, format="PNG", optimize=True)
     return buf.getvalue()
 
-
-_credly_cache: dict[str, bytes] = {}
-
-@router.get("/credly/badge/{badge_id}/image", include_in_schema=False)
-async def credly_badge_image(badge_id: str):
-    if badge_id in _credly_cache:
-        return Response(content=_credly_cache[badge_id], media_type="image/png",
-                        headers={"Cache-Control": "public, max-age=604800"})
-    headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
-    async with httpx.AsyncClient(follow_redirects=True, timeout=10.0, headers=headers) as client:
-        # Fetch badge JSON to get the real CDN image URL
-        meta = await client.get(f"https://www.credly.com/badges/{badge_id}.json")
-        if meta.status_code != 200:
-            raise HTTPException(status_code=502, detail="Badge metadata unavailable")
-        image_url = meta.json()["data"]["badge_template"]["image_url"]
-        img_r = await client.get(image_url)
-    if img_r.status_code != 200:
-        raise HTTPException(status_code=502, detail="Badge image unavailable")
-    _credly_cache[badge_id] = img_r.content
-    return Response(content=img_r.content, media_type=img_r.headers.get("content-type", "image/png"),
-                    headers={"Cache-Control": "public, max-age=604800"})
 
 
 @router.get("/og/{slug}.png", include_in_schema=False)
