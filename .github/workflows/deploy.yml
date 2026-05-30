@@ -7,18 +7,24 @@ jobs:
   deploy:
     runs-on: self-hosted
     steps:
+      - uses: actions/checkout@v4
+
       - name: Deploy
         run: |
-          cd /Users/nathanblatter/Desktop/Personal-Site/backend
-          git -C .. fetch origin && git -C .. reset --hard origin/main
+          PROD=/Users/nathanblatter/Desktop/Personal-Site
 
-          # Build frontend
-          cd /Users/nathanblatter/Desktop/Personal-Site/frontend
+          # Build frontend from fresh checkout
+          cd $GITHUB_WORKSPACE/frontend
           npm ci
           npm run build
+          rsync -a --delete dist/ $PROD/frontend/dist/
+
+          # Sync backend source to production path (preserve .env.prod)
+          rsync -a --delete --exclude '.env.prod' \
+            $GITHUB_WORKSPACE/backend/ $PROD/backend/
 
           # Build new backend image
-          cd /Users/nathanblatter/Desktop/Personal-Site/backend
+          cd $PROD/backend
           DOCKER_BUILDKIT=0 docker build --pull=false -t backend-api:latest .
 
           # Get current running container ID
