@@ -1,4 +1,5 @@
 import asyncio
+import mimetypes
 import os
 import re
 from contextlib import asynccontextmanager
@@ -6,7 +7,7 @@ from html import escape
 from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import select
 
 from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, status, solar, testimonial_requests
@@ -236,10 +237,14 @@ async def serve_spa(full_path: str = "", request: Request = None):
             status_code=200,
         )
 
-    # Serve real files (JS, CSS, images, etc.) directly
+    # Serve real files (JS, CSS, images, etc.) directly.
+    # Read synchronously to avoid OSError 35 (resource deadlock) on macOS Docker bind mounts,
+    # which occurs when anyio's thread pool reads from VirtioFS volumes.
     candidate = STATIC_DIR / full_path
     if full_path and candidate.is_file():
-        response = FileResponse(str(candidate))
+        content = candidate.read_bytes()
+        media_type = mimetypes.guess_type(str(candidate))[0] or "application/octet-stream"
+        response = Response(content=content, media_type=media_type)
         # Vite writes content-hashed filenames (e.g. index-DwP6FtY2.js).
         # These are safe to cache forever; the hash changes when content does.
         if re.search(r'-[A-Za-z0-9]{8}\.(js|css)$', full_path):
@@ -260,5 +265,5 @@ async def serve_spa(full_path: str = "", request: Request = None):
             if modified:
                 return HTMLResponse(modified)
 
-    # All other paths → SPA entry point
-    return FileResponse(str(STATIC_DIR / "index.html"))
+    # All other paths → SPA entry point (use in-memory content, avoids FileResponse thread I/O)
+    return HTMLResponse(index_html)
