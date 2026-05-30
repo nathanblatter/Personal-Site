@@ -10,7 +10,7 @@ jobs:
       - name: Deploy
         run: |
           cd /Users/nathanblatter/Desktop/Personal-Site/backend
-          git -C .. pull origin main
+          git -C .. fetch origin && git -C .. reset --hard origin/main
 
           # Build frontend
           cd /Users/nathanblatter/Desktop/Personal-Site/frontend
