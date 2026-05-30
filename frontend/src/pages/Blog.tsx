@@ -116,10 +116,10 @@ export default function Blog() {
                         <Clock size={11} />
                         {readTime(post.content)} min read
                       </span>
-                      {post.view_count > 0 && (
+                      {(post.view_count ?? 0) > 0 && (
                         <span className="flex items-center gap-1.5">
                           <Eye size={11} />
-                          {post.view_count.toLocaleString()}
+                          {(post.view_count ?? 0).toLocaleString()}
                         </span>
                       )}
                       <span className="ml-auto flex items-center gap-1 text-blue opacity-0 group-hover:opacity-100 transition-opacity text-xs">
