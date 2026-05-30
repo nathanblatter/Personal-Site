@@ -106,6 +106,17 @@ async def init_kpi_db() -> None:
         await conn.execute(
             "ALTER TABLE kpi_daily_log ADD COLUMN IF NOT EXISTS instagram_pickups INTEGER DEFAULT 0"
         )
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS location_log (
+                id        BIGSERIAL PRIMARY KEY,
+                ts        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                lat       DOUBLE PRECISION NOT NULL,
+                lon       DOUBLE PRECISION NOT NULL
+            )
+        """)
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS location_log_ts_idx ON location_log (ts)"
+        )
 
 
 async def close_kpi_db() -> None:
@@ -200,6 +211,27 @@ async def instagram_pickup(_: None = Depends(_verify_health_ingest_key)):
             "SELECT instagram_pickups FROM kpi_daily_log WHERE date = $1", today
         )
     return {"status": "ok", "date": today.isoformat(), "instagram_pickups_today": count}
+
+
+class LocationIngestRequest(BaseModel):
+    lat: float
+    lon: float
+    ts: Optional[datetime] = None
+
+
+@health_ingest_router.post("/location")
+async def location_ingest(
+    body: LocationIngestRequest,
+    _: None = Depends(_verify_health_ingest_key),
+):
+    """Log a lat/lon ping. Called by phone Shortcut every 30 minutes."""
+    ts = body.ts or datetime.now(timezone.utc)
+    async with _KPI_POOL.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO location_log (ts, lat, lon) VALUES ($1, $2, $3)",
+            ts, body.lat, body.lon,
+        )
+    return {"status": "ok", "ts": ts.isoformat(), "lat": body.lat, "lon": body.lon}
 
 
 def verify_kpi_key(x_kpi_api_key: Optional[str] = Header(None)):
