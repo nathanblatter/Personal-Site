@@ -92,10 +92,22 @@ async def _send_visitor_alert(request: FastAPIRequest, link: models.TrackedLink)
     elif "Windows" in ua:
         browser += " (Windows)"
 
+    # Geo-lookup the IP
+    location = ""
+    try:
+        geo = await _imessage_client.get(f"http://ip-api.com/json/{ip}?fields=city,regionName,country", timeout=3.0)
+        if geo.status_code == 200:
+            g = geo.json()
+            parts = [p for p in (g.get("city"), g.get("regionName"), g.get("country")) if p]
+            if parts:
+                location = f" | {', '.join(parts)}"
+    except httpx.HTTPError:
+        pass
+
     msg = (
         f"Portfolio link clicked: /go/{link.slug}\n"
         f"Label: {link.label}\n"
-        f"Click #{link.clicks} | {browser} | IP: {ip}"
+        f"Click #{link.clicks} | {browser}{location}"
     )
 
     try:
