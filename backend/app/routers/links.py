@@ -1,8 +1,9 @@
+import asyncio
 import json as _json
 import os
 from typing import List
-from urllib.request import urlopen, Request
-from urllib.error import URLError
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request as FastAPIRequest
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,9 +17,11 @@ router = APIRouter(tags=["links"])
 UMAMI_URL = os.getenv("UMAMI_URL", "http://docker-services-umami-1:3000")
 WEBSITE_ID = os.getenv("UMAMI_WEBSITE_ID", "49f0edff-13f8-4a9b-9da6-5ad92bd18abc")
 
+_umami_client = httpx.AsyncClient(timeout=3.0)
 
-def _fire_umami_event(request: FastAPIRequest, link: models.TrackedLink):
-    """Send a click event to Umami in the background."""
+
+async def _fire_umami_event(request: FastAPIRequest, link: models.TrackedLink):
+    """Send a click event to Umami without blocking the response."""
     ip = "127.0.0.1"
     for header in ("cf-connecting-ip", "x-real-ip", "x-forwarded-for"):
         val = request.headers.get(header)
@@ -36,38 +39,23 @@ def _fire_umami_event(request: FastAPIRequest, link: models.TrackedLink):
         "X-Real-IP": ip,
     }
 
-    # Send pageview (shows in Pages tab under /go/slug)
-    pv = _json.dumps({
-        "type": "event",
-        "payload": {
-            "website": WEBSITE_ID,
-            "url": f"/go/{link.slug}",
-            "hostname": "nathanblatter.com",
-            "language": request.headers.get("accept-language", "en").split(",")[0],
-            "screen": "0x0",
-            "referrer": request.headers.get("referer", ""),
-        },
-    }).encode()
+    common = {
+        "website": WEBSITE_ID,
+        "url": f"/go/{link.slug}",
+        "hostname": "nathanblatter.com",
+        "language": request.headers.get("accept-language", "en").split(",")[0],
+        "screen": "0x0",
+    }
 
-    # Send named event (shows in Events tab as "link-click")
-    ev = _json.dumps({
-        "type": "event",
-        "payload": {
-            "website": WEBSITE_ID,
-            "url": f"/go/{link.slug}",
-            "hostname": "nathanblatter.com",
-            "language": request.headers.get("accept-language", "en").split(",")[0],
-            "screen": "0x0",
-            "name": "link-click",
-            "data": {"slug": link.slug, "label": link.label, "destination": link.destination_url},
-        },
-    }).encode()
+    payloads = [
+        {"type": "event", "payload": {**common, "referrer": request.headers.get("referer", "")}},
+        {"type": "event", "payload": {**common, "name": "link-click", "data": {"slug": link.slug, "label": link.label, "destination": link.destination_url}}},
+    ]
 
     try:
-        for body in (pv, ev):
-            req = Request(f"{UMAMI_URL}/api/send", data=body, headers=headers, method="POST")
-            urlopen(req, timeout=3)
-    except URLError:
+        for body in payloads:
+            await _umami_client.post(f"{UMAMI_URL}/api/send", json=body, headers=headers)
+    except httpx.HTTPError:
         pass
 
 
@@ -89,7 +77,7 @@ async def redirect_link(slug: str, request: FastAPIRequest, db: AsyncSession = D
     link.clicks += 1
     await db.commit()
 
-    _fire_umami_event(request, link)
+    asyncio.create_task(_fire_umami_event(request, link))
 
     if link.portfolio_ctx is not None:
         return RedirectResponse(url=f"/?ctx={link.slug}", status_code=302)
