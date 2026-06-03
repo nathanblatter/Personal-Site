@@ -17,7 +17,12 @@ router = APIRouter(tags=["links"])
 UMAMI_URL = os.getenv("UMAMI_URL", "http://docker-services-umami-1:3000")
 WEBSITE_ID = os.getenv("UMAMI_WEBSITE_ID", "49f0edff-13f8-4a9b-9da6-5ad92bd18abc")
 
+IMESSAGE_API_URL = os.getenv("IMESSAGE_API_URL", "http://100.79.61.79:8899")
+IMESSAGE_API_KEY = os.getenv("IMESSAGE_API_KEY") or os.getenv("imessage_api_key", "")
+ALERT_RECIPIENT = os.getenv("ALERT_PHONE", "9258869553")
+
 _umami_client = httpx.AsyncClient(timeout=3.0)
+_imessage_client = httpx.AsyncClient(timeout=5.0)
 
 
 async def _fire_umami_event(request: FastAPIRequest, link: models.TrackedLink):
@@ -59,6 +64,50 @@ async def _fire_umami_event(request: FastAPIRequest, link: models.TrackedLink):
         pass
 
 
+async def _send_visitor_alert(request: FastAPIRequest, link: models.TrackedLink):
+    """Send an iMessage alert when someone clicks a tracked link."""
+    if not IMESSAGE_API_KEY:
+        return
+
+    ip = "unknown"
+    for header in ("cf-connecting-ip", "x-real-ip", "x-forwarded-for"):
+        val = request.headers.get(header)
+        if val:
+            ip = val.split(",")[0].strip()
+            break
+
+    ua = request.headers.get("user-agent", "")
+    # Shorten user-agent to just browser/OS
+    browser = "Unknown"
+    for name in ("Chrome", "Firefox", "Safari", "Edge", "Opera"):
+        if name in ua:
+            browser = name
+            break
+    if "iPhone" in ua or "iPad" in ua:
+        browser += " (iOS)"
+    elif "Android" in ua:
+        browser += " (Android)"
+    elif "Mac" in ua:
+        browser += " (Mac)"
+    elif "Windows" in ua:
+        browser += " (Windows)"
+
+    msg = (
+        f"Portfolio link clicked: /go/{link.slug}\n"
+        f"Label: {link.label}\n"
+        f"Click #{link.clicks} | {browser} | IP: {ip}"
+    )
+
+    try:
+        await _imessage_client.post(
+            f"{IMESSAGE_API_URL}/send",
+            json={"recipient": ALERT_RECIPIENT, "message": msg},
+            headers={"X-API-Key": IMESSAGE_API_KEY, "Content-Type": "application/json"},
+        )
+    except httpx.HTTPError:
+        pass
+
+
 # ── Public redirect ──────────────────────────────────────────────────────────
 
 @router.get("/go/{slug}")
@@ -78,6 +127,7 @@ async def redirect_link(slug: str, request: FastAPIRequest, db: AsyncSession = D
     await db.commit()
 
     asyncio.create_task(_fire_umami_event(request, link))
+    asyncio.create_task(_send_visitor_alert(request, link))
 
     if link.portfolio_ctx is not None:
         return RedirectResponse(url=f"/?ctx={link.slug}", status_code=302)
