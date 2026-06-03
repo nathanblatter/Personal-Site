@@ -20,7 +20,7 @@ export default function Blog() {
   const [posts, setPosts] = useState<BlogPostResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
     clearTimeout(debounceRef.current)
