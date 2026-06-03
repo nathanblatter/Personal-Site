@@ -1,7 +1,8 @@
 import json
 import os
 import time
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from fastapi import APIRouter, Depends
 from sqlalchemy import select, delete
@@ -18,6 +19,7 @@ _dirs_env = os.getenv("CLAUDE_DATA_DIRS") or os.getenv("CLAUDE_DATA_DIR", "/clau
 CLAUDE_DATA_DIRS = [Path(p.strip()) for p in _dirs_env.split(",") if p.strip()]
 
 CACHE_TTL = 600  # 10 minutes
+LOCAL_TZ = ZoneInfo(os.getenv("TZ", "America/Denver"))
 
 _cache: dict = {}
 
@@ -85,7 +87,7 @@ def _scan_jsonl() -> dict:
 
                         try:
                             dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                            day_str = dt.astimezone(timezone.utc).date().isoformat()
+                            day_str = dt.astimezone(LOCAL_TZ).date().isoformat()
                         except (ValueError, AttributeError):
                             continue
 
@@ -141,12 +143,11 @@ def _build_result(days: dict, models_agg: dict, projects: dict) -> dict:
         for d in sorted_day_keys
     ]
 
-    today = date.today().isoformat()
+    local_today = datetime.now(LOCAL_TZ).date()
     streak = 0
     if days:
-        from datetime import timedelta
         all_active = {d for d, v in days.items() if v["tokens"] > 0}
-        current = date.today()
+        current = local_today
         while current.isoformat() in all_active:
             streak += 1
             current = current - timedelta(days=1)
