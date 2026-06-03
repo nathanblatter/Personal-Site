@@ -1,41 +1,75 @@
-"""Auto-generate a PDF resume from live DB data using reportlab."""
+"""Auto-generate a resume from live DB data, matching the real Word doc layout."""
 
 import io
+import subprocess
+import tempfile
+from pathlib import Path
+
 from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
 from app import models
 
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.units import inch
-from reportlab.lib.colors import HexColor
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.lib.enums import TA_LEFT, TA_CENTER
+from docx import Document
+from docx.shared import Pt, Inches, Emu, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
+from docx.oxml.ns import qn
+from docx.oxml import parse_xml
 
 router = APIRouter(prefix="/resume", tags=["resume"])
 
-BLUE = HexColor("#2563eb")
-INK = HexColor("#1a1a2e")
-STEEL = HexColor("#64748b")
+FONT_NAME = "Calibri"
+FONT_SIZE = Pt(10.5)
+NAME_SIZE = Pt(18)
+TAB_POS = Inches(7.50)
 
 
-def _styles():
-    return {
-        "name": ParagraphStyle("name", fontName="Helvetica-Bold", fontSize=18, textColor=INK, alignment=TA_CENTER, spaceAfter=2),
-        "tagline": ParagraphStyle("tagline", fontName="Helvetica", fontSize=10, textColor=STEEL, alignment=TA_CENTER, spaceAfter=10),
-        "section": ParagraphStyle("section", fontName="Helvetica-Bold", fontSize=11, textColor=BLUE, spaceBefore=14, spaceAfter=4),
-        "item_title": ParagraphStyle("item_title", fontName="Helvetica-Bold", fontSize=10, textColor=INK, spaceAfter=1),
-        "item_sub": ParagraphStyle("item_sub", fontName="Helvetica-Oblique", fontSize=9, textColor=STEEL, spaceAfter=2),
-        "body": ParagraphStyle("body", fontName="Helvetica", fontSize=9, textColor=INK, leading=13, spaceAfter=4),
-        "skill": ParagraphStyle("skill", fontName="Helvetica", fontSize=9, textColor=INK, spaceAfter=2),
-    }
+def _set_bottom_border(paragraph):
+    """Add a bottom border to a paragraph (like the section headers)."""
+    pPr = paragraph._element.get_or_add_pPr()
+    pBdr = parse_xml(
+        f'<w:pBdr {qn("w:xmlns")}="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f'<w:bottom w:val="single" w:sz="4" w:space="1" w:color="auto"/>'
+        f'</w:pBdr>'
+    )
+    pPr.append(pBdr)
 
 
-@router.get("/pdf")
-async def resume_pdf(db: AsyncSession = Depends(get_db)):
+def _add_right_tab(paragraph):
+    """Add a right-aligned tab stop at 7.5 inches."""
+    paragraph.paragraph_format.tab_stops.add_tab_stop(TAB_POS, WD_TAB_ALIGNMENT.RIGHT)
+
+
+def _run(paragraph, text, bold=False, italic=False, size=None, color=None, name=None):
+    """Add a run with specific formatting."""
+    r = paragraph.add_run(text)
+    r.font.name = name or FONT_NAME
+    r.font.size = size or FONT_SIZE
+    if bold:
+        r.bold = True
+    if italic:
+        r.italic = True
+    if color:
+        r.font.color.rgb = color
+    return r
+
+
+def _para(doc, text="", bold=False, alignment=None, spacing_after=Pt(0), spacing_before=Pt(0)):
+    """Add a paragraph with standard formatting."""
+    p = doc.add_paragraph()
+    if alignment is not None:
+        p.alignment = alignment
+    p.paragraph_format.space_after = spacing_after
+    p.paragraph_format.space_before = spacing_before
+    p.paragraph_format.line_spacing = Pt(13)
+    if text:
+        _run(p, text, bold=bold)
+    return p
+
+
+async def _build_docx(db: AsyncSession) -> io.BytesIO:
     about_r = await db.execute(select(models.About).where(models.About.id == 1))
     about = about_r.scalar_one_or_none()
 
@@ -48,64 +82,157 @@ async def resume_pdf(db: AsyncSession = Depends(get_db)):
     projects_r = await db.execute(select(models.Project).order_by(models.Project.sort_order))
     projects = projects_r.scalars().all()
 
+    doc = Document()
+
+    # Page setup
+    sec = doc.sections[0]
+    sec.page_width = Inches(8.5)
+    sec.page_height = Inches(11)
+    sec.left_margin = Inches(0.5)
+    sec.right_margin = Inches(0.5)
+    sec.top_margin = Inches(0.6)
+    sec.bottom_margin = Inches(0.5)
+
+    # Set default font
+    style = doc.styles["Normal"]
+    style.font.name = FONT_NAME
+    style.font.size = FONT_SIZE
+    style.paragraph_format.space_after = Pt(0)
+    style.paragraph_format.space_before = Pt(0)
+
+    # ── Name ────────────────────────────────────────────────────────────
+    p = _para(doc, alignment=WD_ALIGN_PARAGRAPH.CENTER)
+    _set_bottom_border(p)
+    _run(p, "Nathan Blatter", bold=True, size=NAME_SIZE)
+
+    # ── Contact ─────────────────────────────────────────────────────────
+    p = _para(doc, alignment=WD_ALIGN_PARAGRAPH.CENTER, spacing_after=Pt(2))
+    _set_bottom_border(p)
+    _run(p, "(925) 886-9553 | nzb22@byu.edu | linkedin.com/in/nathanblatter")
+
+    # ── Summary ─────────────────────────────────────────────────────────
+    p = _para(doc, alignment=WD_ALIGN_PARAGRAPH.JUSTIFY, spacing_after=Pt(4))
+    _set_bottom_border(p)
+    _run(p, "Information Systems student (Full-Stack Software Engineering emphasis)", bold=True)
+    _run(p, " with experience in C#, Java, Python, SQL, and cloud technologies. "
+            "Proven ability to build full-stack applications, AI-driven systems, and data pipelines. "
+            "Known for strong ownership, clean code practices, and rapid skill acquisition.")
+
+    # ── Education ───────────────────────────────────────────────────────
+    edu_entries = [e for e in experiences if any(k in e.title for k in ("B.S.", "M.S.", "Bachelor", "Master"))]
+    work_entries = [e for e in experiences if e not in edu_entries]
+
+    p = _para(doc, spacing_before=Pt(4))
+    _set_bottom_border(p)
+    _run(p, "EDUCATION", bold=True)
+
+    for edu in edu_entries:
+        # Title with right-aligned date
+        p = _para(doc)
+        _add_right_tab(p)
+        date_part = edu.year.split("—")[-1].strip() if "—" in edu.year else edu.year
+        _run(p, f"{edu.title}\t{date_part}", bold=True)
+
+        # Subtitle and description lines
+        for line in edu.description.split(". "):
+            line = line.strip().rstrip(".")
+            if line:
+                _para(doc, line)
+
+    # ── Technical Skills ────────────────────────────────────────────────
+    p = _para(doc, spacing_before=Pt(4))
+    _set_bottom_border(p)
+    _run(p, "TECHNICAL SKILLS", bold=True)
+
+    cats: dict[str, list[str]] = {}
+    for sk in skills:
+        cats.setdefault(sk.category, []).append(sk.name)
+    for cat, names in cats.items():
+        p = _para(doc)
+        _run(p, f"{cat}: ", bold=True)
+        _run(p, ", ".join(names))
+
+    # ── Projects ────────────────────────────────────────────────────────
+    p = _para(doc, spacing_before=Pt(4))
+    _set_bottom_border(p)
+    _run(p, "PROJECTS", bold=True)
+
+    for proj in projects[:6]:
+        tags_str = f" ({', '.join(proj.tags[:4])})" if proj.tags else ""
+        year = proj.year or ""
+        p = _para(doc)
+        _run(p, f"{proj.title}{tags_str} | {year}", bold=True)
+
+        desc_lines = [s.strip() for s in proj.description.split(". ") if s.strip()]
+        for line in desc_lines[:3]:
+            line = line.rstrip(".")
+            _para(doc, f"• {line}")
+
+    # ── Experience ──────────────────────────────────────────────────────
+    p = _para(doc, spacing_before=Pt(4))
+    _set_bottom_border(p)
+    _run(p, "EXPERIENCE", bold=True)
+
+    for exp in work_entries:
+        # Title with right-aligned date
+        p = _para(doc)
+        _add_right_tab(p)
+        _run(p, f"{exp.title}\t{exp.year}", bold=True)
+
+        # Subtitle (org name)
+        _para(doc, exp.subtitle)
+
+        # Description bullets
+        desc_lines = [s.strip() for s in exp.description.split(". ") if s.strip()]
+        for line in desc_lines[:4]:
+            line = line.rstrip(".")
+            _para(doc, f"• {line}")
+
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buf, pagesize=letter,
-        leftMargin=0.6 * inch, rightMargin=0.6 * inch,
-        topMargin=0.5 * inch, bottomMargin=0.5 * inch,
+    doc.save(buf)
+    buf.seek(0)
+    return buf
+
+
+@router.get("/pdf")
+async def resume_pdf(db: AsyncSession = Depends(get_db)):
+    docx_buf = await _build_docx(db)
+
+    # Try converting to PDF via LibreOffice if available
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            docx_path = Path(tmpdir) / "resume.docx"
+            docx_path.write_bytes(docx_buf.read())
+            docx_buf.seek(0)
+
+            result = subprocess.run(
+                ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", tmpdir, str(docx_path)],
+                capture_output=True, timeout=30,
+            )
+            pdf_path = Path(tmpdir) / "resume.pdf"
+            if result.returncode == 0 and pdf_path.exists():
+                return Response(
+                    content=pdf_path.read_bytes(),
+                    media_type="application/pdf",
+                    headers={"Content-Disposition": "inline; filename=nathan-blatter-resume.pdf"},
+                )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    # Fallback: serve docx directly
+    docx_buf.seek(0)
+    return StreamingResponse(
+        docx_buf,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": "inline; filename=nathan-blatter-resume.docx"},
     )
 
-    s = _styles()
-    story = []
 
-    # Header
-    story.append(Paragraph("Nathan Blatter", s["name"]))
-    info_parts = []
-    if about and about.info_fields:
-        for f in about.info_fields:
-            info_parts.append(f"{f['label']}: {f['value']}")
-    tagline = "nathanblatter.com"
-    if info_parts:
-        tagline = " | ".join(info_parts[:3]) + f" | {tagline}"
-    story.append(Paragraph(tagline, s["tagline"]))
-    story.append(HRFlowable(width="100%", thickness=0.5, color=STEEL, spaceAfter=8))
-
-    # Experience
-    if experiences:
-        story.append(Paragraph("Experience", s["section"]))
-        for exp in experiences:
-            story.append(Paragraph(exp.title, s["item_title"]))
-            story.append(Paragraph(f"{exp.subtitle} | {exp.year}", s["item_sub"]))
-            story.append(Paragraph(exp.description, s["body"]))
-
-    # Skills
-    if skills:
-        story.append(Paragraph("Skills", s["section"]))
-        cats: dict[str, list[str]] = {}
-        for sk in skills:
-            cats.setdefault(sk.category, []).append(sk.name)
-        for cat, names in cats.items():
-            story.append(Paragraph(f"<b>{cat}:</b> {', '.join(names)}", s["skill"]))
-
-    # Projects
-    if projects:
-        story.append(Paragraph("Projects", s["section"]))
-        for proj in projects[:6]:
-            tags_str = f" ({', '.join(proj.tags[:4])})" if proj.tags else ""
-            story.append(Paragraph(f"{proj.title}{tags_str}", s["item_title"]))
-            story.append(Paragraph(proj.description, s["body"]))
-
-    # Education
-    if about and about.gpa:
-        story.append(Paragraph("Education", s["section"]))
-        story.append(Paragraph("Brigham Young University", s["item_title"]))
-        story.append(Paragraph(f"B.S. Information Systems | GPA: {about.gpa}", s["item_sub"]))
-
-    doc.build(story)
-    buf.seek(0)
-
+@router.get("/docx")
+async def resume_docx(db: AsyncSession = Depends(get_db)):
+    docx_buf = await _build_docx(db)
     return StreamingResponse(
-        buf,
-        media_type="application/pdf",
-        headers={"Content-Disposition": "inline; filename=nathan-blatter-resume.pdf"},
+        docx_buf,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": "attachment; filename=nathan-blatter-resume.docx"},
     )
