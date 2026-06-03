@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 
 log = logging.getLogger("kpi")
+# GitHub KPI scraper v2 — counts pushes and opened PRs
 
 router = APIRouter(prefix="/kpi", tags=["kpi"])
 
