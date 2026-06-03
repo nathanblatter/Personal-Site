@@ -29,8 +29,9 @@ TAB_POS = Inches(7.50)
 def _set_bottom_border(paragraph):
     """Add a bottom border to a paragraph (like the section headers)."""
     pPr = paragraph._element.get_or_add_pPr()
+    nsmap = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
     pBdr = parse_xml(
-        f'<w:pBdr {qn("w:xmlns")}="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f'<w:pBdr xmlns:w="{nsmap}">'
         f'<w:bottom w:val="single" w:sz="4" w:space="1" w:color="auto"/>'
         f'</w:pBdr>'
     )
