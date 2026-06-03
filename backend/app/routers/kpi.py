@@ -307,7 +307,7 @@ async def scrape_github_kpi() -> dict[str, int]:
             daily[date_str] = {"commits": 0, "prs": 0}
 
         if ev["type"] == "PushEvent":
-            daily[date_str]["commits"] += ev["payload"].get("size", 0)
+            daily[date_str]["commits"] += 1
         elif ev["type"] == "PullRequestEvent" and ev["payload"].get("action") == "opened":
             daily[date_str]["prs"] += 1
 
