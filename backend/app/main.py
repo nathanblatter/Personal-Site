@@ -93,6 +93,19 @@ async def _periodic_claude_snapshot():
         await asyncio.sleep(86400)  # 24 hours
 
 
+async def _periodic_github_kpi():
+    """Scrape GitHub commits/PRs into kpi_daily_log once on startup, then every 6 h."""
+    import logging
+    log = logging.getLogger("github_kpi")
+    while True:
+        try:
+            daily = await kpi.scrape_github_kpi()
+            log.info("GitHub KPI: %d days updated", len(daily))
+        except Exception as exc:
+            log.warning("GitHub KPI scrape failed: %s", exc)
+        await asyncio.sleep(21600)  # 6 hours
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await kpi.init_kpi_db()
@@ -100,6 +113,8 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(github.warmup())
     # Persist Claude usage data to DB daily so history survives JSONL pruning
     asyncio.create_task(_periodic_claude_snapshot())
+    # Scrape GitHub commits/PRs into KPI daily log every 6 hours
+    asyncio.create_task(_periodic_github_kpi())
     # Prime index.html cache
     _read_index_html()
     yield
