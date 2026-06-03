@@ -81,17 +81,12 @@ async def get_dashboard(
     )
     source_counts = {(row[0] or "unknown"): row[1] for row in source_q.all()}
 
-    # Helper to convert Application to list item dict
-    async def _app_to_item(app):
-        await db.refresh(app, ["job_posting"])
+    def _app_to_item(app):
         posting = app.job_posting
-        company_name = None
-        if posting:
-            await db.refresh(posting, ["company"])
-            company_name = posting.company.name if posting.company else None
+        company = posting.company if posting else None
         return {
             "id": str(app.id),
-            "company_name": company_name,
+            "company_name": company.name if company else None,
             "job_title": posting.title if posting else None,
             "current_status": _enum_val(app.current_status),
             "priority": _enum_val(app.priority),
@@ -100,6 +95,8 @@ async def get_dashboard(
             "created_at": str(app.created_at) if app.created_at else None,
             "tags": [],
         }
+
+    _eager = selectinload(Application.job_posting).selectinload(JobPosting.company)
 
     # Upcoming actions (next 5 due)
     upcoming_q = await db.execute(
@@ -110,21 +107,23 @@ async def get_dashboard(
                 Application.next_action_due.isnot(None),
             )
         )
+        .options(_eager)
         .order_by(Application.next_action_due.asc())
         .limit(5)
     )
-    upcoming_apps = upcoming_q.scalars().all()
-    upcoming_actions = [await _app_to_item(a) for a in upcoming_apps]
+    upcoming_apps = upcoming_q.scalars().unique().all()
+    upcoming_actions = [_app_to_item(a) for a in upcoming_apps]
 
     # Recent applications (last 5 created)
     recent_q = await db.execute(
         select(Application)
         .where(Application.archived_at.is_(None))
+        .options(_eager)
         .order_by(Application.created_at.desc())
         .limit(5)
     )
-    recent_apps = recent_q.scalars().all()
-    recent_applications = [await _app_to_item(a) for a in recent_apps]
+    recent_apps = recent_q.scalars().unique().all()
+    recent_applications = [_app_to_item(a) for a in recent_apps]
 
     # Normalize status_counts keys to strings
     normalized_status = {}

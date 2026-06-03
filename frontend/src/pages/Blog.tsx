@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Calendar, Clock, Eye, ArrowRight } from 'lucide-react'
+import { Calendar, Clock, Eye, ArrowRight, Search, X } from 'lucide-react'
 import { api, type BlogPostResponse } from '../lib/api'
 
 function readTime(content: string): number {
@@ -19,10 +19,19 @@ function formatDate(iso: string): string {
 export default function Blog() {
   const [posts, setPosts] = useState<BlogPostResponse[]>([])
   const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
 
   useEffect(() => {
-    api.blog.list().then(setPosts).finally(() => setLoading(false))
-  }, [])
+    clearTimeout(debounceRef.current)
+    const doFetch = () => {
+      setLoading(true)
+      api.blog.list(query || undefined).then(setPosts).finally(() => setLoading(false))
+    }
+    if (!query) { doFetch(); return }
+    debounceRef.current = setTimeout(doFetch, 300)
+    return () => clearTimeout(debounceRef.current)
+  }, [query])
 
   return (
     <div className="max-w-[1100px] w-full mx-auto px-6 py-20">
@@ -39,6 +48,22 @@ export default function Blog() {
         <p className="text-steel text-lg max-w-xl">
           Thoughts on software, technology, and things I'm learning.
         </p>
+
+        <div className="relative mt-6 max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-silver" />
+          <input
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search posts…"
+            className="w-full pl-9 pr-8 py-2 text-sm font-mono bg-white border border-mist rounded-lg text-ink placeholder:text-silver focus:outline-none focus:border-blue/40 focus:ring-1 focus:ring-blue/20 transition-colors"
+          />
+          {query && (
+            <button onClick={() => setQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-silver hover:text-steel">
+              <X size={14} />
+            </button>
+          )}
+        </div>
       </motion.div>
 
       {/* Content */}

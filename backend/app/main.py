@@ -1,4 +1,5 @@
 import asyncio
+import json as _json
 import mimetypes
 import os
 import re
@@ -11,7 +12,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import select
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, status, solar, testimonial_requests, rss
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, status, solar, testimonial_requests, rss, resume
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
 from app.database import AsyncSessionLocal
 from app import models
@@ -204,6 +205,7 @@ app.include_router(status.router, prefix=f"{API_PREFIX}/status")
 app.include_router(solar.router, prefix=f"{API_PREFIX}/solar")
 app.include_router(testimonial_requests.router)
 app.include_router(rss.router)
+app.include_router(resume.router, prefix=API_PREFIX)
 
 
 async def _blog_og_html(slug: str, index_html: str) -> str | None:
@@ -221,6 +223,18 @@ async def _blog_og_html(slug: str, index_html: str) -> str | None:
     url = f"{DOMAIN}/blog/{post.slug}"
     image = f"{DOMAIN}/og/{post.slug}.png"
 
+    jsonld = _json.dumps({
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": post.title,
+        "description": post.excerpt or post.subtitle or post.title,
+        "url": url,
+        "image": image,
+        "datePublished": post.published_at,
+        "dateModified": post.updated_at,
+        "author": {"@type": "Person", "name": "Nathan Blatter", "url": DOMAIN},
+    })
+
     og_tags = (
         f'<meta property="og:title" content="{title}" />\n'
         f'    <meta property="og:description" content="{desc}" />\n'
@@ -231,7 +245,8 @@ async def _blog_og_html(slug: str, index_html: str) -> str | None:
         f'    <meta name="twitter:title" content="{title}" />\n'
         f'    <meta name="twitter:description" content="{desc}" />\n'
         f'    <meta name="twitter:image" content="{image}" />\n'
-        f'    <title>{title}</title>'
+        f'    <title>{title}</title>\n'
+        f'    <script type="application/ld+json">{jsonld}</script>'
     )
 
     # Replace default OG tags and title

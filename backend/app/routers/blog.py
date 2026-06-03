@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 from app.database import get_db
 from app import models, schemas
 from app.auth import require_auth
@@ -15,12 +15,23 @@ def _now() -> str:
 
 
 @router.get("", response_model=List[schemas.BlogPostResponse])
-async def list_published_posts(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
+async def list_published_posts(
+    q: str = Query(None, min_length=1, max_length=200),
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
         select(models.BlogPost)
         .where(models.BlogPost.published == True)  # noqa: E712
-        .order_by(models.BlogPost.published_at.desc())
     )
+    if q:
+        pattern = f"%{q}%"
+        query = query.where(
+            func.lower(models.BlogPost.title).contains(q.lower())
+            | func.lower(models.BlogPost.content).contains(q.lower())
+            | func.lower(models.BlogPost.excerpt).contains(q.lower())
+        )
+    query = query.order_by(models.BlogPost.published_at.desc())
+    result = await db.execute(query)
     return result.scalars().all()
 
 

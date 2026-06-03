@@ -446,7 +446,7 @@ export const api = {
   },
 
   blog: {
-    list: () => request<BlogPostResponse[]>('GET', '/blog'),
+    list: (q?: string) => request<BlogPostResponse[]>('GET', q ? `/blog?q=${encodeURIComponent(q)}` : '/blog'),
     listAll: () => request<BlogPostResponse[]>('GET', '/blog/admin'),
     get: (slug: string) => request<BlogPostResponse>('GET', `/blog/${slug}`),
     view: (slug: string) => request<void>('POST', `/blog/${slug}/view`),
