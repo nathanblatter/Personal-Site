@@ -1,5 +1,7 @@
 """KPI router — exposes site analytics metrics for external dashboards."""
 
+import json
+import logging
 import os
 import time
 import httpx
@@ -10,6 +12,8 @@ from urllib.parse import urlparse, urlunparse
 
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
+
+log = logging.getLogger("kpi")
 
 router = APIRouter(prefix="/kpi", tags=["kpi"])
 
@@ -268,6 +272,63 @@ async def location_ingest(
     }
 
 
+GITHUB_USERNAME = os.getenv("GITHUB_USERNAME", "nathanzbl")
+
+
+async def scrape_github_kpi() -> dict[str, int]:
+    """Fetch today's GitHub commits and opened PRs from the Events API, upsert into kpi_daily_log.
+
+    Returns dict of {date_str: {"commits": n, "prs": n}} for days updated.
+    """
+    if not _KPI_POOL:
+        return {}
+
+    async with httpx.AsyncClient(
+        headers={"User-Agent": "PortfolioSite/1.0"}, timeout=10.0
+    ) as client:
+        # Fetch up to 3 pages of events (300 events, ~a few days of history)
+        all_events = []
+        for page in range(1, 4):
+            resp = await client.get(
+                f"https://api.github.com/users/{GITHUB_USERNAME}/events",
+                params={"per_page": 100, "page": page},
+            )
+            resp.raise_for_status()
+            events = resp.json()
+            if not events:
+                break
+            all_events.extend(events)
+
+    # Aggregate commits and PRs by date
+    daily: dict[str, dict[str, int]] = {}
+    for ev in all_events:
+        date_str = ev["created_at"][:10]
+        if date_str not in daily:
+            daily[date_str] = {"commits": 0, "prs": 0}
+
+        if ev["type"] == "PushEvent":
+            daily[date_str]["commits"] += ev["payload"].get("size", 0)
+        elif ev["type"] == "PullRequestEvent" and ev["payload"].get("action") == "opened":
+            daily[date_str]["prs"] += 1
+
+    # Upsert each day into kpi_daily_log
+    async with _KPI_POOL.acquire() as conn:
+        for date_str, counts in daily.items():
+            d = date_type.fromisoformat(date_str)
+            await conn.execute(
+                """
+                INSERT INTO kpi_daily_log (date, github_commits, github_prs)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (date) DO UPDATE
+                  SET github_commits = $2, github_prs = $3
+                """,
+                d, counts["commits"], counts["prs"],
+            )
+
+    log.info("GitHub KPI scraped: %d days updated", len(daily))
+    return daily
+
+
 def verify_kpi_key(x_kpi_api_key: Optional[str] = Header(None)):
     if x_kpi_api_key != os.getenv("KPI_API_KEY"):
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -329,6 +390,27 @@ async def get_kpi(_=Depends(verify_kpi_key)):
     except Exception as e:
         print(f"Instagram pickups unavailable: {e}")
 
+    # GitHub commits & PRs — per-day series
+    gh_days = []
+    try:
+        async with _KPI_POOL.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT date,
+                       COALESCE(github_commits, 0) AS commits,
+                       COALESCE(github_prs, 0) AS prs
+                FROM kpi_daily_log
+                WHERE github_commits > 0 OR github_prs > 0
+                ORDER BY date ASC
+                """
+            )
+            gh_days = [
+                {"date": str(r["date"]), "commits": r["commits"], "prs": r["prs"]}
+                for r in rows
+            ]
+    except Exception as e:
+        print(f"GitHub KPI unavailable: {e}")
+
     return {
         "project": "personal_site",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -362,6 +444,11 @@ async def get_kpi(_=Depends(verify_kpi_key)):
                 "value": ig_days,
                 "label": "Instagram Pickups per Day",
                 "unit": "opens",
+            },
+            "github_activity": {
+                "value": gh_days,
+                "label": "GitHub Commits & PRs per Day",
+                "unit": "count",
             },
         },
     }
