@@ -1,9 +1,12 @@
 import asyncio
 import json as _json
+import logging
 import mimetypes
 import os
 import re
+import time
 from contextlib import asynccontextmanager
+from difflib import SequenceMatcher
 from html import escape
 from pathlib import Path
 from fastapi import FastAPI, Request
@@ -16,6 +19,13 @@ from app.routers import projects, skills, experience, about, contact, auth, blog
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
 from app.database import AsyncSessionLocal
 from app import models
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+log = logging.getLogger(__name__)
 
 # Resolve static files directory: env var → frontend/dist/ at repo root
 STATIC_DIR = Path(
@@ -81,44 +91,49 @@ def _read_index_html() -> str | None:
     return _index_cache["content"]
 
 
-async def _periodic_claude_snapshot():
-    """Snapshot Claude JSONL data to DB once on startup, then every 24 h."""
-    import logging
-    log = logging.getLogger("claude_snapshot")
+async def _supervised(name: str, coro_fn, interval: int, max_retries: int = 3):
+    """Run a coroutine on an interval with auto-retry and backoff on failure."""
+    logger = logging.getLogger(name)
+    consecutive_failures = 0
     while True:
         try:
-            n = await _claude_snapshot()
-            log.info("Claude snapshot: %d days upserted", n)
+            result = await coro_fn()
+            logger.info("%s completed: %s", name, result)
+            consecutive_failures = 0
         except Exception as exc:
-            log.warning("Claude snapshot failed: %s", exc)
-        await asyncio.sleep(86400)  # 24 hours
+            consecutive_failures += 1
+            backoff = min(interval, 60 * (2 ** consecutive_failures))
+            logger.warning("%s failed (attempt %d): %s — retrying in %ds",
+                           name, consecutive_failures, exc, backoff)
+            if consecutive_failures <= max_retries:
+                await asyncio.sleep(backoff)
+                continue
+            logger.error("%s exceeded %d retries, waiting for next interval", name, max_retries)
+            consecutive_failures = 0
+        await asyncio.sleep(interval)
+
+
+async def _periodic_claude_snapshot():
+    return f"{await _claude_snapshot()} days upserted"
 
 
 async def _periodic_github_kpi():
-    """Scrape GitHub commits/PRs into kpi_daily_log once on startup, then every 6 h."""
-    import logging
-    log = logging.getLogger("github_kpi")
-    while True:
-        try:
-            daily = await kpi.scrape_github_kpi()
-            log.info("GitHub KPI: %d days updated", len(daily))
-        except Exception as exc:
-            log.warning("GitHub KPI scrape failed: %s", exc)
-        await asyncio.sleep(21600)  # 6 hours
+    daily = await kpi.scrape_github_kpi()
+    return f"{len(daily)} days updated"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await kpi.init_kpi_db()
-    # Warm GitHub cache in the background so it doesn't delay startup
-    asyncio.create_task(github.warmup())
-    # Persist Claude usage data to DB daily so history survives JSONL pruning
-    asyncio.create_task(_periodic_claude_snapshot())
-    # Scrape GitHub commits/PRs into KPI daily log every 6 hours
-    asyncio.create_task(_periodic_github_kpi())
-    # Prime index.html cache
+    _tasks = [
+        asyncio.create_task(github.warmup()),
+        asyncio.create_task(_supervised("claude_snapshot", _periodic_claude_snapshot, 86400)),
+        asyncio.create_task(_supervised("github_kpi", _periodic_github_kpi, 21600)),
+    ]
     _read_index_html()
     yield
+    for t in _tasks:
+        t.cancel()
     await kpi.close_kpi_db()
 
 
@@ -170,6 +185,20 @@ app.add_middleware(
 )
 
 
+_req_log = logging.getLogger("request")
+
+
+@app.middleware("http")
+async def request_logging(request: Request, call_next):
+    start = time.monotonic()
+    response = await call_next(request)
+    duration_ms = round((time.monotonic() - start) * 1000)
+    if request.url.path.startswith("/api/"):
+        ip = request.headers.get("cf-connecting-ip") or request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (request.client.host if request.client else "-")
+        _req_log.info("%s %s %d %dms ip=%s", request.method, request.url.path, response.status_code, duration_ms, ip)
+    return response
+
+
 @app.middleware("http")
 async def add_public_cache_control(request: Request, call_next):
     response = await call_next(request)
@@ -206,6 +235,44 @@ app.include_router(solar.router, prefix=f"{API_PREFIX}/solar")
 app.include_router(testimonial_requests.router)
 app.include_router(rss.router)
 app.include_router(resume.router, prefix=API_PREFIX)
+
+
+@app.get("/api/v1/suggest", include_in_schema=False)
+async def suggest_page(path: str = ""):
+    """Fuzzy-match a dead URL against known routes, blog slugs, and project IDs."""
+    path = path.strip("/").lower()
+    if not path:
+        return {"suggestion": None}
+
+    candidates: list[str] = []
+
+    # Static routes
+    for route in ("about", "projects", "blog", "contact", "resume"):
+        candidates.append(route)
+
+    # Blog slugs
+    async with AsyncSessionLocal() as db:
+        blog_rows = await db.execute(
+            select(models.BlogPost.slug).where(models.BlogPost.published == True)  # noqa: E712
+        )
+        for (slug,) in blog_rows.all():
+            candidates.append(f"blog/{slug}")
+
+        proj_rows = await db.execute(select(models.Project.project_id))
+        for (pid,) in proj_rows.all():
+            candidates.append(f"projects/{pid}")
+
+    best_match = None
+    best_score = 0.0
+    for c in candidates:
+        score = SequenceMatcher(None, path, c).ratio()
+        if score > best_score:
+            best_score = score
+            best_match = c
+
+    if best_score >= 0.4:
+        return {"suggestion": f"/{best_match}", "score": round(best_score, 2)}
+    return {"suggestion": None}
 
 
 async def _blog_og_html(slug: str, index_html: str) -> str | None:
@@ -280,10 +347,13 @@ async def serve_spa(full_path: str = "", request: Request = None):
         response = Response(content=content, media_type=media_type)
         # Vite writes content-hashed filenames (e.g. index-DwP6FtY2.js).
         # These are safe to cache forever; the hash changes when content does.
+        # CDN-Cache-Control tells Cloudflare to cache independently of browser cache.
         if re.search(r'-[A-Za-z0-9]{8}\.(js|css)$', full_path):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            response.headers["CDN-Cache-Control"] = "public, max-age=31536000, immutable"
         elif full_path.endswith(('.webp', '.png', '.jpg', '.svg', '.ico', '.gif', '.woff2', '.woff')):
-            response.headers["Cache-Control"] = "public, max-age=604800"  # 1 week
+            response.headers["Cache-Control"] = "public, max-age=604800"
+            response.headers["CDN-Cache-Control"] = "public, max-age=2592000"  # 30 days at CDN
         return response
 
     # For social crawlers, inject per-route OG tags

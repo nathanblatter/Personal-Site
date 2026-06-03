@@ -252,7 +252,7 @@ async def location_ingest(
     _: None = Depends(_verify_health_ingest_key),
 ):
     """Log a lat/lon ping. Called by phone Shortcut every 30 minutes."""
-    print(f"[location_ingest] received: {body.model_dump()}", flush=True)
+    log.info("location_ingest received: %s", body.model_dump())
     ts = body.ts or datetime.now(timezone.utc)
     async with _KPI_POOL.acquire() as conn:
         await conn.execute(
@@ -363,7 +363,7 @@ async def get_kpi(_=Depends(verify_kpi_key)):
             )
             visitor_data = stats_res.json()
     except Exception as e:
-        print(f"Umami unavailable: {e}")
+        log.warning("Umami unavailable: %s", e)
 
     def _val(d, key):
         v = d.get(key, 0)
@@ -388,7 +388,7 @@ async def get_kpi(_=Depends(verify_kpi_key)):
             )
             ig_days = [{"date": str(r["date"]), "count": r["count"]} for r in rows]
     except Exception as e:
-        print(f"Instagram pickups unavailable: {e}")
+        log.warning("Instagram pickups unavailable: %s", e)
 
     # GitHub commits & PRs — per-day series
     gh_days = []
@@ -409,7 +409,7 @@ async def get_kpi(_=Depends(verify_kpi_key)):
                 for r in rows
             ]
     except Exception as e:
-        print(f"GitHub KPI unavailable: {e}")
+        log.warning("GitHub KPI unavailable: %s", e)
 
     return {
         "project": "personal_site",

@@ -1,14 +1,13 @@
 import math
-import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, Request
 import httpx
 
+from app.cache import cache
+
 router = APIRouter(tags=["solar"])
 
-# Cache: { ip: { expires: float, mode: str, sunrise: str, sunset: str } }
-_cache: dict[str, dict] = {}
 _CACHE_TTL = 1800  # 30 minutes
 
 
@@ -74,10 +73,9 @@ async def get_solar(request: Request):
     if is_local:
         ip = "_local"
 
-    now = time.monotonic()
-    cached = _cache.get(ip)
-    if cached and cached["expires"] > now:
-        return cached["data"]
+    cached = await cache.get(f"solar:{ip}")
+    if cached is not None:
+        return cached
 
     if is_local:
         lat, lon, tz_name = 40.2338, -111.6585, "America/Denver"
@@ -101,5 +99,5 @@ async def get_solar(request: Request):
         "sunrise": sunrise,
         "sunset": sunset,
     }
-    _cache[ip] = {"expires": now + _CACHE_TTL, "data": data}
+    await cache.set(f"solar:{ip}", data, ttl=_CACHE_TTL)
     return data

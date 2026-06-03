@@ -23,7 +23,7 @@ STATIC_PAGES = [
     "/contact",
 ]
 
-# ── OG Image cache ───────────────────────────────────────────────────────────
+# OG images are binary blobs — keep in-memory (not worth serializing to Redis)
 _og_cache: dict[str, bytes] = {}
 
 

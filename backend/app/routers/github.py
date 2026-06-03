@@ -1,10 +1,11 @@
 import asyncio
 import os
 import re
-import time
 
 import httpx
 from fastapi import APIRouter
+
+from app.cache import cache
 
 router = APIRouter(prefix="/github", tags=["github"])
 
@@ -12,7 +13,6 @@ GITHUB_USERNAME = os.getenv("GITHUB_USERNAME", "nathanzbl")
 GITHUB_ORG = os.getenv("GITHUB_ORG", "nathanblatter")
 CACHE_TTL = 3600  # 1 hour
 
-_cache: dict = {}
 _client = httpx.AsyncClient(
     headers={"User-Agent": "PortfolioSite/1.0"},
     timeout=10.0,
@@ -20,15 +20,15 @@ _client = httpx.AsyncClient(
 
 
 async def _fetch_cached(key: str, url: str, ttl: int = CACHE_TTL) -> str:
-    now = time.time()
-    if key in _cache and now - _cache[key]["ts"] < ttl:
-        return _cache[key]["data"]
+    cached = await cache.get(f"github:{key}")
+    if cached is not None:
+        return cached
 
     resp = await _client.get(url)
     resp.raise_for_status()
     data = resp.text
 
-    _cache[key] = {"data": data, "ts": now}
+    await cache.set(f"github:{key}", data, ttl=ttl)
     return data
 
 

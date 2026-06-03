@@ -1,6 +1,9 @@
+import logging
 import os
 import aiosmtplib
 from email.message import EmailMessage
+
+log = logging.getLogger(__name__)
 
 SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "25"))
@@ -74,5 +77,5 @@ It only takes a couple of minutes.
         await aiosmtplib.send(msg, hostname=SMTP_HOST, port=SMTP_PORT, use_tls=False, start_tls=False)
         return True
     except Exception as e:
-        print(f"[email_service] SMTP error: {e}")
+        log.warning("SMTP error: %s", e)
         return False

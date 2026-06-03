@@ -1,14 +1,14 @@
 import json
 import os
-import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.database import AsyncSessionLocal
+from app.cache import cache
 from app import models
 from app.auth import require_auth
 
@@ -20,8 +20,6 @@ CLAUDE_DATA_DIRS = [Path(p.strip()) for p in _dirs_env.split(",") if p.strip()]
 
 CACHE_TTL = 600  # 10 minutes
 LOCAL_TZ = ZoneInfo(os.getenv("TZ", "America/Denver"))
-
-_cache: dict = {}
 
 PRICING = {
     "claude-opus":   {"input": 15.00, "output": 75.00, "cache_create": 18.75, "cache_read": 1.50},
@@ -220,16 +218,15 @@ async def _do_snapshot() -> int:
         await session.commit()
 
     # Bust cache so next GET reflects merged data
-    _cache.clear()
+    await cache.delete("claude:usage")
     return len(rows)
 
 
 @router.get("/usage")
 async def claude_usage():
-    now = time.time()
-    cache_key = "claude_usage"
-    if cache_key in _cache and now - _cache[cache_key]["ts"] < CACHE_TTL:
-        return _cache[cache_key]["data"]
+    cached = await cache.get("claude:usage")
+    if cached is not None:
+        return cached
 
     # Scan live JSONL files
     scan = _scan_jsonl()
@@ -253,7 +250,7 @@ async def claude_usage():
             }
 
     result_data = _build_result(merged_days, models_agg, projects)
-    _cache[cache_key] = {"data": result_data, "ts": now}
+    await cache.set("claude:usage", result_data, ttl=CACHE_TTL)
     return result_data
 
 
