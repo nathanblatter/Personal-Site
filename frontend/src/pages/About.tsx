@@ -142,7 +142,13 @@ export default function About() {
             >
               <div className="aspect-[3/4] rounded-2xl border border-mist bg-cloud overflow-hidden relative">
                 <picture>
-                  {!about?.headshot_url && <source srcSet="/headshot.webp" type="image/webp" />}
+                  {!about?.headshot_url && (
+                    <source
+                      srcSet="/headshot-400w.webp 400w, /headshot-600w.webp 600w, /headshot.webp 800w"
+                      sizes="(max-width: 640px) 400px, (max-width: 1024px) 600px, 800px"
+                      type="image/webp"
+                    />
+                  )}
                   <img
                     src={displayAbout?.headshot_url ?? '/headshot.webp'}
                     alt="Nathan Blatter"

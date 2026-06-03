@@ -267,6 +267,8 @@ async def serve_spa(full_path: str = "", request: Request = None):
         # These are safe to cache forever; the hash changes when content does.
         if re.search(r'-[A-Za-z0-9]{8}\.(js|css)$', full_path):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif full_path.endswith(('.webp', '.png', '.jpg', '.svg', '.ico', '.gif', '.woff2', '.woff')):
+            response.headers["Cache-Control"] = "public, max-age=604800"  # 1 week
         return response
 
     # For social crawlers, inject per-route OG tags
