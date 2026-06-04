@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { X } from 'lucide-react'
 import { api, type ClaudeUsage, type ClaudeDay } from '../lib/api'
@@ -35,6 +35,7 @@ interface SelectedDay {
 
 function TokenHeatmap({ days }: { days: ClaudeDay[] }) {
   const [selected, setSelected] = useState<SelectedDay | null>(null)
+  const detailRef = useRef<HTMLDivElement>(null)
 
   // Build a map for quick lookup
   const byDate = new Map<string, ClaudeDay>(days.map(d => [d.date, d]))
@@ -93,6 +94,7 @@ function TokenHeatmap({ days }: { days: ClaudeDay[] }) {
       cost_cents: full?.cost_cents ?? 0,
       sessions: full?.sessions ?? 0,
     })
+    setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 200)
   }
 
   const formatDate = (dateStr: string) =>
@@ -183,6 +185,7 @@ function TokenHeatmap({ days }: { days: ClaudeDay[] }) {
       <AnimatePresence>
         {selected && (
           <motion.div
+            ref={detailRef}
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}

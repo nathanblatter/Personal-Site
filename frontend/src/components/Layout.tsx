@@ -103,6 +103,7 @@ export default function Layout() {
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="text-ink p-2"
+              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
             >
               {mobileOpen ? <X size={20} /> : <Menu size={20} />}
             </button>

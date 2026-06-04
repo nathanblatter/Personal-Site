@@ -57,6 +57,7 @@ export default function BlogPost() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [copied, setCopied] = useState(false)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [activeId, setActiveId] = useState<string>('')
   const headingsRef = useRef<TocItem[]>([])
 
@@ -377,7 +378,8 @@ export default function BlogPost() {
               onClick={() => {
                 navigator.clipboard.writeText(`https://nathanblatter.com/blog/${post.slug}`)
                 setCopied(true)
-                setTimeout(() => setCopied(false), 2000)
+                clearTimeout(copyTimerRef.current)
+                copyTimerRef.current = setTimeout(() => setCopied(false), 2000)
               }}
               className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border transition-all font-mono text-[11px] ${
                 copied ? 'border-teal/30 text-teal bg-teal/5' : 'border-mist text-steel hover:text-blue hover:border-blue/30'

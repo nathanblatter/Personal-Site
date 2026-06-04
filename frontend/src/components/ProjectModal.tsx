@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { X, ArrowUpRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Project } from './ProjectCard'
@@ -11,18 +11,50 @@ interface Props {
 export default function ProjectModal({ project, onClose }: Props) {
   const [imgIdx, setImgIdx] = useState(0)
   const images = project?.images ?? []
+  const modalRef = useRef<HTMLDivElement>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
+
+  // Body scroll lock
+  useEffect(() => {
+    if (!project) return
+    previousFocusRef.current = document.activeElement as HTMLElement
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [project])
+
+  // Focus trap
+  const trapFocus = useCallback((e: KeyboardEvent) => {
+    if (e.key !== 'Tab' || !modalRef.current) return
+    const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault(); last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault(); first.focus()
+    }
+  }, [])
 
   useEffect(() => {
     if (!project) return
     setImgIdx(0)
+    // Focus the modal
+    setTimeout(() => modalRef.current?.focus(), 0)
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
       if (e.key === 'ArrowLeft') setImgIdx(i => Math.max(0, i - 1))
       if (e.key === 'ArrowRight') setImgIdx(i => Math.min((project.images?.length ?? 1) - 1, i + 1))
+      trapFocus(e)
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [project, onClose])
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      previousFocusRef.current?.focus()
+    }
+  }, [project, onClose, trapFocus])
 
   const statusColors: Record<string, string> = {
     live: 'bg-teal',
@@ -54,7 +86,14 @@ export default function ProjectModal({ project, onClose }: Props) {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
           >
-            <div className="relative w-full max-w-lg bg-white rounded-2xl border border-mist shadow-2xl pointer-events-auto overflow-hidden max-h-[90vh] overflow-y-auto">
+            <div
+              ref={modalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label={project.title}
+              tabIndex={-1}
+              className="relative w-full max-w-lg bg-white rounded-2xl border border-mist shadow-2xl pointer-events-auto overflow-hidden max-h-[90vh] overflow-y-auto focus:outline-none"
+            >
               <div className="p-7 md:p-8">
                 {/* Header row */}
                 <div className="flex items-start justify-between mb-5">
@@ -100,10 +139,10 @@ export default function ProjectModal({ project, onClose }: Props) {
 
                 {/* Image gallery */}
                 {images.length > 0 && (
-                  <div className="relative mb-6 rounded-lg overflow-hidden border border-mist">
+                  <div className="relative mb-6 rounded-lg overflow-hidden border border-mist" aria-live="polite">
                     <img
                       src={images[imgIdx]}
-                      alt={`${project.title} screenshot ${imgIdx + 1}`}
+                      alt={`${project.title} screenshot ${imgIdx + 1} of ${images.length}`}
                       loading="lazy"
                       className="w-full object-cover"
                     />

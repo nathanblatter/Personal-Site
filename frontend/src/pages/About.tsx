@@ -157,8 +157,14 @@ export default function About() {
                     loading="eager"
                     decoding="async"
                     className="w-full h-full object-cover object-top"
-                      onError={(e) => {
+                    onError={(e) => {
                       const target = e.target as HTMLImageElement
+                      const retries = Number(target.dataset.retries || '0')
+                      if (retries < 2) {
+                        target.dataset.retries = String(retries + 1)
+                        setTimeout(() => { target.src = target.src.split('?')[0] + '?r=' + Date.now() }, 1000 * (retries + 1))
+                        return
+                      }
                       target.style.display = 'none'
                       target.parentElement!.innerHTML = `
                         <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue/5 to-violet/5">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { Github, Star, GitFork, ExternalLink, X } from 'lucide-react'
 import { api, type GitHubProfile, type GitHubRepo, type GitHubContributions } from '../lib/api'
@@ -43,6 +43,7 @@ interface SelectedDay {
 
 function ContributionGraph({ data }: { data: GitHubContributions }) {
   const [selected, setSelected] = useState<SelectedDay | null>(null)
+  const detailRef = useRef<HTMLDivElement>(null)
 
   const weeks: { date: string; level: number }[][] = []
   for (let i = 0; i < data.days.length; i += 7) {
@@ -73,6 +74,7 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
         level: day.level,
         repos: data.activity?.[day.date] || [],
       })
+      setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 200)
     }
   }
 
@@ -180,6 +182,7 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
       <AnimatePresence>
         {selected && (
           <motion.div
+            ref={detailRef}
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}

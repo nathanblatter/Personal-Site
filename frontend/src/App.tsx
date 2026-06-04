@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useRef } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import Layout from './components/Layout'
@@ -18,7 +18,16 @@ const TestimonialForm = lazy(() => import('./pages/TestimonialForm'))
 
 function ScrollToTop() {
   const { pathname } = useLocation()
-  useEffect(() => { window.scrollTo(0, 0) }, [pathname])
+  const prevPath = useRef(pathname)
+  useEffect(() => {
+    if (prevPath.current !== pathname) {
+      const navType = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type
+      if (navType !== 'back_forward') {
+        window.scrollTo(0, 0)
+      }
+      prevPath.current = pathname
+    }
+  }, [pathname])
   return null
 }
 

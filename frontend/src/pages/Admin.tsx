@@ -334,6 +334,15 @@ export default function Admin() {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
   const showError = (msg: string) => showToast(`Error: ${msg}`)
 
+  // ── Unsaved changes warning ────────────────────────────────────────────
+  useEffect(() => {
+    const hasUnsaved = editingProject !== null || editingBlog !== null || editingExp !== null || editingSocial !== null
+    if (!hasUnsaved) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault() }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [editingProject, editingBlog, editingExp, editingSocial])
+
   // ── Initial data load ────────────────────────────────────────────────────
   useEffect(() => {
     api.auth.verify().catch(() => { navigate('/admin/login'); return })

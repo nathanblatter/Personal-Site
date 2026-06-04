@@ -27,12 +27,27 @@ export default function Resume() {
     }).finally(() => setLoading(false))
   }, [])
 
-  if (loading || !about) {
+  if (!about) {
     return (
-      <div className="max-w-[850px] mx-auto px-6 py-32 flex items-center gap-3 text-steel">
-        <div className="w-4 h-4 border-2 border-blue/30 border-t-blue rounded-full animate-spin" />
-        <span className="font-mono text-sm">Loading…</span>
-      </div>
+      <>
+        <div className="max-w-[850px] mx-auto px-6 pt-8 pb-4 flex items-center justify-between print:hidden">
+          <h1 className="font-mono text-xs text-steel uppercase tracking-wider">Resume</h1>
+          <a
+            href="/resume.pdf"
+            target="_blank"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue text-white font-mono text-xs font-semibold rounded-lg hover:bg-blue-dim transition-colors"
+          >
+            <Download size={13} /> Download PDF
+          </a>
+        </div>
+        <div className="max-w-[850px] mx-auto px-6 pb-16">
+          <div className="bg-white border border-mist rounded-2xl px-12 py-10 space-y-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-4 bg-cloud rounded animate-pulse" style={{ width: `${70 + Math.random() * 30}%` }} />
+            ))}
+          </div>
+        </div>
+      </>
     )
   }
 

@@ -19,19 +19,25 @@ function formatDate(iso: string): string {
 export default function Blog() {
   const [posts, setPosts] = useState<BlogPostResponse[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [query, setQuery] = useState('')
+  const [retryKey, setRetryKey] = useState(0)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
     clearTimeout(debounceRef.current)
     const doFetch = () => {
       setLoading(true)
-      api.blog.list(query || undefined).then(setPosts).finally(() => setLoading(false))
+      setError(false)
+      api.blog.list(query || undefined)
+        .then(setPosts)
+        .catch(() => { setPosts([]); setError(true) })
+        .finally(() => setLoading(false))
     }
     if (!query) { doFetch(); return }
     debounceRef.current = setTimeout(doFetch, 300)
     return () => clearTimeout(debounceRef.current)
-  }, [query])
+  }, [query, retryKey])
 
   return (
     <div className="max-w-[1100px] w-full mx-auto px-6 py-20">
@@ -72,14 +78,39 @@ export default function Blog() {
           <div className="w-4 h-4 border-2 border-blue/30 border-t-blue rounded-full animate-spin" />
           <span className="font-mono text-sm">Loading posts…</span>
         </div>
+      ) : error ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center py-32 text-steel"
+        >
+          <p className="font-mono text-sm mb-2">Failed to load posts.</p>
+          <button
+            onClick={() => setRetryKey(k => k + 1)}
+            className="font-mono text-xs text-blue hover:underline underline-offset-2 mt-1"
+          >
+            Try again
+          </button>
+        </motion.div>
       ) : posts.length === 0 ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="text-center py-32 text-steel"
         >
-          <p className="font-mono text-sm mb-2">No posts yet.</p>
-          <p className="text-xs text-silver">Check back soon.</p>
+          {query ? (
+            <>
+              <p className="font-mono text-sm mb-2">No posts matching "{query}"</p>
+              <button onClick={() => setQuery('')} className="font-mono text-xs text-blue hover:underline underline-offset-2">
+                Clear search
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="font-mono text-sm mb-2">No posts yet.</p>
+              <p className="text-xs text-silver">Check back soon.</p>
+            </>
+          )}
         </motion.div>
       ) : (
         <div className="grid md:grid-cols-2 gap-6">
