@@ -62,34 +62,28 @@ export default function Home() {
         <div className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-blue/[0.04] rounded-full blur-[120px]" />
 
         <div className="relative max-w-[900px] w-full mx-auto px-6 text-center py-12 md:py-20">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="flex items-center justify-center gap-4 mb-6 md:mb-8"
+          <div
+            className="flex items-center justify-center gap-4 mb-6 md:mb-8 animate-fade-up"
+            style={{ animationDelay: '0.2s' }}
           >
             <div className="h-px w-8 md:w-12 bg-blue" />
             <span className="font-mono text-[10px] md:text-xs text-blue tracking-[0.3em] uppercase">
               Information Systems
             </span>
             <div className="h-px w-8 md:w-12 bg-blue" />
-          </motion.div>
+          </div>
 
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.4 }}
-            className="text-6xl sm:text-8xl md:text-[120px] font-serif italic text-ink leading-[0.9] mb-6 md:mb-8"
+          <h1
+            className="text-6xl sm:text-8xl md:text-[120px] font-serif italic text-ink leading-[0.9] mb-6 md:mb-8 animate-fade-up"
+            style={{ animationDelay: '0.4s' }}
           >
             Nathan<br />
             <span className="text-gradient-blue">Blatter</span>
-          </motion.h1>
+          </h1>
 
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.6 }}
-            className="text-base md:text-xl text-steel max-w-[560px] mx-auto leading-relaxed mb-8 md:mb-10"
+          <p
+            className="text-base md:text-xl text-steel max-w-[560px] mx-auto leading-relaxed mb-8 md:mb-10 animate-fade-up"
+            style={{ animationDelay: '0.6s' }}
           >
             {portfolioCtx?.tagline ? portfolioCtx.tagline : (
               <>
@@ -99,13 +93,11 @@ export default function Home() {
                 production-ready systems.
               </>
             )}
-          </motion.p>
+          </p>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.8 }}
-            className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-5 mb-12 md:mb-16"
+          <div
+            className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-5 mb-12 md:mb-16 animate-fade-up"
+            style={{ animationDelay: '0.8s' }}
           >
             <Link
               to="/projects"
@@ -121,13 +113,11 @@ export default function Home() {
               Get In Touch
               <ArrowUpRight size={16} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </Link>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 1.2 }}
-            className="flex flex-wrap justify-center gap-6 md:gap-10 pt-8 border-t border-mist"
+          <div
+            className="flex flex-wrap justify-center gap-6 md:gap-10 pt-8 border-t border-mist animate-fade-in"
+            style={{ animationDelay: '1.2s' }}
           >
             <div className="flex items-center gap-2">
               <MapPin size={14} className="text-blue" />
@@ -142,7 +132,7 @@ export default function Home() {
                 <span className="text-blue font-semibold">{about.gpa}</span> GPA
               </div>
             )}
-          </motion.div>
+          </div>
         </div>
       </section>
 

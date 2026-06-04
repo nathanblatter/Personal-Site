@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { Menu, X, Sun, Moon } from 'lucide-react'
@@ -13,10 +13,25 @@ const navLinks = [
   { to: '/contact', label: 'Contact', code: '04' },
 ]
 
+const chunkMap: Record<string, () => Promise<unknown>> = {
+  '/about': () => import('../pages/About'),
+  '/projects': () => import('../pages/Projects'),
+  '/blog': () => import('../pages/Blog'),
+  '/contact': () => import('../pages/Contact'),
+  '/resume': () => import('../pages/Resume'),
+}
+const prefetched = new Set<string>()
+
 export default function Layout() {
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { theme, toggle } = useTheme()
+
+  const prefetch = useCallback((to: string) => {
+    if (prefetched.has(to) || !chunkMap[to]) return
+    prefetched.add(to)
+    chunkMap[to]()
+  }, [])
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -40,6 +55,8 @@ export default function Layout() {
                 <Link
                   key={link.to}
                   to={link.to}
+                  onMouseEnter={() => prefetch(link.to)}
+                  onFocus={() => prefetch(link.to)}
                   className={`relative px-5 py-2.5 font-mono text-xs tracking-wider transition-colors rounded-lg ${
                     isActive ? 'text-blue bg-blue-wash' : 'text-steel hover:text-ink hover:bg-cloud'
                   }`}
