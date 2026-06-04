@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app import models, schemas
 from app.auth import require_auth
+from app.cache import cache
 
 router = APIRouter(prefix="/experience", tags=["experience"])
 
@@ -32,6 +33,7 @@ async def create_experience(payload: schemas.ExperienceCreate, db: AsyncSession 
     db.add(exp)
     await db.commit()
     await db.refresh(exp)
+    await cache.delete_prefix("page:")
     return exp
 
 
@@ -49,6 +51,7 @@ async def update_experience(
         setattr(exp, key, value)
     await db.commit()
     await db.refresh(exp)
+    await cache.delete_prefix("page:")
     return exp
 
 
@@ -62,3 +65,4 @@ async def delete_experience(experience_id: int, db: AsyncSession = Depends(get_d
         raise HTTPException(status_code=404, detail="Experience not found")
     await db.delete(exp)
     await db.commit()
+    await cache.delete_prefix("page:")

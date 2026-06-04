@@ -16,9 +16,12 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-motion': ['motion/react'],
           'vendor-lucide': ['lucide-react'],
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-markdown': ['react-markdown', 'remark-gfm', 'remark-frontmatter', 'remark-emoji', 'remark-math', 'rehype-raw'],
+          'vendor-katex': ['katex', 'rehype-katex'],
+          'vendor-recharts': ['recharts'],
         },
       },
     },

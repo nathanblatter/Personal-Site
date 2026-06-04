@@ -1,8 +1,15 @@
+import logging
 import os
 import time
 from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BaseModel
+from sqlalchemy import text
+
+from app.database import AsyncSessionLocal
+from app.cache import cache
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["status"])
 
@@ -53,3 +60,29 @@ async def get_status():
         (now - s["last_ping"]) > STALE_AFTER for s in _sources.values()
     )
     return {"dev_active": False, "dev_type": "none", "stale": all_stale}
+
+
+@router.get("/healthz", include_in_schema=False)
+async def healthz():
+    checks = {"db": "ok", "redis": "ok"}
+
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("SELECT 1"))
+    except Exception as exc:
+        log.warning("healthz db check failed: %s", exc)
+        checks["db"] = "fail"
+
+    try:
+        r = await cache._conn()
+        await r.ping()
+    except Exception as exc:
+        log.warning("healthz redis check failed: %s", exc)
+        checks["redis"] = "fail"
+
+    healthy = all(v == "ok" for v in checks.values())
+    return Response(
+        content='{"status":"healthy"}' if healthy else '{"status":"unhealthy","checks":' + str(checks).replace("'", '"') + '}',
+        status_code=200 if healthy else 503,
+        media_type="application/json",
+    )

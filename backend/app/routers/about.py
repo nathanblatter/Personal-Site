@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app import models, schemas
 from app.auth import require_auth
+from app.cache import cache
 
 router = APIRouter(prefix="/about", tags=["about"])
 
@@ -39,6 +40,7 @@ async def upsert_about(payload: schemas.AboutUpdate, db: AsyncSession = Depends(
 
     await db.commit()
     await db.refresh(about)
+    await cache.delete_prefix("page:")
     return about
 
 
@@ -69,6 +71,7 @@ async def create_interest(payload: schemas.InterestCreate, db: AsyncSession = De
     db.add(interest)
     await db.commit()
     await db.refresh(interest)
+    await cache.delete("page:about")
     return interest
 
 
@@ -86,6 +89,7 @@ async def update_interest(
         setattr(interest, key, value)
     await db.commit()
     await db.refresh(interest)
+    await cache.delete("page:about")
     return interest
 
 
@@ -99,6 +103,7 @@ async def delete_interest(interest_id: int, db: AsyncSession = Depends(get_db), 
         raise HTTPException(status_code=404, detail="Interest not found")
     await db.delete(interest)
     await db.commit()
+    await cache.delete("page:about")
 
 
 # ── Coursework ────────────────────────────────────────────────────────────────
@@ -128,6 +133,7 @@ async def create_coursework(payload: schemas.CourseworkCreate, db: AsyncSession 
     db.add(cw)
     await db.commit()
     await db.refresh(cw)
+    await cache.delete("page:about")
     return cw
 
 
@@ -145,6 +151,7 @@ async def update_coursework(
         setattr(cw, key, value)
     await db.commit()
     await db.refresh(cw)
+    await cache.delete("page:about")
     return cw
 
 
@@ -158,6 +165,7 @@ async def delete_coursework(coursework_id: int, db: AsyncSession = Depends(get_d
         raise HTTPException(status_code=404, detail="Coursework not found")
     await db.delete(cw)
     await db.commit()
+    await cache.delete("page:about")
 
 
 # ── Testimonials ─────────────────────────────────────────────────────────────
@@ -174,6 +182,7 @@ async def create_testimonial(payload: schemas.TestimonialCreate, db: AsyncSessio
     db.add(t)
     await db.commit()
     await db.refresh(t)
+    await cache.delete("page:about")
     return t
 
 
@@ -187,6 +196,7 @@ async def update_testimonial(tid: int, payload: schemas.TestimonialUpdate, db: A
         setattr(t, key, value)
     await db.commit()
     await db.refresh(t)
+    await cache.delete("page:about")
     return t
 
 
@@ -198,3 +208,4 @@ async def delete_testimonial(tid: int, db: AsyncSession = Depends(get_db), _: No
         raise HTTPException(status_code=404, detail="Testimonial not found")
     await db.delete(t)
     await db.commit()
+    await cache.delete("page:about")

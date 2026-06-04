@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Send, MapPin, ArrowUpRight } from 'lucide-react'
 import SectionHeader from '../components/SectionHeader'
-import { api, type SocialResponse, type ContactMetaResponse, type ContactSubmitRequest } from '../lib/api'
+import { api, type SocialResponse, type ContactMetaResponse, type ContactSubmitRequest, type ContactPageResponse } from '../lib/api'
 import { getIcon } from '../lib/iconMap'
 
 export default function Contact() {
@@ -14,8 +14,8 @@ export default function Contact() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([api.socials.list(), api.contact.get()])
-      .then(([s, m]) => { setSocials(s); setMeta(m) })
+    api.contactPage.get()
+      .then(({ meta: m, socials: s }) => { setMeta(m); setSocials(s) })
       .catch(() => {})
   }, [])
 

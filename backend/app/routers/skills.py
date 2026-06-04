@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app import models, schemas
 from app.auth import require_auth
+from app.cache import cache
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
@@ -30,6 +31,7 @@ async def create_skill(payload: schemas.SkillCreate, db: AsyncSession = Depends(
     db.add(skill)
     await db.commit()
     await db.refresh(skill)
+    await cache.delete("page:home")
     return skill
 
 
@@ -45,6 +47,7 @@ async def update_skill(
         setattr(skill, key, value)
     await db.commit()
     await db.refresh(skill)
+    await cache.delete("page:home")
     return skill
 
 
@@ -56,3 +59,4 @@ async def delete_skill(skill_id: int, db: AsyncSession = Depends(get_db), _: Non
         raise HTTPException(status_code=404, detail="Skill not found")
     await db.delete(skill)
     await db.commit()
+    await cache.delete("page:home")

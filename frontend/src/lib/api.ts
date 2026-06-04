@@ -319,6 +319,13 @@ export interface AboutPageResponse {
   testimonials: TestimonialResponse[]
 }
 
+// ── Contact Page Types ───────────────────────────────────────────────────────
+
+export interface ContactPageResponse {
+  meta: ContactMetaResponse
+  socials: SocialResponse[]
+}
+
 // ── Solar Types ───────────────────────────────────────────────────────────
 
 export interface SolarResponse {
@@ -466,6 +473,10 @@ export const api = {
 
   aboutPage: {
     get: () => request<AboutPageResponse>('GET', '/about-page'),
+  },
+
+  contactPage: {
+    get: () => request<ContactPageResponse>('GET', '/contact-page'),
   },
 
   links: {

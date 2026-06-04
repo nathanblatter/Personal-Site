@@ -5,6 +5,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app import models, schemas
 from app.auth import require_auth
+from app.cache import cache
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -30,6 +31,7 @@ async def create_project(payload: schemas.ProjectCreate, db: AsyncSession = Depe
     db.add(project)
     await db.commit()
     await db.refresh(project)
+    await cache.delete("page:home")
     return project
 
 
@@ -45,6 +47,7 @@ async def update_project(
         setattr(project, key, value)
     await db.commit()
     await db.refresh(project)
+    await cache.delete("page:home")
     return project
 
 
@@ -56,3 +59,4 @@ async def delete_project(project_id: int, db: AsyncSession = Depends(get_db), _:
         raise HTTPException(status_code=404, detail="Project not found")
     await db.delete(project)
     await db.commit()
+    await cache.delete("page:home")

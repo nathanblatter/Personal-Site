@@ -21,7 +21,7 @@ services:
       - /Users/nathanblatter/.claude-laptop/projects:/claude_data_laptop:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/status/healthz')"]
       interval: 10s
       timeout: 10s
       retries: 6

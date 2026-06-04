@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from app.database import get_db
 from app import models, schemas
 from app.auth import require_auth
+from app.cache import cache
 
 router = APIRouter(prefix="/blog", tags=["blog"])
 
@@ -59,6 +60,7 @@ async def create_post(
     db.add(post)
     await db.commit()
     await db.refresh(post)
+    await cache.delete_prefix("page:blog")
     return post
 
 
@@ -84,6 +86,7 @@ async def update_post(
 
     await db.commit()
     await db.refresh(post)
+    await cache.delete_prefix("page:blog")
     return post
 
 
@@ -99,6 +102,7 @@ async def delete_post(
         raise HTTPException(status_code=404, detail="Post not found")
     await db.delete(post)
     await db.commit()
+    await cache.delete_prefix("page:blog")
 
 
 @router.get("/{slug}", response_model=schemas.BlogPostResponse)

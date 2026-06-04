@@ -10,6 +10,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app import models, schemas
 from app.auth import require_auth
+from app.cache import cache as app_cache
 
 router = APIRouter(prefix="/contact", tags=["contact"])
 
@@ -110,6 +111,7 @@ async def upsert_contact_meta(
 
     await db.commit()
     await db.refresh(meta)
+    await app_cache.delete("page:contact")
     return meta
 
 
@@ -138,6 +140,7 @@ async def create_social(payload: schemas.SocialCreate, db: AsyncSession = Depend
     db.add(social)
     await db.commit()
     await db.refresh(social)
+    await app_cache.delete("page:contact")
     return social
 
 
@@ -153,6 +156,7 @@ async def update_social(
         setattr(social, key, value)
     await db.commit()
     await db.refresh(social)
+    await app_cache.delete("page:contact")
     return social
 
 
@@ -164,3 +168,4 @@ async def delete_social(social_id: int, db: AsyncSession = Depends(get_db), _: N
         raise HTTPException(status_code=404, detail="Social not found")
     await db.delete(social)
     await db.commit()
+    await app_cache.delete("page:contact")
