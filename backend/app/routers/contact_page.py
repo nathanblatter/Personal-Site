@@ -1,4 +1,3 @@
-import asyncio
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -18,10 +17,8 @@ async def get_contact_page_data(db: AsyncSession = Depends(get_db)):
     if cached is not None:
         return cached
 
-    meta_q = db.execute(select(models.ContactMeta).where(models.ContactMeta.id == 1))
-    socials_q = db.execute(select(models.Social).order_by(models.Social.sort_order))
-
-    meta_r, socials_r = await asyncio.gather(meta_q, socials_q)
+    meta_r = await db.execute(select(models.ContactMeta).where(models.ContactMeta.id == 1))
+    socials_r = await db.execute(select(models.Social).order_by(models.Social.sort_order))
 
     data = {
         "meta": schemas.ContactMetaResponse.model_validate(meta_r.scalar_one_or_none()).model_dump(),

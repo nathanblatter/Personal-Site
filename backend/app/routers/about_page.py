@@ -1,4 +1,3 @@
-import asyncio
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -18,15 +17,11 @@ async def get_about_page_data(db: AsyncSession = Depends(get_db)):
     if cached is not None:
         return cached
 
-    about_q = db.execute(select(models.About).where(models.About.id == 1))
-    interests_q = db.execute(select(models.Interest).order_by(models.Interest.sort_order))
-    coursework_q = db.execute(select(models.Coursework).order_by(models.Coursework.sort_order))
-    experience_q = db.execute(select(models.Experience).order_by(models.Experience.sort_order))
-    testimonials_q = db.execute(select(models.Testimonial).order_by(models.Testimonial.sort_order))
-
-    about_r, interests_r, coursework_r, experience_r, testimonials_r = await asyncio.gather(
-        about_q, interests_q, coursework_q, experience_q, testimonials_q
-    )
+    about_r = await db.execute(select(models.About).where(models.About.id == 1))
+    interests_r = await db.execute(select(models.Interest).order_by(models.Interest.sort_order))
+    coursework_r = await db.execute(select(models.Coursework).order_by(models.Coursework.sort_order))
+    experience_r = await db.execute(select(models.Experience).order_by(models.Experience.sort_order))
+    testimonials_r = await db.execute(select(models.Testimonial).order_by(models.Testimonial.sort_order))
 
     data = {
         "about": schemas.AboutResponse.model_validate(about_r.scalar_one_or_none()).model_dump(),
