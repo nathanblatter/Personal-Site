@@ -9,7 +9,6 @@ export default function Resume() {
   const [skills, setSkills] = useState<SkillResponse[]>([])
   const [projects, setProjects] = useState<ProjectResponse[]>([])
   const [coursework, setCoursework] = useState<CourseworkResponse[]>([])
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
@@ -24,7 +23,7 @@ export default function Resume() {
       setSkills(sk)
       setProjects(pr.filter(p => p.status === 'live').slice(0, 5))
       setCoursework(cw)
-    }).finally(() => setLoading(false))
+    })
   }, [])
 
   if (!about) {
