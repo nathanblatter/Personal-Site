@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { ArrowLeft, Calendar, Clock, Eye, Link2, Check } from 'lucide-react'
+import { ArrowLeft, Calendar, Clock, Eye, Link2, Check, List, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkFrontmatter from 'remark-frontmatter'
@@ -59,6 +59,7 @@ export default function BlogPost() {
   const [copied, setCopied] = useState(false)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [activeId, setActiveId] = useState<string>('')
+  const [tocOpen, setTocOpen] = useState(false)
   const headingsRef = useRef<TocItem[]>([])
 
   useEffect(() => {
@@ -399,36 +400,69 @@ export default function BlogPost() {
       </motion.div>
         </div>{/* end main column */}
 
-        {/* Table of Contents sidebar */}
+        {/* Table of Contents sidebar — desktop */}
         {toc.length >= 2 && (
           <aside className="hidden xl:block">
             <div className="sticky top-24">
               <p className="font-mono text-[10px] uppercase tracking-widest text-silver mb-3">On this page</p>
-              <nav className="space-y-1">
-                {toc.map(({ id, text, level }) => (
-                  <a
-                    key={id}
-                    href={`#${id}`}
-                    onClick={e => {
-                      e.preventDefault()
-                      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
-                    }}
-                    className={`block font-mono text-[11px] leading-snug transition-colors truncate ${
-                      level === 3 ? 'pl-3' : ''
-                    } ${
-                      activeId === id
-                        ? 'text-blue'
-                        : 'text-silver hover:text-steel'
-                    }`}
-                  >
-                    {text}
-                  </a>
-                ))}
-              </nav>
+              <TocNav toc={toc} activeId={activeId} />
             </div>
           </aside>
         )}
       </div>{/* end grid */}
+
+      {/* Floating ToC — mobile/tablet */}
+      {toc.length >= 2 && (
+        <>
+          <button
+            onClick={() => setTocOpen(o => !o)}
+            className="xl:hidden fixed bottom-6 right-6 z-40 w-11 h-11 bg-blue text-white rounded-full shadow-lg shadow-blue/25 flex items-center justify-center hover:bg-blue-dim transition-colors"
+            aria-label={tocOpen ? 'Close table of contents' : 'Open table of contents'}
+          >
+            {tocOpen ? <X size={18} /> : <List size={18} />}
+          </button>
+
+          {tocOpen && (
+            <>
+              <div
+                className="xl:hidden fixed inset-0 z-30 bg-ink/20 backdrop-blur-sm"
+                onClick={() => setTocOpen(false)}
+              />
+              <div className="xl:hidden fixed bottom-20 right-6 z-40 w-64 max-h-[60vh] overflow-y-auto bg-white border border-mist rounded-xl shadow-2xl p-4">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-silver mb-3">On this page</p>
+                <TocNav toc={toc} activeId={activeId} onNavigate={() => setTocOpen(false)} />
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
+  )
+}
+
+function TocNav({ toc, activeId, onNavigate }: { toc: TocItem[]; activeId: string; onNavigate?: () => void }) {
+  return (
+    <nav className="space-y-1">
+      {toc.map(({ id, text, level }) => (
+        <a
+          key={id}
+          href={`#${id}`}
+          onClick={e => {
+            e.preventDefault()
+            document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+            onNavigate?.()
+          }}
+          className={`block font-mono text-[11px] leading-snug transition-colors truncate ${
+            level === 3 ? 'pl-3' : ''
+          } ${
+            activeId === id
+              ? 'text-blue'
+              : 'text-silver hover:text-steel'
+          }`}
+        >
+          {text}
+        </a>
+      ))}
+    </nav>
   )
 }
