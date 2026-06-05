@@ -3241,6 +3241,7 @@ export default function Admin() {
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault()
+                    if (!bkScheduleForm.name || !bkScheduleForm.email || !bkScheduleForm.topic) { showError('Name, email, and topic required'); return }
                     if (!bkScheduleForm.date || !bkScheduleForm.time) { showError('Date and time required'); return }
                     setBkScheduleLoading(true)
                     try {
@@ -3262,10 +3263,10 @@ export default function Admin() {
                   className="space-y-4"
                 >
                   <div className="grid grid-cols-2 gap-4">
-                    <AdminInput label="Name" value={bkScheduleForm.name} onChange={v => setBkScheduleForm({ ...bkScheduleForm, name: v })} required />
-                    <AdminInput label="Email" value={bkScheduleForm.email} onChange={v => setBkScheduleForm({ ...bkScheduleForm, email: v })} required />
+                    <AdminInput label="Name" value={bkScheduleForm.name} onChange={v => setBkScheduleForm({ ...bkScheduleForm, name: v })} />
+                    <AdminInput label="Email" value={bkScheduleForm.email} onChange={v => setBkScheduleForm({ ...bkScheduleForm, email: v })} />
                   </div>
-                  <AdminInput label="Topic" value={bkScheduleForm.topic} onChange={v => setBkScheduleForm({ ...bkScheduleForm, topic: v })} required />
+                  <AdminInput label="Topic" value={bkScheduleForm.topic} onChange={v => setBkScheduleForm({ ...bkScheduleForm, topic: v })} />
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="block font-mono text-[11px] text-steel mb-1.5 tracking-wider uppercase">Date</label>
