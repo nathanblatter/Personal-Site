@@ -332,10 +332,10 @@ export default function LinkInBio() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={social.label}
-                  title={social.label}
-                  className="w-10 h-10 rounded-xl bg-white border border-mist flex items-center justify-center text-steel hover:text-blue hover:border-blue/30 hover:shadow-sm transition-all"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-mist text-steel hover:text-blue hover:border-blue/30 hover:shadow-sm transition-all"
                 >
-                  {SocialIcon ? <SocialIcon size={18} /> : <Icons.Link size={18} />}
+                  {SocialIcon ? <SocialIcon size={16} /> : <Icons.Link size={16} />}
+                  <span className="text-xs font-mono">{social.label}</span>
                 </a>
               )
             })}
