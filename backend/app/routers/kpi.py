@@ -254,10 +254,10 @@ async def location_ingest(
     """Log a lat/lon ping. Called by phone Shortcut every 30 minutes."""
     log.info("location_ingest received: %s", body.model_dump())
     ts = body.ts or datetime.now(timezone.utc)
-    resolved_location = f"{body.street}, {body.city}, {body.state} {str(body.zip)} , {body.region}"
+    resolved_location = f"{body.street}, {body.city}, {body.state} {str(body.zip)}, {body.region}"
     async with _KPI_POOL.acquire() as conn:
         await conn.execute(
-            "INSERT INTO location_log (ts, lat, lon, resolved_location, street, city, zip, state, region) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+            "INSERT INTO location_log (ts, lat, lon, resolved_location, street, city, zip, state, region) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
             ts, body.lat, body.lon, resolved_location, body.street, body.city, body.zip, body.state, body.region,
         )
     return {
