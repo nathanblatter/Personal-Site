@@ -1,7 +1,9 @@
+import logging
 import os
 from datetime import date, datetime, timedelta, time as dt_time
 from zoneinfo import ZoneInfo
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from redis.asyncio import Redis
 from sqlalchemy import select, and_
@@ -17,9 +19,16 @@ from app.email_service import (
 )
 from app.zoom_service import create_meeting, delete_meeting
 
+log = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+IMESSAGE_API_URL = os.getenv("IMESSAGE_API_URL", "http://100.79.61.79:8899")
+IMESSAGE_API_KEY = os.getenv("IMESSAGE_API_KEY") or os.getenv("imessage_api_key", "")
+ALERT_RECIPIENT = os.getenv("ALERT_PHONE", "9258869553")
+
+_imessage_client = httpx.AsyncClient(timeout=5.0)
 
 _redis: Redis | None = None
 
@@ -37,6 +46,28 @@ def _real_ip(request: Request) -> str:
         or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
         or request.client.host
     )
+
+
+async def _send_booking_imessage(booking, admin_tz: str = "America/Denver"):
+    """Send an iMessage alert for a new booking request."""
+    if not IMESSAGE_API_KEY:
+        return
+    from app.email_service import _fmt_time
+    time_str = _fmt_time(booking.start_at, admin_tz)
+    msg = (
+        f"New booking request!\n"
+        f"{booking.visitor_name} ({booking.visitor_email})\n"
+        f"Topic: {booking.topic}\n"
+        f"Time: {time_str} ({booking.duration_minutes} min)"
+    )
+    try:
+        await _imessage_client.post(
+            f"{IMESSAGE_API_URL}/send",
+            json={"recipient": ALERT_RECIPIENT, "message": msg},
+            headers={"X-API-Key": IMESSAGE_API_KEY, "Content-Type": "application/json"},
+        )
+    except httpx.HTTPError:
+        log.warning("iMessage booking alert failed")
 
 
 SETTINGS_ID = 1
@@ -235,9 +266,13 @@ async def create_booking(payload: schemas.BookingCreate, request: Request, db: A
     await db.commit()
     await db.refresh(booking)
 
-    # Send notification email (fire and forget)
+    # Send notifications (fire and forget)
     try:
         await send_booking_request_email(booking, settings.timezone)
+    except Exception:
+        pass
+    try:
+        await _send_booking_imessage(booking, settings.timezone)
     except Exception:
         pass
 
