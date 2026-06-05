@@ -13,10 +13,6 @@ function formatSlotTime(iso: string): string {
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
-function formatDateLabel(d: Date): string {
-  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`
-}
-
 function BookACall() {
   const [bookingSettings, setBookingSettings] = useState<BookingSettingsResponse | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
