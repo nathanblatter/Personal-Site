@@ -987,7 +987,7 @@ class BioPageSettingsResponse(BaseModel):
 class BioPagePublicResponse(BaseModel):
     settings: BioPageSettingsResponse
     links: List[BioLinkResponse]
-    socials: List[Any] = []  # reuse Social model data
+    socials: List[SocialResponse] = []
 
 
 # ── Dashboard / Overview ─────────────────────────────────────────────────────
