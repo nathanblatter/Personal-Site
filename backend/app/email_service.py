@@ -150,11 +150,16 @@ def _fmt_time(dt: datetime, tz_name: str) -> str:
     return local.strftime("%A, %B %-d at %-I:%M %p %Z")
 
 
-async def send_booking_request_email(booking, admin_tz: str = "America/Denver") -> bool:
-    """Notify Nathan of a new booking request."""
+async def send_booking_request_email(booking, admin_tz: str = "America/Denver",
+                                     accept_token: str | None = None,
+                                     decline_token: str | None = None) -> bool:
+    """Notify Nathan of a new booking request with optional accept/decline magic links."""
     time_str = _fmt_time(booking.start_at, admin_tz)
     subject = f"New booking request: {booking.topic} — {booking.visitor_name}"
     admin_link = f"{SITE_URL}/admin"
+
+    accept_url = f"{SITE_URL}/api/v1/bookings/action?token={accept_token}" if accept_token else ""
+    decline_url = f"{SITE_URL}/api/v1/bookings/action?token={decline_token}" if decline_token else ""
 
     text_body = (
         f"New booking request from {booking.visitor_name} ({booking.visitor_email})\n\n"
@@ -162,6 +167,26 @@ async def send_booking_request_email(booking, admin_tz: str = "America/Denver") 
         f"Time: {time_str} ({booking.duration_minutes} min)\n\n"
         f"Review in admin: {admin_link}"
     )
+    if accept_url:
+        text_body += f"\n\nQuick actions:\nAccept: {accept_url}\nDecline: {decline_url}"
+
+    action_buttons = ""
+    if accept_url:
+        action_buttons = f"""
+  <div style="margin-top:24px;display:flex;gap:12px;">
+    <a href="{accept_url}" style="display:inline-block;background:#10b981;color:white;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:600;font-size:14px;">
+      Accept
+    </a>
+    <a href="{decline_url}" style="display:inline-block;background:#ef4444;color:white;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:600;font-size:14px;">
+      Decline
+    </a>
+  </div>
+  <p style="margin-top:12px;font-size:11px;color:#9ca3af;">Or review in <a href="{admin_link}" style="color:#3b6cf5;">admin</a></p>"""
+    else:
+        action_buttons = f"""
+  <a href="{admin_link}" style="display:inline-block;margin-top:24px;background:#3b6cf5;color:white;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:600;font-size:15px;">
+    Review in Admin &rarr;
+  </a>"""
 
     html_body = f"""<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#f8f9fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
@@ -172,16 +197,14 @@ async def send_booking_request_email(booking, admin_tz: str = "America/Denver") 
   <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Email:</strong> {booking.visitor_email}</p>
   <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Topic:</strong> {booking.topic}</p>
   <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Time:</strong> {time_str} ({booking.duration_minutes} min)</p>
-  <a href="{admin_link}" style="display:inline-block;margin-top:24px;background:#3b6cf5;color:white;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:600;font-size:15px;">
-    Review in Admin &rarr;
-  </a>
+  {action_buttons}
 </div>
 </div></body></html>"""
 
     return await _send_mime(CONTACT_TO_EMAIL, subject, text_body, html_body)
 
 
-async def send_booking_confirmed_email(booking, admin_tz: str = "America/Denver") -> bool:
+async def send_booking_confirmed_email(booking, admin_tz: str = "America/Denver", cancel_token: str | None = None) -> bool:
     """Send confirmation with Zoom link and .ics to both Nathan and visitor."""
     time_str = _fmt_time(booking.start_at, admin_tz)
     subject = f"Call confirmed: {booking.topic}"
@@ -197,6 +220,8 @@ async def send_booking_confirmed_email(booking, admin_tz: str = "America/Denver"
         attendee_email=booking.visitor_email,
     )
 
+    cancel_link = f"{SITE_URL}/api/v1/bookings/action?token={cancel_token}" if cancel_token else ""
+
     text_body = (
         f"Your call has been confirmed!\n\n"
         f"Topic: {booking.topic}\n"
@@ -204,6 +229,12 @@ async def send_booking_confirmed_email(booking, admin_tz: str = "America/Denver"
         f"Zoom: {zoom_url}\n\n"
         f"A calendar invite is attached."
     )
+    if cancel_link:
+        text_body += f"\n\nNeed to cancel? {cancel_link}"
+
+    cancel_html = ""
+    if cancel_link:
+        cancel_html = f'<p style="margin-top:16px;"><a href="{cancel_link}" style="color:#ef4444;font-size:12px;text-decoration:underline;">Need to cancel this booking?</a></p>'
 
     html_body = f"""<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#f8f9fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
@@ -217,6 +248,7 @@ async def send_booking_confirmed_email(booking, admin_tz: str = "America/Denver"
     Join Zoom Meeting &rarr;
   </a>
   <p style="margin-top:20px;font-size:12px;color:#9ca3af;">A calendar invite (.ics) is attached to this email.</p>
+  {cancel_html}
 </div>
 </div></body></html>"""
 
@@ -261,3 +293,39 @@ async def send_booking_declined_email(booking) -> bool:
 </div></body></html>"""
 
     return await _send_mime(booking.visitor_email, subject, text_body, html_body)
+
+
+async def send_booking_cancelled_email(booking, admin_tz: str = "America/Denver",
+                                        cancelled_by_visitor: bool = False) -> bool:
+    """Send cancellation notification to both parties."""
+    time_str = _fmt_time(booking.start_at, admin_tz)
+    who = booking.visitor_name if cancelled_by_visitor else "Nathan"
+    subject = f"Booking cancelled: {booking.topic}"
+
+    text_body = (
+        f"The booking for \"{booking.topic}\" on {time_str} has been cancelled by {who}.\n\n"
+        f"Visitor: {booking.visitor_name} ({booking.visitor_email})\n"
+        f"Duration: {booking.duration_minutes} min"
+    )
+
+    html_body = f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8f9fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<div style="max-width:560px;margin:40px auto;padding:0 20px;">
+<div style="background:white;border-radius:16px;padding:48px 40px;border:1px solid #e5e7eb;">
+  <p style="font-family:monospace;font-size:11px;color:#ef4444;letter-spacing:0.15em;text-transform:uppercase;margin:0 0 20px;">Booking Cancelled</p>
+  <h1 style="font-size:24px;color:#1a1f2e;margin:0 0 16px;font-weight:700;">{booking.topic}</h1>
+  <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Time:</strong> {time_str} ({booking.duration_minutes} min)</p>
+  <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Cancelled by:</strong> {who}</p>
+  <p style="color:#64748b;font-size:14px;line-height:1.6;margin-top:20px;">
+    This booking has been cancelled. If you'd like to reschedule, visit the
+    <a href="{SITE_URL}/contact" style="color:#3b6cf5;">contact page</a>.
+  </p>
+</div>
+</div></body></html>"""
+
+    # Notify the other party (and Nathan always gets a copy)
+    ok1 = await _send_mime(booking.visitor_email, subject, text_body, html_body)
+    if not cancelled_by_visitor:
+        return ok1
+    ok2 = await _send_mime(CONTACT_TO_EMAIL, subject, text_body, html_body)
+    return ok1 and ok2

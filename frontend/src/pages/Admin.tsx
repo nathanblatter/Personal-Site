@@ -42,6 +42,8 @@ import {
   Calendar,
   Video,
   Ban,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import {
   api,
@@ -335,6 +337,9 @@ export default function Admin() {
   const [bkTab, setBkTab] = useState<'pending' | 'upcoming' | 'past' | 'settings'>('pending')
   const [bkDeclineNote, setBkDeclineNote] = useState<Record<number, string>>({})
   const [bkShowDecline, setBkShowDecline] = useState<number | null>(null)
+  const [bkShowBlockPicker, setBkShowBlockPicker] = useState(false)
+  const [bkBlockMonth, setBkBlockMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1) })
+  const [bkBlockReason, setBkBlockReason] = useState('')
 
   // ── Local bio state (derived from about.bio_paragraphs) ─────────────────
   const [headline, setHeadline] = useState('')
@@ -3482,21 +3487,89 @@ export default function Admin() {
               <div className="flex items-center justify-between mb-5">
                 <h3 className="font-sans font-semibold text-ink">Blocked Dates</h3>
                 <button
-                  onClick={async () => {
-                    const dateStr = prompt('Enter date to block (YYYY-MM-DD):')
-                    if (!dateStr) return
-                    const reason = prompt('Reason (optional):') || undefined
-                    try {
-                      const d = await api.bookings.blockedDates.create({ date: dateStr, reason })
-                      setBkBlocked([...bkBlocked, d])
-                      showToast('Date blocked')
-                    } catch (err) { showError((err as Error).message) }
-                  }}
+                  onClick={() => setBkShowBlockPicker(!bkShowBlockPicker)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-blue bg-blue-wash rounded-lg hover:bg-blue/10 transition-colors"
                 >
                   <Plus size={12} /> Block Date
                 </button>
               </div>
+
+              <AnimatePresence>
+                {bkShowBlockPicker && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mb-5">
+                    <div className="p-4 bg-cloud rounded-xl border border-mist space-y-4">
+                      {/* Month navigation */}
+                      <div className="flex items-center justify-between">
+                        <button onClick={() => setBkBlockMonth(new Date(bkBlockMonth.getFullYear(), bkBlockMonth.getMonth() - 1, 1))} className="p-1.5 rounded-lg text-steel hover:text-ink hover:bg-white transition-colors"><ChevronLeft size={16} /></button>
+                        <span className="font-mono text-sm text-ink font-medium">
+                          {bkBlockMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                        </span>
+                        <button onClick={() => setBkBlockMonth(new Date(bkBlockMonth.getFullYear(), bkBlockMonth.getMonth() + 1, 1))} className="p-1.5 rounded-lg text-steel hover:text-ink hover:bg-white transition-colors"><ChevronRight size={16} /></button>
+                      </div>
+                      {/* Day headers */}
+                      <div className="grid grid-cols-7 gap-1 text-center">
+                        {['Mo','Tu','We','Th','Fr','Sa','Su'].map(d => (
+                          <span key={d} className="font-mono text-[10px] text-silver py-1">{d}</span>
+                        ))}
+                      </div>
+                      {/* Calendar grid */}
+                      <div className="grid grid-cols-7 gap-1">
+                        {(() => {
+                          const year = bkBlockMonth.getFullYear()
+                          const month = bkBlockMonth.getMonth()
+                          const firstDay = new Date(year, month, 1)
+                          const lastDay = new Date(year, month + 1, 0)
+                          const startPad = (firstDay.getDay() + 6) % 7 // Mon=0
+                          const cells: React.ReactNode[] = []
+                          for (let i = 0; i < startPad; i++) cells.push(<div key={`pad-${i}`} />)
+                          for (let d = 1; d <= lastDay.getDate(); d++) {
+                            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+                            const isBlocked = bkBlocked.some(b => b.date === dateStr)
+                            const isPast = new Date(year, month, d) < new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())
+                            cells.push(
+                              <button
+                                key={d}
+                                disabled={isPast}
+                                onClick={async () => {
+                                  if (isBlocked) return
+                                  try {
+                                    const created = await api.bookings.blockedDates.create({ date: dateStr, reason: bkBlockReason || undefined })
+                                    setBkBlocked([...bkBlocked, created])
+                                    showToast(`${dateStr} blocked`)
+                                  } catch (err) { showError((err as Error).message) }
+                                }}
+                                className={`aspect-square rounded-lg text-xs font-mono flex items-center justify-center transition-all ${
+                                  isBlocked
+                                    ? 'bg-ember/10 text-ember font-semibold border border-ember/20'
+                                    : isPast
+                                    ? 'text-silver/40 cursor-not-allowed'
+                                    : 'text-ink hover:bg-blue-wash hover:text-blue cursor-pointer'
+                                }`}
+                              >
+                                {d}
+                              </button>
+                            )
+                          }
+                          return cells
+                        })()}
+                      </div>
+                      {/* Reason input */}
+                      <div>
+                        <label className="block font-mono text-[10px] text-steel mb-1 tracking-wider uppercase">Reason (optional)</label>
+                        <input
+                          type="text"
+                          value={bkBlockReason}
+                          onChange={e => setBkBlockReason(e.target.value)}
+                          placeholder="e.g. Vacation, Holiday"
+                          className="w-full px-3 py-2 bg-white border border-mist rounded-lg text-sm text-ink placeholder-silver focus:outline-none focus:border-blue/50 transition-colors"
+                        />
+                      </div>
+                      <p className="font-mono text-[10px] text-silver">Click a date to block it. Blocked dates shown in red.</p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="space-y-2">
                 {bkBlocked.map(d => (
                   <div key={d.id} className="flex items-center justify-between p-3 bg-cloud rounded-lg">

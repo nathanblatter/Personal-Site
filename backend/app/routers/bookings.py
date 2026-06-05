@@ -5,17 +5,19 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import HTMLResponse
 from redis.asyncio import Redis
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import models, schemas
-from app.auth import require_auth
+from app.auth import require_auth, create_action_token, verify_action_token
 from app.database import get_db
 from app.email_service import (
     send_booking_request_email,
     send_booking_confirmed_email,
     send_booking_declined_email,
+    send_booking_cancelled_email,
 )
 from app.zoom_service import create_meeting, delete_meeting
 
@@ -27,6 +29,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 IMESSAGE_API_URL = os.getenv("IMESSAGE_API_URL", "http://100.79.61.79:8899")
 IMESSAGE_API_KEY = os.getenv("IMESSAGE_API_KEY") or os.getenv("imessage_api_key", "")
 ALERT_RECIPIENT = os.getenv("ALERT_PHONE", "9258869553")
+SITE_URL = os.getenv("SITE_URL", "https://nathanblatter.com")
 
 _imessage_client = httpx.AsyncClient(timeout=5.0)
 
@@ -54,11 +57,15 @@ async def _send_booking_imessage(booking, admin_tz: str = "America/Denver"):
         return
     from app.email_service import _fmt_time
     time_str = _fmt_time(booking.start_at, admin_tz)
+    accept_url = f"{SITE_URL}/api/v1/bookings/action?token={create_action_token('accept', booking.id)}"
+    decline_url = f"{SITE_URL}/api/v1/bookings/action?token={create_action_token('decline', booking.id)}"
     msg = (
         f"New booking request!\n"
         f"{booking.visitor_name} ({booking.visitor_email})\n"
         f"Topic: {booking.topic}\n"
-        f"Time: {time_str} ({booking.duration_minutes} min)"
+        f"Time: {time_str} ({booking.duration_minutes} min)\n\n"
+        f"Accept: {accept_url}\n"
+        f"Decline: {decline_url}"
     )
     try:
         await _imessage_client.post(
@@ -84,6 +91,20 @@ async def _get_settings(db: AsyncSession) -> models.BookingSettings:
         await db.commit()
         await db.refresh(settings)
     return settings
+
+
+def _action_result_html(title: str, message: str, success: bool = True) -> HTMLResponse:
+    color = "#10b981" if success else "#ef4444"
+    icon = "&#10003;" if success else "&#10007;"
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title}</title></head>
+<body style="margin:0;padding:0;background:#f8f9fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;">
+<div style="max-width:400px;text-align:center;padding:40px;">
+<div style="width:64px;height:64px;border-radius:50%;background:{color}20;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:28px;color:{color};">{icon}</div>
+<h1 style="font-size:24px;color:#1a1f2e;margin:0 0 8px;">{title}</h1>
+<p style="color:#64748b;font-size:15px;line-height:1.6;">{message}</p>
+</div></body></html>""")
 
 
 # ── Public endpoints ─────────────────────────────────────────────────────────
@@ -268,7 +289,9 @@ async def create_booking(payload: schemas.BookingCreate, request: Request, db: A
 
     # Send notifications (fire and forget)
     try:
-        await send_booking_request_email(booking, settings.timezone)
+        accept_token = create_action_token("accept", booking.id)
+        decline_token = create_action_token("decline", booking.id)
+        await send_booking_request_email(booking, settings.timezone, accept_token, decline_token)
     except Exception:
         pass
     try:
@@ -277,6 +300,109 @@ async def create_booking(payload: schemas.BookingCreate, request: Request, db: A
         pass
 
     return booking
+
+
+# ── Public action endpoint (magic link from email/text) ──────────────────────
+
+@router.get("/action", response_class=HTMLResponse)
+async def handle_action(token: str, db: AsyncSession = Depends(get_db)):
+    """Accept/decline/cancel a booking via a magic link token."""
+    payload = verify_action_token(token)
+    action = payload.get("action")
+    booking_id = payload.get("booking_id")
+
+    result = await db.execute(
+        select(models.Booking).where(models.Booking.id == booking_id)
+    )
+    booking = result.scalar_one_or_none()
+    if not booking:
+        return _action_result_html("Not Found", "This booking no longer exists.", False)
+
+    settings = await _get_settings(db)
+
+    if action == "accept":
+        if booking.status != models.BookingStatus.pending:
+            return _action_result_html("Already Handled", f"This booking has already been {booking.status.value}.")
+
+        # Create Zoom meeting
+        try:
+            zoom = await create_meeting(
+                topic=f"Call with Nathan and {booking.visitor_name}",
+                start_at=booking.start_at,
+                duration_minutes=booking.duration_minutes,
+            )
+            if zoom:
+                booking.zoom_join_url = zoom["join_url"]
+                booking.zoom_meeting_id = zoom["meeting_id"]
+        except Exception as e:
+            log.warning("Zoom meeting creation failed: %s", e)
+
+        booking.status = models.BookingStatus.confirmed
+        booking.decided_at = datetime.now(ZoneInfo("UTC"))
+        await db.commit()
+        await db.refresh(booking)
+
+        try:
+            cancel_token = create_action_token("cancel", booking.id, hours=168)
+            await send_booking_confirmed_email(booking, settings.timezone, cancel_token)
+        except Exception:
+            pass
+
+        return _action_result_html(
+            "Booking Accepted",
+            f"Call with {booking.visitor_name} confirmed. Zoom meeting created and invites sent."
+        )
+
+    elif action == "decline":
+        if booking.status != models.BookingStatus.pending:
+            return _action_result_html("Already Handled", f"This booking has already been {booking.status.value}.")
+
+        booking.status = models.BookingStatus.declined
+        booking.decided_at = datetime.now(ZoneInfo("UTC"))
+        await db.commit()
+        await db.refresh(booking)
+
+        try:
+            await send_booking_declined_email(booking)
+        except Exception:
+            pass
+
+        return _action_result_html(
+            "Booking Declined",
+            f"Booking from {booking.visitor_name} has been declined. They've been notified."
+        )
+
+    elif action == "cancel":
+        if booking.status == models.BookingStatus.cancelled:
+            return _action_result_html("Already Cancelled", "This booking has already been cancelled.")
+        if booking.status not in (models.BookingStatus.pending, models.BookingStatus.confirmed):
+            return _action_result_html("Cannot Cancel", f"This booking has been {booking.status.value} and cannot be cancelled.", False)
+
+        was_confirmed = booking.status == models.BookingStatus.confirmed
+
+        # Delete Zoom meeting if exists
+        if booking.zoom_meeting_id:
+            try:
+                await delete_meeting(booking.zoom_meeting_id)
+            except Exception:
+                pass
+
+        booking.status = models.BookingStatus.cancelled
+        booking.decided_at = datetime.now(ZoneInfo("UTC"))
+        await db.commit()
+        await db.refresh(booking)
+
+        try:
+            await send_booking_cancelled_email(booking, settings.timezone, cancelled_by_visitor=True)
+        except Exception:
+            pass
+
+        msg = "Your booking has been cancelled." if True else ""
+        if was_confirmed:
+            msg += " The Zoom meeting has been removed."
+        return _action_result_html("Booking Cancelled", msg)
+
+    return _action_result_html("Invalid Action", "Unknown action.", False)
 
 
 # ── Admin endpoints ──────────────────────────────────────────────────────────
@@ -315,7 +441,7 @@ async def accept_booking(
     # Create Zoom meeting
     try:
         zoom = await create_meeting(
-            topic=f"Call with {booking.visitor_name}: {booking.topic}",
+            topic=f"Call with Nathan and {booking.visitor_name}",
             start_at=booking.start_at,
             duration_minutes=booking.duration_minutes,
         )
@@ -323,8 +449,7 @@ async def accept_booking(
             booking.zoom_join_url = zoom["join_url"]
             booking.zoom_meeting_id = zoom["meeting_id"]
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("Zoom meeting creation failed: %s", e)
+        log.warning("Zoom meeting creation failed: %s", e)
 
     booking.status = models.BookingStatus.confirmed
     booking.decided_at = datetime.now(ZoneInfo("UTC"))
@@ -334,9 +459,10 @@ async def accept_booking(
     await db.commit()
     await db.refresh(booking)
 
-    # Send confirmation emails
+    # Send confirmation emails with cancel token for visitor
     try:
-        await send_booking_confirmed_email(booking, settings.timezone)
+        cancel_token = create_action_token("cancel", booking.id, hours=168)
+        await send_booking_confirmed_email(booking, settings.timezone, cancel_token)
     except Exception:
         pass
 
@@ -388,10 +514,22 @@ async def cancel_booking(
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
 
+    was_confirmed = booking.status == models.BookingStatus.confirmed
+
     # If confirmed with Zoom meeting, delete it
     if booking.zoom_meeting_id:
         try:
             await delete_meeting(booking.zoom_meeting_id)
+        except Exception:
+            pass
+
+    settings = await _get_settings(db)
+
+    # Send cancel notification before deleting
+    if booking.status in (models.BookingStatus.pending, models.BookingStatus.confirmed):
+        booking.status = models.BookingStatus.cancelled
+        try:
+            await send_booking_cancelled_email(booking, settings.timezone, cancelled_by_visitor=False)
         except Exception:
             pass
 

@@ -23,3 +23,20 @@ def require_auth(auth_token: str | None = Cookie(default=None)):
         jwt.decode(auth_token, SECRET_KEY, algorithms=[ALGORITHM])
     except jwt.PyJWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+
+def create_action_token(action: str, booking_id: int, hours: int = 72) -> str:
+    """Create a short-lived JWT for a specific booking action (accept/decline/cancel)."""
+    exp = datetime.now(timezone.utc) + timedelta(hours=hours)
+    return jwt.encode(
+        {"action": action, "booking_id": booking_id, "exp": exp},
+        SECRET_KEY, algorithm=ALGORITHM,
+    )
+
+
+def verify_action_token(token: str) -> dict:
+    """Verify and return payload from an action token. Raises on invalid/expired."""
+    try:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=400, detail="Invalid or expired link")

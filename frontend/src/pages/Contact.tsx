@@ -119,7 +119,14 @@ function BookACall() {
           {/* Date picker strip */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <span className="font-mono text-xs text-steel tracking-wider uppercase">Select a date</span>
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-xs text-steel tracking-wider uppercase">Select a date</span>
+                {bookingSettings?.timezone && (
+                  <span className="font-mono text-[10px] text-silver bg-cloud px-2 py-0.5 rounded">
+                    Times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                  </span>
+                )}
+              </div>
               <div className="flex gap-1">
                 <button
                   onClick={() => setDateOffset(Math.max(0, dateOffset - 7))}
