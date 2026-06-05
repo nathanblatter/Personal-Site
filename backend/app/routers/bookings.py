@@ -28,7 +28,7 @@ router = APIRouter(prefix="/bookings", tags=["bookings"])
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 IMESSAGE_API_URL = os.getenv("IMESSAGE_API_URL", "http://100.79.61.79:8899")
 IMESSAGE_API_KEY = os.getenv("IMESSAGE_API_KEY") or os.getenv("imessage_api_key", "")
-ALERT_RECIPIENT = os.getenv("ALERT_PHONE", "9258869553")
+ALERT_RECIPIENT = os.getenv("NATHAN_PHONE", "")
 SITE_URL = os.getenv("SITE_URL", "https://nathanblatter.com")
 
 _imessage_client = httpx.AsyncClient(timeout=5.0)
@@ -53,7 +53,7 @@ def _real_ip(request: Request) -> str:
 
 async def _send_booking_imessage(booking, admin_tz: str = "America/Denver"):
     """Send an iMessage alert for a new booking request."""
-    if not IMESSAGE_API_KEY:
+    if not IMESSAGE_API_KEY or not ALERT_RECIPIENT:
         return
     from app.email_service import _fmt_time
     time_str = _fmt_time(booking.start_at, admin_tz)

@@ -19,7 +19,7 @@ WEBSITE_ID = os.getenv("UMAMI_WEBSITE_ID", "49f0edff-13f8-4a9b-9da6-5ad92bd18abc
 
 IMESSAGE_API_URL = os.getenv("IMESSAGE_API_URL", "http://100.79.61.79:8899")
 IMESSAGE_API_KEY = os.getenv("IMESSAGE_API_KEY") or os.getenv("imessage_api_key", "")
-ALERT_RECIPIENT = os.getenv("ALERT_PHONE", "9258869553")
+ALERT_RECIPIENT = os.getenv("NATHAN_PHONE", "")
 
 _umami_client = httpx.AsyncClient(timeout=3.0)
 _imessage_client = httpx.AsyncClient(timeout=5.0)
@@ -66,7 +66,7 @@ async def _fire_umami_event(request: FastAPIRequest, link: models.TrackedLink):
 
 async def _send_visitor_alert(request: FastAPIRequest, link: models.TrackedLink):
     """Send an iMessage alert when someone clicks a tracked link."""
-    if not IMESSAGE_API_KEY:
+    if not IMESSAGE_API_KEY or not ALERT_RECIPIENT:
         return
 
     ip = "unknown"
