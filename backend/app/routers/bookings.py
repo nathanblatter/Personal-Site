@@ -112,7 +112,18 @@ def _action_result_html(title: str, message: str, success: bool = True) -> HTMLR
 @router.get("/settings/public", response_model=schemas.BookingSettingsResponse)
 async def get_public_settings(db: AsyncSession = Depends(get_db)):
     settings = await _get_settings(db)
-    return settings
+    # Fetch which weekdays have enabled availability windows
+    result = await db.execute(
+        select(models.AvailabilityWindow.day_of_week).where(
+            models.AvailabilityWindow.enabled == True
+        ).distinct()
+    )
+    available_days = [row[0] for row in result.all()]
+    return schemas.BookingSettingsResponse(
+        timezone=settings.timezone,
+        enabled=settings.enabled,
+        available_days=sorted(available_days),
+    )
 
 
 @router.get("/slots", response_model=list[schemas.AvailableSlot])
@@ -295,6 +306,11 @@ async def create_booking(payload: schemas.BookingCreate, request: Request, db: A
     except Exception:
         pass
     try:
+        from app.email_service import send_booking_received_email
+        await send_booking_received_email(booking)
+    except Exception:
+        pass
+    try:
         await _send_booking_imessage(booking, settings.timezone)
     except Exception:
         pass
@@ -397,9 +413,10 @@ async def handle_action(token: str, db: AsyncSession = Depends(get_db)):
         except Exception:
             pass
 
-        msg = "Your booking has been cancelled." if True else ""
+        msg = "Your booking has been cancelled."
         if was_confirmed:
             msg += " The Zoom meeting has been removed."
+        msg += f' <a href="{SITE_URL}/contact" style="color:#3b6cf5;text-decoration:underline;">Reschedule a call</a>'
         return _action_result_html("Booking Cancelled", msg)
 
     return _action_result_html("Invalid Action", "Unknown action.", False)
@@ -686,3 +703,56 @@ async def auto_decline_expired():
             count += 1
         await db.commit()
         return f"{count} bookings auto-declined"
+
+
+async def send_booking_reminders():
+    """Send reminder emails/texts for confirmed bookings starting in ~1 hour."""
+    from app.database import AsyncSessionLocal
+    from app.email_service import send_booking_reminder_email
+    async with AsyncSessionLocal() as db:
+        now = datetime.now(ZoneInfo("UTC"))
+        window_start = now + timedelta(minutes=50)
+        window_end = now + timedelta(minutes=70)
+        result = await db.execute(
+            select(models.Booking).where(
+                and_(
+                    models.Booking.status == models.BookingStatus.confirmed,
+                    models.Booking.start_at >= window_start,
+                    models.Booking.start_at <= window_end,
+                    models.Booking.admin_note != "reminder_sent",
+                )
+            )
+        )
+        bookings_list = result.scalars().all()
+        settings = await _get_settings(db)
+        count = 0
+        for booking in bookings_list:
+            try:
+                await send_booking_reminder_email(booking, settings.timezone)
+                # Send iMessage reminder too
+                if IMESSAGE_API_KEY and ALERT_RECIPIENT:
+                    from app.email_service import _fmt_time
+                    time_str = _fmt_time(booking.start_at, settings.timezone)
+                    zoom_url = booking.zoom_join_url or "No Zoom link"
+                    msg = (
+                        f"Reminder: Call in ~1 hour\n"
+                        f"{booking.visitor_name} — {booking.topic}\n"
+                        f"Time: {time_str}\n"
+                        f"Zoom: {zoom_url}"
+                    )
+                    try:
+                        await _imessage_client.post(
+                            f"{IMESSAGE_API_URL}/send",
+                            json={"recipient": ALERT_RECIPIENT, "message": msg},
+                            headers={"X-API-Key": IMESSAGE_API_KEY, "Content-Type": "application/json"},
+                        )
+                    except httpx.HTTPError:
+                        pass
+            except Exception:
+                pass
+            # Mark as reminded (use admin_note field with a prefix to not overwrite real notes)
+            if not booking.admin_note:
+                booking.admin_note = "reminder_sent"
+            count += 1
+        await db.commit()
+        return f"{count} reminders sent"

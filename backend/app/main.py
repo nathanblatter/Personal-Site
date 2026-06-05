@@ -136,6 +136,10 @@ async def _periodic_booking_cleanup():
     return await bookings.auto_decline_expired()
 
 
+async def _periodic_booking_reminders():
+    return await bookings.send_booking_reminders()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await kpi.init_kpi_db()
@@ -144,6 +148,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_supervised("claude_snapshot", _periodic_claude_snapshot, 86400)),
         asyncio.create_task(_supervised("github_kpi", _periodic_github_kpi, 21600)),
         asyncio.create_task(_supervised("booking_cleanup", _periodic_booking_cleanup, 3600)),
+        asyncio.create_task(_supervised("booking_reminders", _periodic_booking_reminders, 600)),
     ]
     _read_index_html()
     yield

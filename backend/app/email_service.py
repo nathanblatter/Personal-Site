@@ -248,6 +248,7 @@ async def send_booking_confirmed_email(booking, admin_tz: str = "America/Denver"
     Join Zoom Meeting &rarr;
   </a>
   <p style="margin-top:20px;font-size:12px;color:#9ca3af;">A calendar invite (.ics) is attached to this email.</p>
+  <p style="margin-top:12px;font-size:12px;color:#9ca3af;">Want to book another call later? Visit <a href="{SITE_URL}/contact" style="color:#3b6cf5;">nathanblatter.com/contact</a></p>
   {cancel_html}
 </div>
 </div></body></html>"""
@@ -286,7 +287,7 @@ async def send_booking_declined_email(booking) -> bool:
   </p>
   {"<p style='color:#374151;font-size:14px;line-height:1.6;margin-top:12px;font-style:italic;'>&ldquo;" + booking.admin_note + "&rdquo;</p>" if booking.admin_note else ""}
   <p style="color:#374151;font-size:14px;line-height:1.6;margin-top:20px;">
-    Feel free to reach out via the <a href="{SITE_URL}/contact" style="color:#3b6cf5;">contact form</a> if you'd like to get in touch another way.
+    Feel free to <a href="{SITE_URL}/contact" style="color:#3b6cf5;">book a different time</a> or reach out via the contact form.
   </p>
   <p style="color:#9ca3af;font-size:13px;margin-top:24px;">Best,<br>Nathan Blatter</p>
 </div>
@@ -317,8 +318,7 @@ async def send_booking_cancelled_email(booking, admin_tz: str = "America/Denver"
   <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Time:</strong> {time_str} ({booking.duration_minutes} min)</p>
   <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Cancelled by:</strong> {who}</p>
   <p style="color:#64748b;font-size:14px;line-height:1.6;margin-top:20px;">
-    This booking has been cancelled. If you'd like to reschedule, visit the
-    <a href="{SITE_URL}/contact" style="color:#3b6cf5;">contact page</a>.
+    This booking has been cancelled. <a href="{SITE_URL}/contact" style="color:#3b6cf5;font-weight:600;">Reschedule a call &rarr;</a>
   </p>
 </div>
 </div></body></html>"""
@@ -327,5 +327,78 @@ async def send_booking_cancelled_email(booking, admin_tz: str = "America/Denver"
     ok1 = await _send_mime(booking.visitor_email, subject, text_body, html_body)
     if not cancelled_by_visitor:
         return ok1
+    ok2 = await _send_mime(CONTACT_TO_EMAIL, subject, text_body, html_body)
+    return ok1 and ok2
+
+
+async def send_booking_received_email(booking) -> bool:
+    """Send acknowledgment email to visitor when they submit a booking request."""
+    subject = f"Booking request received — {booking.topic}"
+    first_name = booking.visitor_name.split()[0]
+
+    text_body = (
+        f"Hi {first_name},\n\n"
+        f"Thanks for requesting a call! Nathan has been notified and will review your "
+        f"request within 48 hours.\n\n"
+        f"Topic: {booking.topic}\n"
+        f"Duration: {booking.duration_minutes} min\n\n"
+        f"You'll receive another email once Nathan accepts or declines.\n\n"
+        f"— nathanblatter.com"
+    )
+
+    html_body = f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8f9fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<div style="max-width:560px;margin:40px auto;padding:0 20px;">
+<div style="background:white;border-radius:16px;padding:48px 40px;border:1px solid #e5e7eb;">
+  <p style="font-family:monospace;font-size:11px;color:#3b6cf5;letter-spacing:0.15em;text-transform:uppercase;margin:0 0 20px;">Request Received</p>
+  <h1 style="font-size:24px;color:#1a1f2e;margin:0 0 16px;font-weight:700;">Thanks, {first_name}!</h1>
+  <p style="color:#374151;font-size:14px;line-height:1.6;">
+    Your call request has been received. Nathan will review it and get back to you within 48 hours.
+  </p>
+  <div style="margin-top:20px;padding:16px;background:#f0f4ff;border-radius:10px;">
+    <p style="color:#374151;font-size:14px;margin:4px 0;"><strong>Topic:</strong> {booking.topic}</p>
+    <p style="color:#374151;font-size:14px;margin:4px 0;"><strong>Duration:</strong> {booking.duration_minutes} min</p>
+  </div>
+  <p style="color:#64748b;font-size:13px;line-height:1.6;margin-top:20px;">
+    If accepted, you'll receive a Zoom link and calendar invite by email.
+  </p>
+</div>
+<p style="text-align:center;margin-top:20px;font-size:12px;color:#9ca3af;">
+  Sent from <a href="{SITE_URL}" style="color:#9ca3af;">nathanblatter.com</a>
+</p>
+</div></body></html>"""
+
+    return await _send_mime(booking.visitor_email, subject, text_body, html_body)
+
+
+async def send_booking_reminder_email(booking, admin_tz: str = "America/Denver") -> bool:
+    """Send reminder email to both parties ~1 hour before a confirmed call."""
+    time_str = _fmt_time(booking.start_at, admin_tz)
+    subject = f"Reminder: Call in 1 hour — {booking.topic}"
+    zoom_url = booking.zoom_join_url or "Zoom link not available"
+
+    text_body = (
+        f"Quick reminder — your call starts in about 1 hour.\n\n"
+        f"Topic: {booking.topic}\n"
+        f"Time: {time_str} ({booking.duration_minutes} min)\n"
+        f"Zoom: {zoom_url}\n"
+    )
+
+    html_body = f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8f9fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<div style="max-width:560px;margin:40px auto;padding:0 20px;">
+<div style="background:white;border-radius:16px;padding:48px 40px;border:1px solid #e5e7eb;">
+  <p style="font-family:monospace;font-size:11px;color:#f59e0b;letter-spacing:0.15em;text-transform:uppercase;margin:0 0 20px;">Reminder</p>
+  <h1 style="font-size:24px;color:#1a1f2e;margin:0 0 16px;font-weight:700;">Call in 1 hour</h1>
+  <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Topic:</strong> {booking.topic}</p>
+  <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Time:</strong> {time_str}</p>
+  <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>With:</strong> {booking.visitor_name}</p>
+  <a href="{zoom_url}" style="display:inline-block;margin-top:24px;background:#2563eb;color:white;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:600;font-size:15px;">
+    Join Zoom Meeting &rarr;
+  </a>
+</div>
+</div></body></html>"""
+
+    ok1 = await _send_mime(booking.visitor_email, subject, text_body, html_body)
     ok2 = await _send_mime(CONTACT_TO_EMAIL, subject, text_body, html_body)
     return ok1 and ok2

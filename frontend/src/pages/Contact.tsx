@@ -13,6 +13,11 @@ function formatSlotTime(iso: string): string {
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
+function formatSlotTimeInTz(iso: string, tz: string): string {
+  const d = new Date(iso)
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: tz })
+}
+
 function BookACall() {
   const [bookingSettings, setBookingSettings] = useState<BookingSettingsResponse | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -25,9 +30,13 @@ function BookACall() {
   const [bookingLoading, setBookingLoading] = useState(false)
   const [bookingError, setBookingError] = useState<string | null>(null)
   const [dateOffset, setDateOffset] = useState(0)
+  const [settingsLoading, setSettingsLoading] = useState(true)
 
   useEffect(() => {
-    api.bookings.settingsPublic().then(setBookingSettings).catch(() => {})
+    api.bookings.settingsPublic()
+      .then(setBookingSettings)
+      .catch(() => {})
+      .finally(() => setSettingsLoading(false))
   }, [])
 
   const dates = useMemo(() => {
@@ -80,6 +89,28 @@ function BookACall() {
     }
   }
 
+  if (settingsLoading) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-20">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 rounded-xl bg-cloud animate-pulse" />
+          <div className="space-y-2">
+            <div className="w-32 h-5 bg-cloud rounded animate-pulse" />
+            <div className="w-48 h-3 bg-cloud rounded animate-pulse" />
+          </div>
+        </div>
+        <div className="space-y-4">
+          <div className="w-28 h-3 bg-cloud rounded animate-pulse" />
+          <div className="grid grid-cols-7 gap-2">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="h-20 bg-cloud rounded-xl animate-pulse" />
+            ))}
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
+
   if (!bookingSettings?.enabled) return null
 
   return (
@@ -110,8 +141,11 @@ function BookACall() {
           </div>
           <h3 className="font-sans font-semibold text-ink text-xl mb-2">Request sent!</h3>
           <p className="text-steel text-sm max-w-md">
-            Nathan will review your request and you'll hear back by email.
-            If accepted, you'll receive a Zoom link and calendar invite.
+            A confirmation has been sent to <span className="font-medium text-ink">{bookingForm.email}</span>.
+            Nathan will review your request and you'll hear back within 48 hours.
+          </p>
+          <p className="text-silver text-xs mt-3 max-w-md">
+            If accepted, you'll receive a Zoom link and calendar invite by email.
           </p>
         </motion.div>
       ) : (
@@ -144,18 +178,23 @@ function BookACall() {
                 </button>
               </div>
             </div>
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
               {visibleDates.map(d => {
                 const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
                 const todayNow = new Date()
                 const isToday = d.getFullYear() === todayNow.getFullYear() && d.getMonth() === todayNow.getMonth() && d.getDate() === todayNow.getDate()
                 const isSelected = dateStr === selectedDate
+                const dayOfWeek = (d.getDay() + 6) % 7 // Convert Sun=0 to Mon=0
+                const hasWindows = bookingSettings?.available_days?.includes(dayOfWeek) ?? true
                 return (
                   <button
                     key={dateStr}
-                    onClick={() => { setSelectedDate(dateStr); setSelectedSlot(null) }}
+                    onClick={() => { if (hasWindows) { setSelectedDate(dateStr); setSelectedSlot(null) } }}
+                    disabled={!hasWindows}
                     className={`flex flex-col items-center py-3 px-2 rounded-xl border transition-all text-center ${
-                      isSelected
+                      !hasWindows
+                        ? 'border-mist/50 bg-cloud/50 text-silver cursor-not-allowed opacity-50'
+                        : isSelected
                         ? 'border-blue bg-blue-wash text-blue'
                         : isToday
                         ? 'border-blue/30 bg-snow text-ink hover:border-blue/50'
@@ -243,14 +282,21 @@ function BookACall() {
                 onSubmit={handleBookingSubmit}
               >
                 <div className="p-6 rounded-2xl border border-mist bg-snow space-y-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar size={14} className="text-blue" />
-                    <span className="text-sm text-ink font-medium">
-                      {new Date(selectedSlot.start).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
-                    </span>
-                    <span className="text-sm text-steel">at</span>
-                    <span className="text-sm text-ink font-medium">{formatSlotTime(selectedSlot.start)}</span>
-                    <span className="font-mono text-xs text-steel">({selectedDuration} min)</span>
+                  <div className="space-y-1 mb-2">
+                    <div className="flex items-center gap-2">
+                      <Calendar size={14} className="text-blue" />
+                      <span className="text-sm text-ink font-medium">
+                        {new Date(selectedSlot.start).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+                      </span>
+                      <span className="text-sm text-steel">at</span>
+                      <span className="text-sm text-ink font-medium">{formatSlotTime(selectedSlot.start)}</span>
+                      <span className="font-mono text-xs text-steel">({selectedDuration} min)</span>
+                    </div>
+                    {bookingSettings?.timezone && bookingSettings.timezone !== Intl.DateTimeFormat().resolvedOptions().timeZone && (
+                      <p className="font-mono text-[11px] text-silver ml-6">
+                        {formatSlotTimeInTz(selectedSlot.start, bookingSettings.timezone)} {bookingSettings.timezone.split('/').pop()?.replace('_', ' ')} time
+                      </p>
+                    )}
                   </div>
 
                   {/* Honeypot */}

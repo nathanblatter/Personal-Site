@@ -414,6 +414,7 @@ export interface BookingResponse {
 export interface BookingSettingsResponse {
   timezone: string
   enabled: boolean
+  available_days: number[]
 }
 
 // ── API client ─────────────────────────────────────────────────────────────

@@ -340,6 +340,10 @@ export default function Admin() {
   const [bkShowBlockPicker, setBkShowBlockPicker] = useState(false)
   const [bkBlockMonth, setBkBlockMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1) })
   const [bkBlockReason, setBkBlockReason] = useState('')
+  const [bkConfirmAction, setBkConfirmAction] = useState<{ type: 'accept' | 'decline' | 'cancel'; id: number } | null>(null)
+  const [bkPastSort, setBkPastSort] = useState<'date' | 'name' | 'status'>('date')
+  const [bkPastFilter, setBkPastFilter] = useState<string>('all')
+  const [bkCopied, setBkCopied] = useState<number | null>(null)
 
   // ── Local bio state (derived from about.bio_paragraphs) ─────────────────
   const [headline, setHeadline] = useState('')
@@ -3165,9 +3169,10 @@ export default function Admin() {
 
   const handleBkAccept = async (id: number) => {
     try {
-      await api.bookings.accept(id)
+      const updated = await api.bookings.accept(id)
+      setBkBookings(bkBookings.map(b => b.id === id ? updated : b))
       showToast('Booking accepted')
-      refreshBookings()
+      setBkConfirmAction(null)
     } catch (err) { showError((err as Error).message) }
   }
 
@@ -3176,6 +3181,7 @@ export default function Admin() {
       await api.bookings.decline(id, { admin_note: bkDeclineNote[id] || undefined })
       showToast('Booking declined')
       setBkShowDecline(null)
+      setBkConfirmAction(null)
       refreshBookings()
     } catch (err) { showError((err as Error).message) }
   }
@@ -3183,8 +3189,9 @@ export default function Admin() {
   const handleBkDelete = async (id: number) => {
     try {
       await api.bookings.delete(id)
+      setBkBookings(bkBookings.filter(b => b.id !== id))
       showToast('Booking cancelled')
-      refreshBookings()
+      setBkConfirmAction(null)
     } catch (err) { showError((err as Error).message) }
   }
 
@@ -3238,7 +3245,7 @@ export default function Admin() {
                   </div>
                   <div className="flex flex-col gap-2 shrink-0 ml-4">
                     <button
-                      onClick={() => handleBkAccept(b.id)}
+                      onClick={() => setBkConfirmAction({ type: 'accept', id: b.id })}
                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal text-white font-mono text-xs font-semibold rounded-lg hover:bg-teal/90 transition-colors"
                     >
                       <Check size={13} /> Accept
@@ -3291,13 +3298,25 @@ export default function Admin() {
                       {' · '}{b.duration_minutes} min
                     </p>
                     {b.zoom_join_url && (
-                      <a href={b.zoom_join_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-blue font-mono text-xs hover:underline">
-                        <Video size={13} /> Join Zoom
-                      </a>
+                      <div className="flex items-center gap-2 mt-2">
+                        <a href={b.zoom_join_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-blue font-mono text-xs hover:underline">
+                          <Video size={13} /> Join Zoom
+                        </a>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(b.zoom_join_url!)
+                            setBkCopied(b.id)
+                            setTimeout(() => setBkCopied(null), 2000)
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-steel hover:text-blue font-mono text-[10px] bg-cloud rounded-md transition-colors"
+                        >
+                          {bkCopied === b.id ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy link</>}
+                        </button>
+                      </div>
                     )}
                   </div>
                   <button
-                    onClick={() => handleBkDelete(b.id)}
+                    onClick={() => setBkConfirmAction({ type: 'cancel', id: b.id })}
                     className="p-2 text-steel hover:text-ember transition-colors"
                     title="Cancel booking"
                   >
@@ -3311,24 +3330,44 @@ export default function Admin() {
 
         {bkTab === 'past' && (
           <div className="space-y-3">
-            {pastBookings.length === 0 ? (
-              <p className="text-steel text-sm text-center py-12">No past bookings.</p>
-            ) : pastBookings.map(b => (
-              <SectionCard key={b.id}>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <h4 className="text-sm font-medium text-ink">{b.visitor_name} — {b.topic}</h4>
-                    <p className="font-mono text-xs text-steel">
-                      {new Date(b.start_at).toLocaleDateString()} · {b.duration_minutes} min ·{' '}
-                      <span className={b.status === 'confirmed' ? 'text-teal' : b.status === 'declined' ? 'text-ember' : 'text-steel'}>
-                        {b.status}
-                      </span>
-                    </p>
-                    {b.admin_note && <p className="text-xs text-steel italic mt-1">{b.admin_note}</p>}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-[10px] text-silver">Sort:</span>
+                {(['date', 'name', 'status'] as const).map(s => (
+                  <button key={s} onClick={() => setBkPastSort(s)} className={`font-mono text-[10px] px-2 py-1 rounded transition-all capitalize ${bkPastSort === s ? 'bg-blue text-white' : 'text-steel hover:text-ink'}`}>{s}</button>
+                ))}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-[10px] text-silver">Filter:</span>
+                {['all', 'confirmed', 'declined', 'cancelled'].map(f => (
+                  <button key={f} onClick={() => setBkPastFilter(f)} className={`font-mono text-[10px] px-2 py-1 rounded transition-all capitalize ${bkPastFilter === f ? 'bg-blue text-white' : 'text-steel hover:text-ink'}`}>{f}</button>
+                ))}
+              </div>
+            </div>
+            {(() => {
+              let filtered = pastBookings.filter(b => bkPastFilter === 'all' || b.status === bkPastFilter)
+              if (bkPastSort === 'date') filtered = [...filtered].sort((a, b) => new Date(b.start_at).getTime() - new Date(a.start_at).getTime())
+              else if (bkPastSort === 'name') filtered = [...filtered].sort((a, b) => a.visitor_name.localeCompare(b.visitor_name))
+              else if (bkPastSort === 'status') filtered = [...filtered].sort((a, b) => a.status.localeCompare(b.status))
+              return filtered.length === 0 ? (
+                <p className="text-steel text-sm text-center py-12">No past bookings{bkPastFilter !== 'all' ? ` with status "${bkPastFilter}"` : ''}.</p>
+              ) : filtered.map(b => (
+                <SectionCard key={b.id}>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-medium text-ink">{b.visitor_name} — {b.topic}</h4>
+                      <p className="font-mono text-xs text-steel">
+                        {new Date(b.start_at).toLocaleDateString()} · {b.duration_minutes} min ·{' '}
+                        <span className={b.status === 'confirmed' ? 'text-teal' : b.status === 'declined' ? 'text-ember' : 'text-steel'}>
+                          {b.status}
+                        </span>
+                      </p>
+                      {b.admin_note && <p className="text-xs text-steel italic mt-1">{b.admin_note}</p>}
+                    </div>
                   </div>
-                </div>
-              </SectionCard>
-            ))}
+                </SectionCard>
+              ))
+            })()}
           </div>
         )}
 
@@ -3531,7 +3570,16 @@ export default function Admin() {
                                 key={d}
                                 disabled={isPast}
                                 onClick={async () => {
-                                  if (isBlocked) return
+                                  if (isBlocked) {
+                                    const blocked = bkBlocked.find(b => b.date === dateStr)
+                                    if (!blocked) return
+                                    try {
+                                      await api.bookings.blockedDates.delete(blocked.id)
+                                      setBkBlocked(bkBlocked.filter(x => x.id !== blocked.id))
+                                      showToast(`${dateStr} unblocked`)
+                                    } catch (err) { showError((err as Error).message) }
+                                    return
+                                  }
                                   try {
                                     const created = await api.bookings.blockedDates.create({ date: dateStr, reason: bkBlockReason || undefined })
                                     setBkBlocked([...bkBlocked, created])
@@ -3564,7 +3612,7 @@ export default function Admin() {
                           className="w-full px-3 py-2 bg-white border border-mist rounded-lg text-sm text-ink placeholder-silver focus:outline-none focus:border-blue/50 transition-colors"
                         />
                       </div>
-                      <p className="font-mono text-[10px] text-silver">Click a date to block it. Blocked dates shown in red.</p>
+                      <p className="font-mono text-[10px] text-silver">Click to block/unblock dates. Blocked dates shown in red.</p>
                     </div>
                   </motion.div>
                 )}
@@ -3598,6 +3646,56 @@ export default function Admin() {
             </SectionCard>
           </div>
         )}
+
+        {/* Confirmation dialog */}
+        <AnimatePresence>
+          {bkConfirmAction && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40"
+              onClick={() => setBkConfirmAction(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 shadow-2xl"
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="font-sans font-semibold text-ink text-lg mb-2 capitalize">
+                  {bkConfirmAction.type} booking?
+                </h3>
+                <p className="text-steel text-sm mb-6">
+                  {bkConfirmAction.type === 'accept' && 'This will create a Zoom meeting and send confirmation emails to both parties.'}
+                  {bkConfirmAction.type === 'decline' && 'This will notify the visitor that their request has been declined.'}
+                  {bkConfirmAction.type === 'cancel' && 'This will cancel the booking, delete any Zoom meeting, and notify the visitor.'}
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setBkConfirmAction(null)}
+                    className="flex-1 px-4 py-2.5 border border-mist text-steel font-mono text-xs rounded-lg hover:bg-cloud transition-colors"
+                  >
+                    Nevermind
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (bkConfirmAction.type === 'accept') handleBkAccept(bkConfirmAction.id)
+                      else if (bkConfirmAction.type === 'decline') handleBkDecline(bkConfirmAction.id)
+                      else handleBkDelete(bkConfirmAction.id)
+                    }}
+                    className={`flex-1 px-4 py-2.5 text-white font-mono text-xs font-semibold rounded-lg transition-colors ${
+                      bkConfirmAction.type === 'accept' ? 'bg-teal hover:bg-teal/90' : 'bg-ember hover:bg-ember/90'
+                    }`}
+                  >
+                    {bkConfirmAction.type === 'accept' ? 'Accept' : bkConfirmAction.type === 'decline' ? 'Decline' : 'Cancel Booking'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     )
   }

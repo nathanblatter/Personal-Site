@@ -920,6 +920,7 @@ class BookingSettingsUpdate(BaseModel):
 class BookingSettingsResponse(BaseModel):
     timezone: str
     enabled: bool
+    available_days: List[int] = []
 
     model_config = {"from_attributes": True}
 
