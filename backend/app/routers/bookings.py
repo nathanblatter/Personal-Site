@@ -437,6 +437,60 @@ async def list_bookings(
     return result.scalars().all()
 
 
+@router.post("/admin-create", response_model=schemas.BookingResponse, status_code=status.HTTP_201_CREATED)
+async def admin_create_booking(
+    payload: schemas.AdminBookingCreate,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_auth),
+):
+    """Admin creates a confirmed booking directly, bypassing availability checks."""
+    settings = await _get_settings(db)
+
+    try:
+        start_at = datetime.fromisoformat(payload.start_at)
+        if start_at.tzinfo is None:
+            start_at = start_at.replace(tzinfo=ZoneInfo("UTC"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid start_at datetime")
+
+    booking = models.Booking(
+        visitor_name=payload.visitor_name,
+        visitor_email=payload.visitor_email,
+        topic=payload.topic,
+        start_at=start_at,
+        duration_minutes=payload.duration_minutes,
+        status=models.BookingStatus.confirmed,
+        created_at=datetime.now(ZoneInfo("UTC")),
+        decided_at=datetime.now(ZoneInfo("UTC")),
+    )
+
+    # Create Zoom meeting
+    try:
+        zoom = await create_meeting(
+            topic=f"Call with Nathan and {payload.visitor_name}",
+            start_at=start_at,
+            duration_minutes=payload.duration_minutes,
+        )
+        if zoom:
+            booking.zoom_join_url = zoom["join_url"]
+            booking.zoom_meeting_id = zoom["meeting_id"]
+    except Exception as e:
+        log.warning("Zoom meeting creation failed: %s", e)
+
+    db.add(booking)
+    await db.commit()
+    await db.refresh(booking)
+
+    # Send confirmation email with cancel token
+    try:
+        cancel_token = create_action_token("cancel", booking.id, hours=168)
+        await send_booking_confirmed_email(booking, settings.timezone, cancel_token)
+    except Exception:
+        pass
+
+    return booking
+
+
 @router.put("/{booking_id}/accept", response_model=schemas.BookingResponse)
 async def accept_booking(
     booking_id: int,

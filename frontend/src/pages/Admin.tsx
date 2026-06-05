@@ -344,6 +344,9 @@ export default function Admin() {
   const [bkPastSort, setBkPastSort] = useState<'date' | 'name' | 'status'>('date')
   const [bkPastFilter, setBkPastFilter] = useState<string>('all')
   const [bkCopied, setBkCopied] = useState<number | null>(null)
+  const [bkShowScheduler, setBkShowScheduler] = useState(false)
+  const [bkScheduleForm, setBkScheduleForm] = useState({ name: '', email: '', topic: '', date: '', time: '', duration: 30 })
+  const [bkScheduleLoading, setBkScheduleLoading] = useState(false)
 
   // ── Local bio state (derived from about.bio_paragraphs) ─────────────────
   const [headline, setHeadline] = useState('')
@@ -3209,7 +3212,13 @@ export default function Admin() {
               {pendingBookings.length} pending · {upcomingBookings.length} upcoming
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setBkShowScheduler(!bkShowScheduler)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-mono text-blue bg-blue-wash rounded-lg hover:bg-blue/10 transition-colors"
+            >
+              <Plus size={12} /> Schedule
+            </button>
             {(['pending', 'upcoming', 'past', 'settings'] as const).map(tab => (
               <button
                 key={tab}
@@ -3223,6 +3232,97 @@ export default function Admin() {
             ))}
           </div>
         </div>
+
+        <AnimatePresence>
+          {bkShowScheduler && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+              <SectionCard>
+                <h3 className="font-sans font-semibold text-ink mb-4">Schedule a Call</h3>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault()
+                    if (!bkScheduleForm.date || !bkScheduleForm.time) { showError('Date and time required'); return }
+                    setBkScheduleLoading(true)
+                    try {
+                      const startAt = new Date(`${bkScheduleForm.date}T${bkScheduleForm.time}`).toISOString()
+                      const booking = await api.bookings.adminCreate({
+                        visitor_name: bkScheduleForm.name,
+                        visitor_email: bkScheduleForm.email,
+                        topic: bkScheduleForm.topic,
+                        start_at: startAt,
+                        duration_minutes: bkScheduleForm.duration,
+                      })
+                      setBkBookings([booking, ...bkBookings])
+                      setBkScheduleForm({ name: '', email: '', topic: '', date: '', time: '', duration: 30 })
+                      setBkShowScheduler(false)
+                      showToast('Call scheduled & confirmation sent')
+                    } catch (err) { showError((err as Error).message) }
+                    finally { setBkScheduleLoading(false) }
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="grid grid-cols-2 gap-4">
+                    <AdminInput label="Name" value={bkScheduleForm.name} onChange={v => setBkScheduleForm({ ...bkScheduleForm, name: v })} required />
+                    <AdminInput label="Email" value={bkScheduleForm.email} onChange={v => setBkScheduleForm({ ...bkScheduleForm, email: v })} required />
+                  </div>
+                  <AdminInput label="Topic" value={bkScheduleForm.topic} onChange={v => setBkScheduleForm({ ...bkScheduleForm, topic: v })} required />
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block font-mono text-[11px] text-steel mb-1.5 tracking-wider uppercase">Date</label>
+                      <input
+                        type="date"
+                        required
+                        value={bkScheduleForm.date}
+                        onChange={e => setBkScheduleForm({ ...bkScheduleForm, date: e.target.value })}
+                        className="w-full px-3 py-2.5 bg-white border border-mist rounded-xl text-sm text-ink font-mono focus:outline-none focus:border-blue/50 focus:ring-2 focus:ring-blue/10 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-mono text-[11px] text-steel mb-1.5 tracking-wider uppercase">Time</label>
+                      <input
+                        type="time"
+                        required
+                        value={bkScheduleForm.time}
+                        onChange={e => setBkScheduleForm({ ...bkScheduleForm, time: e.target.value })}
+                        className="w-full px-3 py-2.5 bg-white border border-mist rounded-xl text-sm text-ink font-mono focus:outline-none focus:border-blue/50 focus:ring-2 focus:ring-blue/10 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-mono text-[11px] text-steel mb-1.5 tracking-wider uppercase">Duration</label>
+                      <select
+                        value={bkScheduleForm.duration}
+                        onChange={e => setBkScheduleForm({ ...bkScheduleForm, duration: Number(e.target.value) })}
+                        className="w-full px-3 py-2.5 bg-white border border-mist rounded-xl text-sm text-ink font-mono focus:outline-none focus:border-blue/50 focus:ring-2 focus:ring-blue/10 transition-all"
+                      >
+                        <option value={15}>15 min</option>
+                        <option value={30}>30 min</option>
+                        <option value={45}>45 min</option>
+                        <option value={60}>60 min</option>
+                      </select>
+                    </div>
+                  </div>
+                  <p className="font-mono text-[10px] text-silver">Bypasses availability windows. Creates a confirmed booking and sends the invite immediately.</p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setBkShowScheduler(false)}
+                      className="px-4 py-2.5 border border-mist text-steel font-mono text-xs rounded-lg hover:bg-cloud transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={bkScheduleLoading}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue text-white font-mono text-xs font-semibold rounded-lg hover:bg-blue-dim transition-colors disabled:opacity-60"
+                    >
+                      {bkScheduleLoading ? 'Scheduling...' : 'Schedule & Send Invite'}
+                    </button>
+                  </div>
+                </form>
+              </SectionCard>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {bkTab === 'pending' && (
           <div className="space-y-3">

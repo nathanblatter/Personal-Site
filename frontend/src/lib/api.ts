@@ -594,6 +594,8 @@ export const api = {
     decline: (id: number, data?: { admin_note?: string }) =>
       request<BookingResponse>('PUT', `/bookings/${id}/decline`, data),
     delete: (id: number) => request<void>('DELETE', `/bookings/${id}`),
+    adminCreate: (data: { visitor_name: string; visitor_email: string; topic: string; start_at: string; duration_minutes: number }) =>
+      request<BookingResponse>('POST', '/bookings/admin-create', data),
     availability: {
       list: () => request<AvailabilityWindowResponse[]>('GET', '/bookings/availability'),
       create: (data: Partial<AvailabilityWindowResponse>) =>

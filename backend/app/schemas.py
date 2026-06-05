@@ -885,6 +885,14 @@ class BookingCreate(BaseModel):
     honeypot: Optional[str] = None
 
 
+class AdminBookingCreate(BaseModel):
+    visitor_name: str = Field(min_length=1, max_length=100)
+    visitor_email: str = Field(min_length=1, max_length=254)
+    topic: str = Field(min_length=1, max_length=500)
+    start_at: str
+    duration_minutes: int = Field(ge=5, le=120)
+
+
 class BookingDecision(BaseModel):
     admin_note: Optional[str] = None
 
