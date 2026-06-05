@@ -175,11 +175,12 @@ async def get_available_slots(date: date, db: AsyncSession = Depends(get_db)):
     )
     existing_bookings = bookings_result.scalars().all()
 
-    # Build booked intervals
+    # Build booked intervals (with buffer: 15 min after a 15-min call, 30 min after a 30+ min call)
     booked_intervals = []
     for b in existing_bookings:
         b_start = b.start_at
-        b_end = b_start + timedelta(minutes=b.duration_minutes)
+        buffer = 15 if b.duration_minutes <= 15 else 30
+        b_end = b_start + timedelta(minutes=b.duration_minutes + buffer)
         booked_intervals.append((b_start, b_end))
 
     slots: list[schemas.AvailableSlot] = []
