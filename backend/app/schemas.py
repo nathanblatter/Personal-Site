@@ -834,6 +834,98 @@ class RejectionResponse(RejectionBase):
 
 # ── Dashboard / Overview ─────────────────────────────────────────────────────
 
+# ── Bookings ─────────────────────────────────────────────────────────────────
+
+class AvailabilityWindowCreate(BaseModel):
+    day_of_week: int = Field(ge=0, le=6)
+    start_time: str
+    end_time: str
+    allowed_durations: List[int] = [30]
+    enabled: bool = True
+
+
+class AvailabilityWindowUpdate(BaseModel):
+    day_of_week: Optional[int] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    allowed_durations: Optional[List[int]] = None
+    enabled: Optional[bool] = None
+
+
+class AvailabilityWindowResponse(BaseModel):
+    id: int
+    day_of_week: int
+    start_time: str
+    end_time: str
+    allowed_durations: List[int]
+    enabled: bool
+
+    model_config = {"from_attributes": True}
+
+
+class DateOverrideCreate(BaseModel):
+    date: date
+    reason: Optional[str] = None
+
+
+class DateOverrideResponse(BaseModel):
+    id: int
+    date: date
+    reason: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class BookingCreate(BaseModel):
+    visitor_name: str = Field(min_length=1, max_length=100)
+    visitor_email: str = Field(min_length=1, max_length=254)
+    topic: str = Field(min_length=5, max_length=500)
+    start_at: str
+    duration_minutes: int = Field(ge=15, le=30)
+    honeypot: Optional[str] = None
+
+
+class BookingDecision(BaseModel):
+    admin_note: Optional[str] = None
+
+
+class BookingResponse(BaseModel):
+    id: int
+    visitor_name: str
+    visitor_email: str
+    topic: str
+    start_at: datetime
+    duration_minutes: int
+    status: str
+    zoom_join_url: Optional[str] = None
+    zoom_meeting_id: Optional[str] = None
+    admin_note: Optional[str] = None
+    created_at: datetime
+    decided_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AvailableSlot(BaseModel):
+    start: str
+    end: str
+    durations: List[int]
+
+
+class BookingSettingsUpdate(BaseModel):
+    timezone: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+class BookingSettingsResponse(BaseModel):
+    timezone: str
+    enabled: bool
+
+    model_config = {"from_attributes": True}
+
+
+# ── Dashboard / Overview ─────────────────────────────────────────────────────
+
 class DashboardStats(BaseModel):
     total_applications: int
     status_counts: dict

@@ -400,6 +400,61 @@ class ApplicationTag(Base):
     tag_id = Column(PgUUID(as_uuid=False), ForeignKey("tag.id", ondelete="CASCADE"), primary_key=True)
 
 
+# ── Booking Enums ────────────────────────────────────────────────────────────
+
+class BookingStatus(str, enum.Enum):
+    pending = "pending"
+    confirmed = "confirmed"
+    declined = "declined"
+    cancelled = "cancelled"
+
+
+# ── Booking Models ───────────────────────────────────────────────────────────
+
+class AvailabilityWindow(Base):
+    __tablename__ = "availability_windows"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    day_of_week = Column(Integer, nullable=False)          # 0=Mon..6=Sun
+    start_time = Column(String, nullable=False)             # "14:00"
+    end_time = Column(String, nullable=False)               # "17:00"
+    allowed_durations = Column(JSON, nullable=False, default=[30])
+    enabled = Column(Boolean, nullable=False, default=True)
+
+
+class DateOverride(Base):
+    __tablename__ = "date_overrides"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    date = Column(Date, nullable=False, unique=True)
+    reason = Column(String, nullable=True)
+
+
+class Booking(Base):
+    __tablename__ = "bookings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    visitor_name = Column(String, nullable=False)
+    visitor_email = Column(String, nullable=False)
+    topic = Column(String, nullable=False)
+    start_at = Column(DateTime(timezone=True), nullable=False)
+    duration_minutes = Column(Integer, nullable=False, default=30)
+    status = Column(SAEnum(BookingStatus, name="bookingstatus"), nullable=False, default=BookingStatus.pending)
+    zoom_join_url = Column(String, nullable=True)
+    zoom_meeting_id = Column(String, nullable=True)
+    admin_note = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    decided_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class BookingSettings(Base):
+    __tablename__ = "booking_settings"
+
+    id = Column(Integer, primary_key=True, default=1)
+    timezone = Column(String, nullable=False, default="America/Denver")
+    enabled = Column(Boolean, nullable=False, default=True)
+
+
 class ClaudeUsageDay(Base):
     __tablename__ = "claude_usage_days"
 

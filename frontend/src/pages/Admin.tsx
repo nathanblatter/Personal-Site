@@ -39,6 +39,9 @@ import {
   Download,
   Copy,
   Settings,
+  Calendar,
+  Video,
+  Ban,
 } from 'lucide-react'
 import {
   api,
@@ -59,6 +62,10 @@ import {
   type TestimonialResponse,
   type TrackedLinkResponse,
   type TestimonialRequestResponse,
+  type BookingResponse,
+  type AvailabilityWindowResponse,
+  type DateOverrideResponse,
+  type BookingSettingsResponse,
 } from '../lib/api'
 
 /* ═══════════════════════════════════════════════
@@ -76,6 +83,7 @@ const sections = [
   { id: 'blog', label: 'Blog', icon: FileText },
   { id: 'files', label: 'Files', icon: HardDrive },
   { id: 'links', label: 'Links', icon: Link2 },
+  { id: 'bookings', label: 'Bookings', icon: Calendar },
   { id: 'internships', label: 'Internships', icon: Target },
 ]
 
@@ -318,6 +326,16 @@ export default function Admin() {
     applied_on: '', next_action: '', next_action_due: '', personal_notes: '',
   })
 
+  // ── Bookings state ──────────────────────────────────────────────────────
+  const [bkBookings, setBkBookings] = useState<BookingResponse[]>([])
+  const [bkWindows, setBkWindows] = useState<AvailabilityWindowResponse[]>([])
+  const [bkBlocked, setBkBlocked] = useState<DateOverrideResponse[]>([])
+  const [bkSettings, setBkSettings] = useState<BookingSettingsResponse | null>(null)
+  const [bkLoaded, setBkLoaded] = useState(false)
+  const [bkTab, setBkTab] = useState<'pending' | 'upcoming' | 'past' | 'settings'>('pending')
+  const [bkDeclineNote, setBkDeclineNote] = useState<Record<number, string>>({})
+  const [bkShowDecline, setBkShowDecline] = useState<number | null>(null)
+
   // ── Local bio state (derived from about.bio_paragraphs) ─────────────────
   const [headline, setHeadline] = useState('')
   const [bio, setBio] = useState('')
@@ -392,6 +410,16 @@ export default function Admin() {
         setFilesLoaded(true)
       }).catch(err => showError((err as Error).message))
     }
+    if (activeSection === 'bookings' && !bkLoaded) {
+      Promise.all([
+        api.bookings.list(),
+        api.bookings.availability.list(),
+        api.bookings.blockedDates.list(),
+        api.bookings.settings.get(),
+      ]).then(([bookings, windows, blocked, settings]) => {
+        setBkBookings(bookings); setBkWindows(windows); setBkBlocked(blocked); setBkSettings(settings); setBkLoaded(true)
+      }).catch(err => showError((err as Error).message))
+    }
     if (activeSection !== 'internships' || intLoaded) return
     Promise.all([
       api.internships.dashboard(),
@@ -405,7 +433,7 @@ export default function Admin() {
       setIntTags(tags)
       setIntLoaded(true)
     }).catch(err => showError((err as Error).message))
-  }, [activeSection, intLoaded, filesLoaded, filesPrefix, linksLoaded, tReqsLoaded])
+  }, [activeSection, intLoaded, filesLoaded, filesPrefix, linksLoaded, tReqsLoaded, bkLoaded])
 
   const refreshInternships = async () => {
     try {
@@ -3109,6 +3137,398 @@ export default function Admin() {
     )
   }
 
+  // ── Bookings helpers ────────────────────────────────────────────────────
+  const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const COMMON_TIMEZONES = [
+    'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+    'America/Phoenix', 'America/Anchorage', 'Pacific/Honolulu',
+    'Europe/London', 'Europe/Paris', 'Europe/Berlin',
+    'Asia/Tokyo', 'Asia/Shanghai', 'Australia/Sydney', 'UTC',
+  ]
+
+  const refreshBookings = async () => {
+    try {
+      const [bookings, windows, blocked, settings] = await Promise.all([
+        api.bookings.list(),
+        api.bookings.availability.list(),
+        api.bookings.blockedDates.list(),
+        api.bookings.settings.get(),
+      ])
+      setBkBookings(bookings); setBkWindows(windows); setBkBlocked(blocked); setBkSettings(settings)
+    } catch (err) { showError((err as Error).message) }
+  }
+
+  const handleBkAccept = async (id: number) => {
+    try {
+      await api.bookings.accept(id)
+      showToast('Booking accepted')
+      refreshBookings()
+    } catch (err) { showError((err as Error).message) }
+  }
+
+  const handleBkDecline = async (id: number) => {
+    try {
+      await api.bookings.decline(id, { admin_note: bkDeclineNote[id] || undefined })
+      showToast('Booking declined')
+      setBkShowDecline(null)
+      refreshBookings()
+    } catch (err) { showError((err as Error).message) }
+  }
+
+  const handleBkDelete = async (id: number) => {
+    try {
+      await api.bookings.delete(id)
+      showToast('Booking cancelled')
+      refreshBookings()
+    } catch (err) { showError((err as Error).message) }
+  }
+
+  const renderBookings = () => {
+    const pendingBookings = bkBookings.filter(b => b.status === 'pending')
+    const upcomingBookings = bkBookings.filter(b => b.status === 'confirmed' && new Date(b.start_at) > new Date())
+    const pastBookings = bkBookings.filter(b => b.status !== 'pending' && (b.status !== 'confirmed' || new Date(b.start_at) <= new Date()))
+
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-sans font-semibold text-ink mb-1">Bookings</h2>
+            <p className="text-steel text-sm">
+              {pendingBookings.length} pending · {upcomingBookings.length} upcoming
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {(['pending', 'upcoming', 'past', 'settings'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setBkTab(tab)}
+                className={`font-mono text-[11px] px-3.5 py-2 rounded-lg transition-all capitalize ${
+                  bkTab === tab ? 'bg-blue text-white' : 'bg-white border border-mist text-steel hover:text-blue hover:border-blue/30'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {bkTab === 'pending' && (
+          <div className="space-y-3">
+            {pendingBookings.length === 0 ? (
+              <p className="text-steel text-sm text-center py-12">No pending booking requests.</p>
+            ) : pendingBookings.map(b => (
+              <SectionCard key={b.id}>
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <h4 className="font-semibold text-ink">{b.visitor_name}</h4>
+                    <p className="font-mono text-xs text-steel">{b.visitor_email}</p>
+                    <p className="text-sm text-ink mt-2">{b.topic}</p>
+                    <p className="font-mono text-xs text-steel mt-1">
+                      {new Date(b.start_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      {' · '}{b.duration_minutes} min
+                    </p>
+                    <p className="font-mono text-[10px] text-silver mt-1">
+                      Requested {new Date(b.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 shrink-0 ml-4">
+                    <button
+                      onClick={() => handleBkAccept(b.id)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal text-white font-mono text-xs font-semibold rounded-lg hover:bg-teal/90 transition-colors"
+                    >
+                      <Check size={13} /> Accept
+                    </button>
+                    <button
+                      onClick={() => setBkShowDecline(bkShowDecline === b.id ? null : b.id)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 border border-mist text-steel font-mono text-xs rounded-lg hover:text-ember hover:border-ember/30 transition-colors"
+                    >
+                      <Ban size={13} /> Decline
+                    </button>
+                  </div>
+                </div>
+                <AnimatePresence>
+                  {bkShowDecline === b.id && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                      <div className="mt-4 pt-4 border-t border-mist space-y-3">
+                        <AdminTextarea
+                          label="Decline note (optional)"
+                          value={bkDeclineNote[b.id] || ''}
+                          onChange={v => setBkDeclineNote({ ...bkDeclineNote, [b.id]: v })}
+                          rows={2}
+                        />
+                        <button
+                          onClick={() => handleBkDecline(b.id)}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 bg-ember text-white font-mono text-xs font-semibold rounded-lg hover:bg-ember/90 transition-colors"
+                        >
+                          Confirm Decline
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </SectionCard>
+            ))}
+          </div>
+        )}
+
+        {bkTab === 'upcoming' && (
+          <div className="space-y-3">
+            {upcomingBookings.length === 0 ? (
+              <p className="text-steel text-sm text-center py-12">No upcoming calls.</p>
+            ) : upcomingBookings.map(b => (
+              <SectionCard key={b.id}>
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <h4 className="font-semibold text-ink">{b.visitor_name}</h4>
+                    <p className="text-sm text-ink">{b.topic}</p>
+                    <p className="font-mono text-xs text-steel">
+                      {new Date(b.start_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      {' · '}{b.duration_minutes} min
+                    </p>
+                    {b.zoom_join_url && (
+                      <a href={b.zoom_join_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-blue font-mono text-xs hover:underline">
+                        <Video size={13} /> Join Zoom
+                      </a>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleBkDelete(b.id)}
+                    className="p-2 text-steel hover:text-ember transition-colors"
+                    title="Cancel booking"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </SectionCard>
+            ))}
+          </div>
+        )}
+
+        {bkTab === 'past' && (
+          <div className="space-y-3">
+            {pastBookings.length === 0 ? (
+              <p className="text-steel text-sm text-center py-12">No past bookings.</p>
+            ) : pastBookings.map(b => (
+              <SectionCard key={b.id}>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-medium text-ink">{b.visitor_name} — {b.topic}</h4>
+                    <p className="font-mono text-xs text-steel">
+                      {new Date(b.start_at).toLocaleDateString()} · {b.duration_minutes} min ·{' '}
+                      <span className={b.status === 'confirmed' ? 'text-teal' : b.status === 'declined' ? 'text-ember' : 'text-steel'}>
+                        {b.status}
+                      </span>
+                    </p>
+                    {b.admin_note && <p className="text-xs text-steel italic mt-1">{b.admin_note}</p>}
+                  </div>
+                </div>
+              </SectionCard>
+            ))}
+          </div>
+        )}
+
+        {bkTab === 'settings' && bkSettings && (
+          <div className="space-y-8">
+            {/* Global settings */}
+            <SectionCard>
+              <h3 className="font-sans font-semibold text-ink mb-5">Global Settings</h3>
+              <div className="space-y-5">
+                <AdminSelect
+                  label="Timezone"
+                  value={bkSettings.timezone}
+                  onChange={async v => {
+                    try {
+                      const updated = await api.bookings.settings.update({ timezone: v })
+                      setBkSettings(updated)
+                      showToast('Timezone updated')
+                    } catch (err) { showError((err as Error).message) }
+                  }}
+                  options={COMMON_TIMEZONES.map(tz => ({ value: tz, label: tz }))}
+                />
+                <div>
+                  <label className="block font-mono text-[11px] text-steel mb-1.5 tracking-wider uppercase">Booking Enabled</label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={bkSettings.enabled}
+                      onChange={async e => {
+                        try {
+                          const updated = await api.bookings.settings.update({ enabled: e.target.checked })
+                          setBkSettings(updated)
+                          showToast(e.target.checked ? 'Booking enabled' : 'Booking disabled')
+                        } catch (err) { showError((err as Error).message) }
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-sm text-ink">{bkSettings.enabled ? 'Enabled' : 'Disabled'}</span>
+                  </label>
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* Availability windows */}
+            <SectionCard>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-sans font-semibold text-ink">Availability Windows</h3>
+                <button
+                  onClick={async () => {
+                    try {
+                      const w = await api.bookings.availability.create({ day_of_week: 1, start_time: '09:00', end_time: '17:00', allowed_durations: [30], enabled: true })
+                      setBkWindows([...bkWindows, w])
+                      showToast('Window added')
+                    } catch (err) { showError((err as Error).message) }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-blue bg-blue-wash rounded-lg hover:bg-blue/10 transition-colors"
+                >
+                  <Plus size={12} /> Add
+                </button>
+              </div>
+              <div className="space-y-4">
+                {bkWindows.map(w => (
+                  <div key={w.id} className="flex items-center gap-3 p-4 bg-cloud rounded-xl">
+                    <select
+                      value={w.day_of_week}
+                      onChange={async e => {
+                        try {
+                          const updated = await api.bookings.availability.update(w.id, { day_of_week: Number(e.target.value) })
+                          setBkWindows(bkWindows.map(x => x.id === w.id ? updated : x))
+                        } catch (err) { showError((err as Error).message) }
+                      }}
+                      className="px-2 py-1.5 bg-white border border-mist rounded-lg text-sm text-ink font-mono"
+                    >
+                      {DAY_LABELS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                    </select>
+                    <input
+                      type="time"
+                      value={w.start_time}
+                      onChange={async e => {
+                        try {
+                          const updated = await api.bookings.availability.update(w.id, { start_time: e.target.value })
+                          setBkWindows(bkWindows.map(x => x.id === w.id ? updated : x))
+                        } catch (err) { showError((err as Error).message) }
+                      }}
+                      className="px-2 py-1.5 bg-white border border-mist rounded-lg text-sm text-ink font-mono"
+                    />
+                    <span className="text-steel text-xs">to</span>
+                    <input
+                      type="time"
+                      value={w.end_time}
+                      onChange={async e => {
+                        try {
+                          const updated = await api.bookings.availability.update(w.id, { end_time: e.target.value })
+                          setBkWindows(bkWindows.map(x => x.id === w.id ? updated : x))
+                        } catch (err) { showError((err as Error).message) }
+                      }}
+                      className="px-2 py-1.5 bg-white border border-mist rounded-lg text-sm text-ink font-mono"
+                    />
+                    <div className="flex items-center gap-2 ml-2">
+                      {[15, 30].map(dur => (
+                        <label key={dur} className="flex items-center gap-1 text-xs font-mono text-steel cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={w.allowed_durations.includes(dur)}
+                            onChange={async e => {
+                              const newDurs = e.target.checked
+                                ? [...w.allowed_durations, dur].sort((a, b) => a - b)
+                                : w.allowed_durations.filter(d => d !== dur)
+                              if (newDurs.length === 0) return
+                              try {
+                                const updated = await api.bookings.availability.update(w.id, { allowed_durations: newDurs })
+                                setBkWindows(bkWindows.map(x => x.id === w.id ? updated : x))
+                              } catch (err) { showError((err as Error).message) }
+                            }}
+                            className="rounded"
+                          />
+                          {dur}m
+                        </label>
+                      ))}
+                    </div>
+                    <label className="flex items-center gap-1 text-xs font-mono text-steel ml-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={w.enabled}
+                        onChange={async e => {
+                          try {
+                            const updated = await api.bookings.availability.update(w.id, { enabled: e.target.checked })
+                            setBkWindows(bkWindows.map(x => x.id === w.id ? updated : x))
+                          } catch (err) { showError((err as Error).message) }
+                        }}
+                        className="rounded"
+                      />
+                      On
+                    </label>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await api.bookings.availability.delete(w.id)
+                          setBkWindows(bkWindows.filter(x => x.id !== w.id))
+                          showToast('Window deleted')
+                        } catch (err) { showError((err as Error).message) }
+                      }}
+                      className="p-1.5 text-steel hover:text-ember transition-colors ml-auto"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+                {bkWindows.length === 0 && (
+                  <p className="text-steel text-sm text-center py-4">No availability windows configured.</p>
+                )}
+              </div>
+            </SectionCard>
+
+            {/* Blocked dates */}
+            <SectionCard>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-sans font-semibold text-ink">Blocked Dates</h3>
+                <button
+                  onClick={async () => {
+                    const dateStr = prompt('Enter date to block (YYYY-MM-DD):')
+                    if (!dateStr) return
+                    const reason = prompt('Reason (optional):') || undefined
+                    try {
+                      const d = await api.bookings.blockedDates.create({ date: dateStr, reason })
+                      setBkBlocked([...bkBlocked, d])
+                      showToast('Date blocked')
+                    } catch (err) { showError((err as Error).message) }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-blue bg-blue-wash rounded-lg hover:bg-blue/10 transition-colors"
+                >
+                  <Plus size={12} /> Block Date
+                </button>
+              </div>
+              <div className="space-y-2">
+                {bkBlocked.map(d => (
+                  <div key={d.id} className="flex items-center justify-between p-3 bg-cloud rounded-lg">
+                    <div>
+                      <span className="font-mono text-sm text-ink">{d.date}</span>
+                      {d.reason && <span className="text-xs text-steel ml-3">{d.reason}</span>}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await api.bookings.blockedDates.delete(d.id)
+                          setBkBlocked(bkBlocked.filter(x => x.id !== d.id))
+                          showToast('Date unblocked')
+                        } catch (err) { showError((err as Error).message) }
+                      }}
+                      className="p-1.5 text-steel hover:text-ember transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+                {bkBlocked.length === 0 && (
+                  <p className="text-steel text-sm text-center py-4">No dates blocked.</p>
+                )}
+              </div>
+            </SectionCard>
+          </div>
+        )}
+      </motion.div>
+    )
+  }
+
   const sectionRenderers: Record<string, () => React.ReactNode> = {
     overview: renderOverview,
     projects: renderProjects,
@@ -3120,6 +3540,7 @@ export default function Admin() {
     blog: renderBlog,
     files: renderFiles,
     links: renderLinks,
+    bookings: renderBookings,
     internships: renderInternships,
   }
 

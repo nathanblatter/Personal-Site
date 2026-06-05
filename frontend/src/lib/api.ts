@@ -373,6 +373,49 @@ export interface GitHubContributions {
   activity: Record<string, { name: string; url: string }[]>
 }
 
+// ── Booking Types ─────────────────────────────────────────────────────────
+
+export interface AvailabilityWindowResponse {
+  id: number
+  day_of_week: number
+  start_time: string
+  end_time: string
+  allowed_durations: number[]
+  enabled: boolean
+}
+
+export interface DateOverrideResponse {
+  id: number
+  date: string
+  reason?: string
+}
+
+export interface AvailableSlot {
+  start: string
+  end: string
+  durations: number[]
+}
+
+export interface BookingResponse {
+  id: number
+  visitor_name: string
+  visitor_email: string
+  topic: string
+  start_at: string
+  duration_minutes: number
+  status: string
+  zoom_join_url?: string
+  zoom_meeting_id?: string
+  admin_note?: string
+  created_at: string
+  decided_at?: string
+}
+
+export interface BookingSettingsResponse {
+  timezone: string
+  enabled: boolean
+}
+
 // ── API client ─────────────────────────────────────────────────────────────
 
 export const api = {
@@ -537,6 +580,38 @@ export const api = {
     list: (prefix = '') => request<{ files: StorageFile[] }>('GET', `/storage/files?prefix=${encodeURIComponent(prefix)}`),
     delete: (key: string) => request<{ deleted: string }>('DELETE', `/storage/files/${key}`),
     downloadUrl: (key: string) => `${API_BASE}/storage/download/${key}`,
+  },
+
+  bookings: {
+    settingsPublic: () => request<BookingSettingsResponse>('GET', '/bookings/settings/public'),
+    slots: (date: string) => request<AvailableSlot[]>('GET', `/bookings/slots?date=${date}`),
+    create: (data: { visitor_name: string; visitor_email: string; topic: string; start_at: string; duration_minutes: number; honeypot?: string }) =>
+      request<BookingResponse>('POST', '/bookings', data),
+    list: (status?: string) => request<BookingResponse[]>('GET', status ? `/bookings?status=${status}` : '/bookings'),
+    accept: (id: number, data?: { admin_note?: string }) =>
+      request<BookingResponse>('PUT', `/bookings/${id}/accept`, data),
+    decline: (id: number, data?: { admin_note?: string }) =>
+      request<BookingResponse>('PUT', `/bookings/${id}/decline`, data),
+    delete: (id: number) => request<void>('DELETE', `/bookings/${id}`),
+    availability: {
+      list: () => request<AvailabilityWindowResponse[]>('GET', '/bookings/availability'),
+      create: (data: Partial<AvailabilityWindowResponse>) =>
+        request<AvailabilityWindowResponse>('POST', '/bookings/availability', data),
+      update: (id: number, data: Partial<AvailabilityWindowResponse>) =>
+        request<AvailabilityWindowResponse>('PUT', `/bookings/availability/${id}`, data),
+      delete: (id: number) => request<void>('DELETE', `/bookings/availability/${id}`),
+    },
+    blockedDates: {
+      list: () => request<DateOverrideResponse[]>('GET', '/bookings/blocked-dates'),
+      create: (data: { date: string; reason?: string }) =>
+        request<DateOverrideResponse>('POST', '/bookings/blocked-dates', data),
+      delete: (id: number) => request<void>('DELETE', `/bookings/blocked-dates/${id}`),
+    },
+    settings: {
+      get: () => request<BookingSettingsResponse>('GET', '/bookings/settings'),
+      update: (data: { timezone?: string; enabled?: boolean }) =>
+        request<BookingSettingsResponse>('PUT', '/bookings/settings', data),
+    },
   },
 
   internships: {

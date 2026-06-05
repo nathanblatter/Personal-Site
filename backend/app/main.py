@@ -15,7 +15,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import select
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
 from app.database import AsyncSessionLocal
 from app import models
@@ -81,7 +81,7 @@ _STATIC_OG: dict[str, dict[str, str]] = {
     },
 }
 
-_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude", "/status", "/solar", "/testimonial"})
+_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude", "/status", "/solar", "/testimonial", "/bookings"})
 
 # Known bot user-agent patterns for OG tag injection
 BOT_PATTERN = re.compile(
@@ -132,6 +132,10 @@ async def _periodic_github_kpi():
     return f"{len(daily)} days updated"
 
 
+async def _periodic_booking_cleanup():
+    return await bookings.auto_decline_expired()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await kpi.init_kpi_db()
@@ -139,6 +143,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(github.warmup()),
         asyncio.create_task(_supervised("claude_snapshot", _periodic_claude_snapshot, 86400)),
         asyncio.create_task(_supervised("github_kpi", _periodic_github_kpi, 21600)),
+        asyncio.create_task(_supervised("booking_cleanup", _periodic_booking_cleanup, 3600)),
     ]
     _read_index_html()
     yield
@@ -278,6 +283,7 @@ app.include_router(solar.router, prefix=f"{API_PREFIX}/solar")
 app.include_router(testimonial_requests.router)
 app.include_router(rss.router)
 app.include_router(resume.router, prefix=API_PREFIX)
+app.include_router(bookings.router, prefix=API_PREFIX)
 
 
 @app.get("/api/v1/suggest", include_in_schema=False)

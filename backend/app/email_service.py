@@ -1,7 +1,11 @@
 import logging
 import os
+import uuid
 import aiosmtplib
+from datetime import datetime, timedelta
 from email.message import EmailMessage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 log = logging.getLogger(__name__)
 
@@ -79,3 +83,181 @@ It only takes a couple of minutes.
     except Exception as e:
         log.warning("SMTP error: %s", e)
         return False
+
+
+# ── Booking emails ───────────────────────────────────────────────────────────
+
+CONTACT_TO_EMAIL = os.getenv("CONTACT_TO_EMAIL", "nzb22@byu.edu")
+
+
+def _build_ics(summary: str, start: datetime, duration_minutes: int,
+               location: str, description: str,
+               organizer_email: str, attendee_email: str) -> str:
+    """Return RFC 5545 VCALENDAR string with METHOD:REQUEST."""
+    end = start + timedelta(minutes=duration_minutes)
+    fmt = "%Y%m%dT%H%M%SZ"
+    uid = f"{uuid.uuid4()}@nathanblatter.com"
+    return (
+        "BEGIN:VCALENDAR\r\n"
+        "VERSION:2.0\r\n"
+        "PRODID:-//nathanblatter.com//Booking//EN\r\n"
+        "METHOD:REQUEST\r\n"
+        "BEGIN:VEVENT\r\n"
+        f"UID:{uid}\r\n"
+        f"DTSTART:{start.strftime(fmt)}\r\n"
+        f"DTEND:{end.strftime(fmt)}\r\n"
+        f"SUMMARY:{summary}\r\n"
+        f"LOCATION:{location}\r\n"
+        f"DESCRIPTION:{description}\r\n"
+        f"ORGANIZER;CN=Nathan Blatter:mailto:{organizer_email}\r\n"
+        f"ATTENDEE;CN=Visitor:mailto:{attendee_email}\r\n"
+        "STATUS:CONFIRMED\r\n"
+        "END:VEVENT\r\n"
+        "END:VCALENDAR\r\n"
+    )
+
+
+async def _send_mime(to: str, subject: str, text_body: str, html_body: str,
+                     ics_content: str | None = None) -> bool:
+    """Send a MIME email, optionally with .ics attachment."""
+    msg = MIMEMultipart("mixed")
+    msg["Subject"] = subject
+    msg["From"] = f"Nathan Blatter <{SMTP_FROM}>"
+    msg["To"] = to
+
+    alt = MIMEMultipart("alternative")
+    alt.attach(MIMEText(text_body, "plain"))
+    alt.attach(MIMEText(html_body, "html"))
+    msg.attach(alt)
+
+    if ics_content:
+        cal = MIMEText(ics_content, "calendar", "utf-8")
+        cal.add_header("Content-Disposition", "attachment", filename="invite.ics")
+        msg.attach(cal)
+
+    try:
+        await aiosmtplib.send(msg, hostname=SMTP_HOST, port=SMTP_PORT, use_tls=False, start_tls=False)
+        return True
+    except Exception as e:
+        log.warning("SMTP error (booking): %s", e)
+        return False
+
+
+def _fmt_time(dt: datetime, tz_name: str) -> str:
+    """Format datetime in a given timezone for display."""
+    from zoneinfo import ZoneInfo
+    local = dt.astimezone(ZoneInfo(tz_name))
+    return local.strftime("%A, %B %-d at %-I:%M %p %Z")
+
+
+async def send_booking_request_email(booking, admin_tz: str = "America/Denver") -> bool:
+    """Notify Nathan of a new booking request."""
+    time_str = _fmt_time(booking.start_at, admin_tz)
+    subject = f"New booking request: {booking.topic} — {booking.visitor_name}"
+    admin_link = f"{SITE_URL}/admin"
+
+    text_body = (
+        f"New booking request from {booking.visitor_name} ({booking.visitor_email})\n\n"
+        f"Topic: {booking.topic}\n"
+        f"Time: {time_str} ({booking.duration_minutes} min)\n\n"
+        f"Review in admin: {admin_link}"
+    )
+
+    html_body = f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8f9fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<div style="max-width:560px;margin:40px auto;padding:0 20px;">
+<div style="background:white;border-radius:16px;padding:48px 40px;border:1px solid #e5e7eb;">
+  <p style="font-family:monospace;font-size:11px;color:#3b6cf5;letter-spacing:0.15em;text-transform:uppercase;margin:0 0 20px;">New Booking Request</p>
+  <h1 style="font-size:24px;color:#1a1f2e;margin:0 0 16px;font-weight:700;">{booking.visitor_name}</h1>
+  <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Email:</strong> {booking.visitor_email}</p>
+  <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Topic:</strong> {booking.topic}</p>
+  <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Time:</strong> {time_str} ({booking.duration_minutes} min)</p>
+  <a href="{admin_link}" style="display:inline-block;margin-top:24px;background:#3b6cf5;color:white;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:600;font-size:15px;">
+    Review in Admin &rarr;
+  </a>
+</div>
+</div></body></html>"""
+
+    return await _send_mime(CONTACT_TO_EMAIL, subject, text_body, html_body)
+
+
+async def send_booking_confirmed_email(booking, admin_tz: str = "America/Denver") -> bool:
+    """Send confirmation with Zoom link and .ics to both Nathan and visitor."""
+    time_str = _fmt_time(booking.start_at, admin_tz)
+    subject = f"Call confirmed: {booking.topic}"
+    zoom_url = booking.zoom_join_url or "Zoom link not available"
+
+    ics = _build_ics(
+        summary=f"Call: {booking.topic}",
+        start=booking.start_at,
+        duration_minutes=booking.duration_minutes,
+        location=zoom_url,
+        description=f"Call with {booking.visitor_name} — {booking.topic}",
+        organizer_email=CONTACT_TO_EMAIL,
+        attendee_email=booking.visitor_email,
+    )
+
+    text_body = (
+        f"Your call has been confirmed!\n\n"
+        f"Topic: {booking.topic}\n"
+        f"Time: {time_str} ({booking.duration_minutes} min)\n"
+        f"Zoom: {zoom_url}\n\n"
+        f"A calendar invite is attached."
+    )
+
+    html_body = f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8f9fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<div style="max-width:560px;margin:40px auto;padding:0 20px;">
+<div style="background:white;border-radius:16px;padding:48px 40px;border:1px solid #e5e7eb;">
+  <p style="font-family:monospace;font-size:11px;color:#10b981;letter-spacing:0.15em;text-transform:uppercase;margin:0 0 20px;">Call Confirmed</p>
+  <h1 style="font-size:24px;color:#1a1f2e;margin:0 0 16px;font-weight:700;">{booking.topic}</h1>
+  <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>Time:</strong> {time_str} ({booking.duration_minutes} min)</p>
+  <p style="color:#374151;font-size:14px;margin:8px 0;"><strong>With:</strong> {booking.visitor_name}</p>
+  <a href="{zoom_url}" style="display:inline-block;margin-top:24px;background:#2563eb;color:white;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:600;font-size:15px;">
+    Join Zoom Meeting &rarr;
+  </a>
+  <p style="margin-top:20px;font-size:12px;color:#9ca3af;">A calendar invite (.ics) is attached to this email.</p>
+</div>
+</div></body></html>"""
+
+    ok1 = await _send_mime(booking.visitor_email, subject, text_body, html_body, ics)
+    ok2 = await _send_mime(CONTACT_TO_EMAIL, subject, text_body, html_body, ics)
+    return ok1 and ok2
+
+
+async def send_booking_declined_email(booking) -> bool:
+    """Send polite decline email to visitor."""
+    subject = "Re: your booking request with Nathan Blatter"
+
+    reason = ""
+    if booking.admin_note:
+        reason = f"\n\nA note from Nathan: \"{booking.admin_note}\""
+
+    text_body = (
+        f"Hi {booking.visitor_name},\n\n"
+        f"Unfortunately, Nathan isn't able to accommodate your booking request "
+        f"for \"{booking.topic}\" at this time.{reason}\n\n"
+        f"Feel free to reach out via the contact form at {SITE_URL}/contact "
+        f"if you'd like to get in touch another way.\n\n"
+        f"Best,\nNathan Blatter"
+    )
+
+    html_body = f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#f8f9fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<div style="max-width:560px;margin:40px auto;padding:0 20px;">
+<div style="background:white;border-radius:16px;padding:48px 40px;border:1px solid #e5e7eb;">
+  <p style="font-family:monospace;font-size:11px;color:#64748b;letter-spacing:0.15em;text-transform:uppercase;margin:0 0 20px;">Booking Update</p>
+  <h1 style="font-size:24px;color:#1a1f2e;margin:0 0 16px;font-weight:700;">Hi {booking.visitor_name}</h1>
+  <p style="color:#374151;font-size:14px;line-height:1.6;">
+    Unfortunately, Nathan isn't able to accommodate your booking request
+    for &ldquo;{booking.topic}&rdquo; at this time.
+  </p>
+  {"<p style='color:#374151;font-size:14px;line-height:1.6;margin-top:12px;font-style:italic;'>&ldquo;" + booking.admin_note + "&rdquo;</p>" if booking.admin_note else ""}
+  <p style="color:#374151;font-size:14px;line-height:1.6;margin-top:20px;">
+    Feel free to reach out via the <a href="{SITE_URL}/contact" style="color:#3b6cf5;">contact form</a> if you'd like to get in touch another way.
+  </p>
+  <p style="color:#9ca3af;font-size:13px;margin-top:24px;">Best,<br>Nathan Blatter</p>
+</div>
+</div></body></html>"""
+
+    return await _send_mime(booking.visitor_email, subject, text_body, html_body)
