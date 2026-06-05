@@ -32,10 +32,9 @@ function BookACall() {
 
   const dates = useMemo(() => {
     const result: Date[] = []
-    const today = new Date()
+    const now = new Date()
     for (let i = 0; i < 14; i++) {
-      const d = new Date(today)
-      d.setDate(today.getDate() + i)
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)
       result.push(d)
     }
     return result
@@ -140,8 +139,9 @@ function BookACall() {
             </div>
             <div className="grid grid-cols-7 gap-2">
               {visibleDates.map(d => {
-                const dateStr = d.toISOString().split('T')[0]
-                const isToday = dateStr === new Date().toISOString().split('T')[0]
+                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                const todayNow = new Date()
+                const isToday = d.getFullYear() === todayNow.getFullYear() && d.getMonth() === todayNow.getMonth() && d.getDate() === todayNow.getDate()
                 const isSelected = dateStr === selectedDate
                 return (
                   <button
