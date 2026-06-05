@@ -455,6 +455,32 @@ class BookingSettings(Base):
     enabled = Column(Boolean, nullable=False, default=True)
 
 
+class BioLink(Base):
+    __tablename__ = "bio_links"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String, nullable=False)
+    url = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    icon = Column(String, nullable=True)          # lucide icon name e.g. "Github"
+    category = Column(String, nullable=True)       # grouping label e.g. "Social", "Projects"
+    featured = Column(Boolean, nullable=False, default=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    clicks = Column(Integer, nullable=False, default=0)
+
+
+class BioPageSettings(Base):
+    __tablename__ = "bio_page_settings"
+
+    id = Column(Integer, primary_key=True, default=1)
+    heading = Column(String, nullable=False, default="Nathan Blatter")
+    subheading = Column(String, nullable=True, default="Software Engineer")
+    avatar_url = Column(String, nullable=True)
+    show_portfolio_link = Column(Boolean, nullable=False, default=True)
+    show_booking_link = Column(Boolean, nullable=False, default=True)
+
+
 class ClaudeUsageDay(Base):
     __tablename__ = "claude_usage_days"
 

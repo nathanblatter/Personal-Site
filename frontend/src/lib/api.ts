@@ -417,6 +417,34 @@ export interface BookingSettingsResponse {
   available_days: number[]
 }
 
+// ── Bio Link in Bio Types ─────────────────────────────────────────────
+export interface BioLinkResponse {
+  id: number
+  title: string
+  url: string
+  description?: string
+  icon?: string
+  category?: string
+  featured: boolean
+  enabled: boolean
+  sort_order: number
+  clicks: number
+}
+
+export interface BioPageSettingsResponse {
+  heading: string
+  subheading?: string
+  avatar_url?: string
+  show_portfolio_link: boolean
+  show_booking_link: boolean
+}
+
+export interface BioPagePublicResponse {
+  settings: BioPageSettingsResponse
+  links: BioLinkResponse[]
+  socials: SocialResponse[]
+}
+
 // ── API client ─────────────────────────────────────────────────────────────
 
 export const api = {
@@ -666,6 +694,23 @@ export const api = {
       create: (data: { name: string; color?: string }) =>
         request<TagResponse>('POST', '/internships/tags', data),
       delete: (id: string) => request<void>('DELETE', `/internships/tags/${id}`),
+    },
+  },
+
+  bio: {
+    page: () => request<BioPagePublicResponse>('GET', '/bio'),
+    links: {
+      list: () => request<BioLinkResponse[]>('GET', '/bio/links'),
+      create: (data: Omit<BioLinkResponse, 'id' | 'clicks'>) =>
+        request<BioLinkResponse>('POST', '/bio/links', data),
+      update: (id: number, data: Partial<Omit<BioLinkResponse, 'id' | 'clicks'>>) =>
+        request<BioLinkResponse>('PUT', `/bio/links/${id}`, data),
+      delete: (id: number) => request<void>('DELETE', `/bio/links/${id}`),
+    },
+    settings: {
+      get: () => request<BioPageSettingsResponse>('GET', '/bio/settings'),
+      update: (data: Partial<BioPageSettingsResponse>) =>
+        request<BioPageSettingsResponse>('PUT', '/bio/settings', data),
     },
   },
 }

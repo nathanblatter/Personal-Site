@@ -933,6 +933,63 @@ class BookingSettingsResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Bio Link in Bio ──────────────────────────────────────────────────────────
+
+class BioLinkBase(BaseModel):
+    title: str
+    url: str
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    category: Optional[str] = None
+    featured: bool = False
+    enabled: bool = True
+    sort_order: int = 0
+
+
+class BioLinkCreate(BioLinkBase):
+    pass
+
+
+class BioLinkUpdate(BaseModel):
+    title: Optional[str] = None
+    url: Optional[str] = None
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    category: Optional[str] = None
+    featured: Optional[bool] = None
+    enabled: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+class BioLinkResponse(BioLinkBase):
+    id: int
+    clicks: int
+    model_config = {"from_attributes": True}
+
+
+class BioPageSettingsUpdate(BaseModel):
+    heading: Optional[str] = None
+    subheading: Optional[str] = None
+    avatar_url: Optional[str] = None
+    show_portfolio_link: Optional[bool] = None
+    show_booking_link: Optional[bool] = None
+
+
+class BioPageSettingsResponse(BaseModel):
+    heading: str
+    subheading: Optional[str] = None
+    avatar_url: Optional[str] = None
+    show_portfolio_link: bool
+    show_booking_link: bool
+    model_config = {"from_attributes": True}
+
+
+class BioPagePublicResponse(BaseModel):
+    settings: BioPageSettingsResponse
+    links: List[BioLinkResponse]
+    socials: List[Any] = []  # reuse Social model data
+
+
 # ── Dashboard / Overview ─────────────────────────────────────────────────────
 
 class DashboardStats(BaseModel):
