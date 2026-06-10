@@ -86,7 +86,7 @@ function LinkButton({ link, index }: { link: BioLinkResponse; index: number }) {
           {link.title}
         </span>
         {link.description && (
-          <span className="block text-xs text-steel mt-0.5 truncate">{link.description}</span>
+          <span className="block text-xs text-steel mt-0.5 break-words select-all">{link.description}</span>
         )}
       </div>
       <ArrowUpRight
