@@ -234,6 +234,25 @@ async def instagram_pickup(_: None = Depends(_verify_health_ingest_key)):
         )
     return {"status": "ok", "date": today.isoformat(), "instagram_pickups_today": count}
 
+@health_ingest_router.post("/temple")
+async def temple_visit(_: None = Depends(_verify_health_ingest_key)):
+    """Mark today's temple visit as true. Called by phone Shortcut on app open."""
+    today = date_type.today()
+    async with _KPI_POOL.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO kpi_daily_log (date, temple)
+            VALUES ($1, TRUE)
+            ON CONFLICT (date) DO UPDATE
+              SET temple = TRUE
+            """,
+            today,
+        )
+        count = await conn.fetchval(
+            "SELECT temple FROM kpi_daily_log WHERE date = $1", today
+        )
+    return {"status": "ok", "date": today.isoformat(), "temple": count}
+
 
 class LocationIngestRequest(BaseModel):
     lat: float
