@@ -1,9 +1,6 @@
 import asyncio
-import json as _json
-import os
 from typing import List
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request as FastAPIRequest
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,73 +8,27 @@ from sqlalchemy import select
 from app.database import get_db
 from app import models, schemas
 from app.auth import require_auth
+from app.utils import get_client_ip
+from app import umami_service, imessage_service
 
 router = APIRouter(tags=["links"])
-
-UMAMI_URL = os.getenv("UMAMI_URL", "http://docker-services-umami-1:3000")
-WEBSITE_ID = os.getenv("UMAMI_WEBSITE_ID", "49f0edff-13f8-4a9b-9da6-5ad92bd18abc")
-
-IMESSAGE_API_URL = os.getenv("IMESSAGE_API_URL", "http://100.79.61.79:8899")
-IMESSAGE_API_KEY = os.getenv("IMESSAGE_API_KEY") or os.getenv("imessage_api_key", "")
-ALERT_RECIPIENT = os.getenv("NATHAN_PHONE", "")
-
-_umami_client = httpx.AsyncClient(timeout=3.0)
-_imessage_client = httpx.AsyncClient(timeout=5.0)
 
 
 async def _fire_umami_event(request: FastAPIRequest, link: models.TrackedLink):
     """Send a click event to Umami without blocking the response."""
-    ip = "127.0.0.1"
-    for header in ("cf-connecting-ip", "x-real-ip", "x-forwarded-for"):
-        val = request.headers.get(header)
-        if val:
-            ip = val.split(",")[0].strip()
-            break
-    else:
-        if request.client:
-            ip = request.client.host
-
-    headers = {
-        "Content-Type": "application/json",
-        "User-Agent": request.headers.get("user-agent", ""),
-        "X-Forwarded-For": ip,
-        "X-Real-IP": ip,
-    }
-
-    common = {
-        "website": WEBSITE_ID,
-        "url": f"/go/{link.slug}",
-        "hostname": "nathanblatter.com",
-        "language": request.headers.get("accept-language", "en").split(",")[0],
-        "screen": "0x0",
-    }
-
-    payloads = [
-        {"type": "event", "payload": {**common, "referrer": request.headers.get("referer", "")}},
-        {"type": "event", "payload": {**common, "name": "link-click", "data": {"slug": link.slug, "label": link.label, "destination": link.destination_url}}},
-    ]
-
-    try:
-        for body in payloads:
-            await _umami_client.post(f"{UMAMI_URL}/api/send", json=body, headers=headers)
-    except httpx.HTTPError:
-        pass
+    await umami_service.fire_event(
+        request,
+        url=f"/go/{link.slug}",
+        event_name="link-click",
+        event_data={"slug": link.slug, "label": link.label, "destination": link.destination_url},
+    )
 
 
 async def _send_visitor_alert(request: FastAPIRequest, link: models.TrackedLink):
     """Send an iMessage alert when someone clicks a tracked link."""
-    if not IMESSAGE_API_KEY or not ALERT_RECIPIENT:
-        return
-
-    ip = "unknown"
-    for header in ("cf-connecting-ip", "x-real-ip", "x-forwarded-for"):
-        val = request.headers.get(header)
-        if val:
-            ip = val.split(",")[0].strip()
-            break
+    ip = get_client_ip(request)
 
     ua = request.headers.get("user-agent", "")
-    # Shorten user-agent to just browser/OS
     browser = "Unknown"
     for name in ("Chrome", "Firefox", "Safari", "Edge", "Opera"):
         if name in ua:
@@ -92,32 +43,14 @@ async def _send_visitor_alert(request: FastAPIRequest, link: models.TrackedLink)
     elif "Windows" in ua:
         browser += " (Windows)"
 
-    # Geo-lookup the IP
-    location = ""
-    try:
-        geo = await _imessage_client.get(f"http://ip-api.com/json/{ip}?fields=city,regionName,country", timeout=3.0)
-        if geo.status_code == 200:
-            g = geo.json()
-            parts = [p for p in (g.get("city"), g.get("regionName"), g.get("country")) if p]
-            if parts:
-                location = f" | {', '.join(parts)}"
-    except httpx.HTTPError:
-        pass
+    location = await imessage_service.geo_lookup(ip)
 
     msg = (
         f"Portfolio link clicked: /go/{link.slug}\n"
         f"Label: {link.label}\n"
         f"Click #{link.clicks} | {browser}{location}"
     )
-
-    try:
-        await _imessage_client.post(
-            f"{IMESSAGE_API_URL}/send",
-            json={"recipient": ALERT_RECIPIENT, "message": msg},
-            headers={"X-API-Key": IMESSAGE_API_KEY, "Content-Type": "application/json"},
-        )
-    except httpx.HTTPError:
-        pass
+    await imessage_service.send_alert(msg)
 
 
 # ── Public redirect ──────────────────────────────────────────────────────────

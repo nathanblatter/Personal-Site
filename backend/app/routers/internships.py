@@ -1,9 +1,9 @@
 import uuid
 from datetime import datetime, date, timezone
-from typing import List, Optional
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case, and_, delete
+from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.auth import require_auth

@@ -2,7 +2,6 @@ import { motion } from 'motion/react'
 
 interface SkillBarProps {
   name: string
-  level: number
   category: string
   index: number
   highlighted?: boolean

@@ -11,13 +11,7 @@ export default function Resume() {
   const [coursework, setCoursework] = useState<CourseworkResponse[]>([])
 
   useEffect(() => {
-    Promise.all([
-      api.about.get(),
-      api.experience.list(),
-      api.skills.list(),
-      api.projects.list(),
-      api.coursework.list(),
-    ]).then(([ab, ex, sk, pr, cw]) => {
+    api.resume.data().then(({ about: ab, experience: ex, skills: sk, projects: pr, coursework: cw }) => {
       setAbout(ab)
       setExperience(ex)
       setSkills(sk)

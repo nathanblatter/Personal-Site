@@ -309,6 +309,16 @@ export interface HomeResponse {
   about: AboutResponse
 }
 
+// ── Resume Page Types ─────────────────────────────────────────────────────────
+
+export interface ResumeDataResponse {
+  about: AboutResponse
+  experience: ExperienceResponse[]
+  skills: SkillResponse[]
+  projects: ProjectResponse[]
+  coursework: CourseworkResponse[]
+}
+
 // ── About Page Types ──────────────────────────────────────────────────────────
 
 export interface AboutPageResponse {
@@ -573,6 +583,10 @@ export const api = {
 
   home: {
     get: () => request<HomeResponse>('GET', '/home'),
+  },
+
+  resume: {
+    data: () => request<ResumeDataResponse>('GET', '/resume/data'),
   },
 
   github: {

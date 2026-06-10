@@ -1,49 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'motion/react'
-import * as Icons from 'lucide-react'
+import { AlertCircle, RefreshCw, User, ArrowUpRight, Star, Calendar, ArrowRight } from 'lucide-react'
+import { getIcon } from '../lib/iconMap'
+import type { BioPagePublicResponse, BioLinkResponse } from '../lib/api'
 
-/* ─── Types ─── */
-interface BioSettings {
-  heading: string
-  subheading: string
-  avatar_url: string
-  show_portfolio_link: boolean
-  show_booking_link: boolean
-}
-
-interface BioLink {
-  id: number
-  title: string
-  url: string
-  description?: string
-  icon?: string
-  category?: string
-  featured: boolean
-  enabled: boolean
-  sort_order: number
-  clicks: number
-}
-
-interface BioSocial {
-  icon: string
-  label: string
-  handle: string
-  href: string
-}
-
-interface BioData {
-  settings: BioSettings
-  links: BioLink[]
-  socials: BioSocial[]
-}
-
-/* ─── Helpers ─── */
-function getLucideIcon(name?: string): React.FC<{ size?: number; className?: string }> | null {
-  if (!name) return null
-  const Icon = Icons[name as keyof typeof Icons] as React.FC<{ size?: number; className?: string }> | undefined
-  if (typeof Icon !== 'function') return null
-  return Icon
-}
+type BioData = BioPagePublicResponse
 
 function trackClick(id: number) {
   fetch(`/api/v1/bio/click/${id}`, { method: 'POST' }).catch(() => {})
@@ -73,7 +34,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
     <div className="min-h-dvh bg-snow flex items-center justify-center">
       <div className="text-center px-6">
         <div className="w-14 h-14 rounded-full bg-mist flex items-center justify-center mx-auto mb-5">
-          <Icons.AlertCircle size={24} className="text-steel" />
+          <AlertCircle size={24} className="text-steel" />
         </div>
         <h2 className="font-serif italic text-xl text-ink mb-2">Something went wrong</h2>
         <p className="text-steel text-sm mb-6">Could not load link data. Please try again.</p>
@@ -81,7 +42,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
           onClick={onRetry}
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue text-white font-mono text-sm rounded-xl hover:bg-blue-dim transition-colors"
         >
-          <Icons.RefreshCw size={14} />
+          <RefreshCw size={14} />
           Retry
         </button>
       </div>
@@ -90,8 +51,8 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
 }
 
 /* ─── Link button ─── */
-function LinkButton({ link, index }: { link: BioLink; index: number }) {
-  const Icon = getLucideIcon(link.icon)
+function LinkButton({ link, index }: { link: BioLinkResponse; index: number }) {
+  const Icon = link.icon ? getIcon(link.icon) : null
 
   return (
     <motion.a
@@ -111,7 +72,7 @@ function LinkButton({ link, index }: { link: BioLink; index: number }) {
     >
       {link.featured && (
         <div className="absolute -top-1.5 right-3">
-          <Icons.Star size={12} className="text-blue fill-blue" />
+          <Star size={12} className="text-blue fill-blue" />
         </div>
       )}
       {Icon && (
@@ -128,7 +89,7 @@ function LinkButton({ link, index }: { link: BioLink; index: number }) {
           <span className="block text-xs text-steel mt-0.5 truncate">{link.description}</span>
         )}
       </div>
-      <Icons.ArrowUpRight
+      <ArrowUpRight
         size={16}
         className="flex-shrink-0 text-silver group-hover:text-blue transition-colors group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
       />
@@ -169,8 +130,8 @@ export default function LinkInBio() {
   const regular = enabledLinks.filter(l => !l.featured)
 
   // Group regular links by category
-  const categories = new Map<string, BioLink[]>()
-  const uncategorized: BioLink[] = []
+  const categories = new Map<string, BioLinkResponse[]>()
+  const uncategorized: BioLinkResponse[] = []
   for (const link of regular) {
     if (link.category) {
       if (!categories.has(link.category)) categories.set(link.category, [])
@@ -211,7 +172,7 @@ export default function LinkInBio() {
               />
             ) : (
               <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-br from-blue/20 to-violet/20 flex items-center justify-center border-[3px] border-white shadow-lg">
-                <Icons.User size={36} className="text-steel" />
+                <User size={36} className="text-steel" />
               </div>
             )}
           </motion.div>
@@ -243,7 +204,7 @@ export default function LinkInBio() {
               className="mt-4 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-mist bg-white text-xs font-mono text-steel hover:text-blue hover:border-blue/30 transition-colors"
             >
               View Portfolio
-              <Icons.ArrowUpRight size={12} />
+              <ArrowUpRight size={12} />
             </motion.a>
           )}
         </header>
@@ -309,9 +270,9 @@ export default function LinkInBio() {
             transition={{ duration: 0.4, delay: 0.1 + linkIndex * 0.06 }}
             className="group flex items-center justify-center gap-3 w-full mt-6 px-5 py-4 rounded-2xl bg-blue text-white font-mono text-sm font-semibold shadow-lg shadow-blue/20 hover:bg-blue-dim transition-colors"
           >
-            <Icons.Calendar size={18} />
+            <Calendar size={18} />
             Book a Call
-            <Icons.ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
           </motion.a>
         )}
 
@@ -324,7 +285,7 @@ export default function LinkInBio() {
             className="flex items-center justify-center gap-3 mt-10"
           >
             {socials.map(social => {
-              const SocialIcon = getLucideIcon(social.icon)
+              const SocialIcon = getIcon(social.icon)
               return (
                 <a
                   key={social.label}
@@ -334,7 +295,7 @@ export default function LinkInBio() {
                   aria-label={social.label}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-mist text-steel hover:text-blue hover:border-blue/30 hover:shadow-sm transition-all"
                 >
-                  {SocialIcon ? <SocialIcon size={16} /> : <Icons.Link size={16} />}
+                  <SocialIcon size={16} />
                   <span className="text-xs font-mono">{social.label}</span>
                 </a>
               )

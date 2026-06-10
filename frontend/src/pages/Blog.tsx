@@ -3,18 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Calendar, Clock, Eye, ArrowRight, Search, X } from 'lucide-react'
 import { api, type BlogPostResponse } from '../lib/api'
-
-function readTime(content: string): number {
-  return Math.max(1, Math.round(content.trim().split(/\s+/).length / 200))
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-}
+import { readTime, formatDate } from '../lib/blogUtils'
 
 export default function Blog() {
   const [posts, setPosts] = useState<BlogPostResponse[]>([])

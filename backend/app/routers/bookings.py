@@ -6,7 +6,6 @@ from zoneinfo import ZoneInfo
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
-from redis.asyncio import Redis
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,44 +17,23 @@ from app.email_service import (
     send_booking_confirmed_email,
     send_booking_declined_email,
     send_booking_cancelled_email,
+    send_booking_received_email,
+    send_booking_reminder_email,
+    _fmt_time,
 )
 from app.zoom_service import create_meeting, delete_meeting
+from app.utils import get_client_ip, get_redis
+from app import imessage_service
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
-IMESSAGE_API_URL = os.getenv("IMESSAGE_API_URL", "http://100.79.61.79:8899")
-IMESSAGE_API_KEY = os.getenv("IMESSAGE_API_KEY") or os.getenv("imessage_api_key", "")
-ALERT_RECIPIENT = os.getenv("NATHAN_PHONE", "")
 SITE_URL = os.getenv("SITE_URL", "https://nathanblatter.com")
-
-_imessage_client = httpx.AsyncClient(timeout=5.0)
-
-_redis: Redis | None = None
-
-
-def _get_redis() -> Redis:
-    global _redis
-    if _redis is None:
-        _redis = Redis.from_url(REDIS_URL, decode_responses=True)
-    return _redis
-
-
-def _real_ip(request: Request) -> str:
-    return (
-        request.headers.get("CF-Connecting-IP")
-        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-        or request.client.host
-    )
 
 
 async def _send_booking_imessage(booking, admin_tz: str = "America/Denver"):
     """Send an iMessage alert for a new booking request."""
-    if not IMESSAGE_API_KEY or not ALERT_RECIPIENT:
-        return
-    from app.email_service import _fmt_time
     time_str = _fmt_time(booking.start_at, admin_tz)
     accept_url = f"{SITE_URL}/api/v1/bookings/action?token={create_action_token('accept', booking.id)}"
     decline_url = f"{SITE_URL}/api/v1/bookings/action?token={create_action_token('decline', booking.id)}"
@@ -67,14 +45,7 @@ async def _send_booking_imessage(booking, admin_tz: str = "America/Denver"):
         f"Accept: {accept_url}\n"
         f"Decline: {decline_url}"
     )
-    try:
-        await _imessage_client.post(
-            f"{IMESSAGE_API_URL}/send",
-            json={"recipient": ALERT_RECIPIENT, "message": msg},
-            headers={"X-API-Key": IMESSAGE_API_KEY, "Content-Type": "application/json"},
-        )
-    except httpx.HTTPError:
-        log.warning("iMessage booking alert failed")
+    await imessage_service.send_alert(msg)
 
 
 SETTINGS_ID = 1
@@ -246,8 +217,8 @@ async def create_booking(payload: schemas.BookingCreate, request: Request, db: A
         raise HTTPException(status_code=400, detail="Booking is currently disabled")
 
     # Rate limiting
-    redis = _get_redis()
-    ip = _real_ip(request)
+    redis = get_redis()
+    ip = get_client_ip(request)
     ip_key = f"booking:ip:{ip}"
     ip_count = await redis.incr(ip_key)
     if ip_count == 1:
@@ -307,7 +278,6 @@ async def create_booking(payload: schemas.BookingCreate, request: Request, db: A
     except Exception:
         pass
     try:
-        from app.email_service import send_booking_received_email
         await send_booking_received_email(booking)
     except Exception:
         pass
@@ -763,7 +733,6 @@ async def auto_decline_expired():
 async def send_booking_reminders():
     """Send reminder emails/texts for confirmed bookings starting in ~1 hour."""
     from app.database import AsyncSessionLocal
-    from app.email_service import send_booking_reminder_email
     async with AsyncSessionLocal() as db:
         now = datetime.now(ZoneInfo("UTC"))
         window_start = now + timedelta(minutes=50)
@@ -774,7 +743,7 @@ async def send_booking_reminders():
                     models.Booking.status == models.BookingStatus.confirmed,
                     models.Booking.start_at >= window_start,
                     models.Booking.start_at <= window_end,
-                    models.Booking.admin_note != "reminder_sent",
+                    models.Booking.reminder_sent_at.is_(None),
                 )
             )
         )
@@ -784,30 +753,18 @@ async def send_booking_reminders():
         for booking in bookings_list:
             try:
                 await send_booking_reminder_email(booking, settings.timezone)
-                # Send iMessage reminder too
-                if IMESSAGE_API_KEY and ALERT_RECIPIENT:
-                    from app.email_service import _fmt_time
-                    time_str = _fmt_time(booking.start_at, settings.timezone)
-                    zoom_url = booking.zoom_join_url or "No Zoom link"
-                    msg = (
-                        f"Reminder: Call in ~1 hour\n"
-                        f"{booking.visitor_name} — {booking.topic}\n"
-                        f"Time: {time_str}\n"
-                        f"Zoom: {zoom_url}"
-                    )
-                    try:
-                        await _imessage_client.post(
-                            f"{IMESSAGE_API_URL}/send",
-                            json={"recipient": ALERT_RECIPIENT, "message": msg},
-                            headers={"X-API-Key": IMESSAGE_API_KEY, "Content-Type": "application/json"},
-                        )
-                    except httpx.HTTPError:
-                        pass
+                time_str = _fmt_time(booking.start_at, settings.timezone)
+                zoom_url = booking.zoom_join_url or "No Zoom link"
+                msg = (
+                    f"Reminder: Call in ~1 hour\n"
+                    f"{booking.visitor_name} — {booking.topic}\n"
+                    f"Time: {time_str}\n"
+                    f"Zoom: {zoom_url}"
+                )
+                await imessage_service.send_alert(msg)
             except Exception:
                 pass
-            # Mark as reminded (use admin_note field with a prefix to not overwrite real notes)
-            if not booking.admin_note:
-                booking.admin_note = "reminder_sent"
+            booking.reminder_sent_at = datetime.now(ZoneInfo("UTC"))
             count += 1
         await db.commit()
         return f"{count} reminders sent"

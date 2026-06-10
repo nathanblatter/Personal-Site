@@ -18,6 +18,22 @@ function formatSlotTimeInTz(iso: string, tz: string): string {
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: tz })
 }
 
+/* Honeypot — hidden from real users, bots fill it out */
+function HoneypotField({ name, value, onChange }: { name: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div style={{ display: 'none' }} aria-hidden="true">
+      <input
+        type="text"
+        name={name}
+        tabIndex={-1}
+        autoComplete="off"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
+
 function BookACall() {
   const [bookingSettings, setBookingSettings] = useState<BookingSettingsResponse | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -299,17 +315,7 @@ function BookACall() {
                     )}
                   </div>
 
-                  {/* Honeypot */}
-                  <div style={{ display: 'none' }} aria-hidden="true">
-                    <input
-                      type="text"
-                      name="website"
-                      tabIndex={-1}
-                      autoComplete="off"
-                      value={bookingForm.honeypot}
-                      onChange={e => setBookingForm({ ...bookingForm, honeypot: e.target.value })}
-                    />
-                  </div>
+                  <HoneypotField name="website" value={bookingForm.honeypot} onChange={v => setBookingForm({ ...bookingForm, honeypot: v })} />
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
@@ -489,17 +495,7 @@ export default function Contact() {
               </motion.div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Honeypot — hidden from real users, bots fill it out */}
-                <div style={{ display: 'none' }} aria-hidden="true">
-                  <input
-                    type="text"
-                    name="honeypot"
-                    tabIndex={-1}
-                    autoComplete="off"
-                    value={formData.honeypot}
-                    onChange={(e) => setFormData({ ...formData, honeypot: e.target.value })}
-                  />
-                </div>
+                <HoneypotField name="honeypot" value={formData.honeypot ?? ''} onChange={v => setFormData({ ...formData, honeypot: v })} />
                 <div>
                   <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase">Name</label>
                   <input

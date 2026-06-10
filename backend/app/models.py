@@ -445,6 +445,7 @@ class Booking(Base):
     admin_note = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
     decided_at = Column(DateTime(timezone=True), nullable=True)
+    reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class BookingSettings(Base):

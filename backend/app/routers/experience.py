@@ -33,7 +33,8 @@ async def create_experience(payload: schemas.ExperienceCreate, db: AsyncSession 
     db.add(exp)
     await db.commit()
     await db.refresh(exp)
-    await cache.delete_prefix("page:")
+    await cache.delete("page:home")
+    await cache.delete("page:about")
     return exp
 
 
@@ -51,7 +52,8 @@ async def update_experience(
         setattr(exp, key, value)
     await db.commit()
     await db.refresh(exp)
-    await cache.delete_prefix("page:")
+    await cache.delete("page:home")
+    await cache.delete("page:about")
     return exp
 
 
@@ -65,4 +67,5 @@ async def delete_experience(experience_id: int, db: AsyncSession = Depends(get_d
         raise HTTPException(status_code=404, detail="Experience not found")
     await db.delete(exp)
     await db.commit()
-    await cache.delete_prefix("page:")
+    await cache.delete("page:home")
+    await cache.delete("page:about")

@@ -1,8 +1,6 @@
 import asyncio
-import os
 from typing import List
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request as FastAPIRequest, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -10,52 +8,19 @@ from sqlalchemy import select
 from app.database import get_db
 from app import models, schemas
 from app.auth import require_auth
+from app import umami_service
 
 router = APIRouter(tags=["bio"])
-
-UMAMI_URL = os.getenv("UMAMI_URL", "http://docker-services-umami-1:3000")
-WEBSITE_ID = os.getenv("UMAMI_WEBSITE_ID", "49f0edff-13f8-4a9b-9da6-5ad92bd18abc")
-
-_umami_client = httpx.AsyncClient(timeout=3.0)
 
 
 async def _fire_umami_bio_event(request: FastAPIRequest, link: models.BioLink):
     """Send a bio link click event to Umami without blocking the response."""
-    ip = "127.0.0.1"
-    for header in ("cf-connecting-ip", "x-real-ip", "x-forwarded-for"):
-        val = request.headers.get(header)
-        if val:
-            ip = val.split(",")[0].strip()
-            break
-    else:
-        if request.client:
-            ip = request.client.host
-
-    headers = {
-        "Content-Type": "application/json",
-        "User-Agent": request.headers.get("user-agent", ""),
-        "X-Forwarded-For": ip,
-        "X-Real-IP": ip,
-    }
-
-    common = {
-        "website": WEBSITE_ID,
-        "url": "/linkinbio",
-        "hostname": "nathanblatter.com",
-        "language": request.headers.get("accept-language", "en").split(",")[0],
-        "screen": "0x0",
-    }
-
-    payloads = [
-        {"type": "event", "payload": {**common, "referrer": request.headers.get("referer", "")}},
-        {"type": "event", "payload": {**common, "name": "bio-link-click", "data": {"title": link.title, "url": link.url, "category": link.category or ""}}},
-    ]
-
-    try:
-        for body in payloads:
-            await _umami_client.post(f"{UMAMI_URL}/api/send", json=body, headers=headers)
-    except httpx.HTTPError:
-        pass
+    await umami_service.fire_event(
+        request,
+        url="/linkinbio",
+        event_name="bio-link-click",
+        event_data={"title": link.title, "url": link.url, "category": link.category or ""},
+    )
 
 
 # ── Public endpoints ─────────────────────────────────────────────────────────

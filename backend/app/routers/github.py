@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import re
 
@@ -54,7 +55,6 @@ async def warmup():
 @router.get("/profile")
 async def github_profile():
     raw = await _fetch_cached("profile", f"https://api.github.com/users/{GITHUB_USERNAME}")
-    import json
     d = json.loads(raw)
     return {
         "username": d["login"],
@@ -69,7 +69,6 @@ async def github_profile():
 
 @router.get("/repos")
 async def github_repos():
-    import json
     raw = await _fetch_cached(
         "repos",
         f"https://api.github.com/orgs/{GITHUB_ORG}/repos?sort=pushed&per_page=100",
@@ -94,8 +93,6 @@ async def github_repos():
 
 @router.get("/contributions")
 async def github_contributions():
-    import json
-
     html = await _fetch_cached(
         "contributions",
         f"https://github.com/users/{GITHUB_USERNAME}/contributions",

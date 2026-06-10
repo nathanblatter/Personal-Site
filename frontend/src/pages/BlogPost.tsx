@@ -11,18 +11,7 @@ import rehypeRaw from 'rehype-raw'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { api, type BlogPostResponse } from '../lib/api'
-
-function readTime(content: string): number {
-  return Math.max(1, Math.round(content.trim().split(/\s+/).length / 200))
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-}
+import { readTime, formatDate } from '../lib/blogUtils'
 
 function textContent(node: unknown): string {
   const n = node as { type?: string; value?: string; children?: unknown[] }

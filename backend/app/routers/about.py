@@ -40,7 +40,7 @@ async def upsert_about(payload: schemas.AboutUpdate, db: AsyncSession = Depends(
 
     await db.commit()
     await db.refresh(about)
-    await cache.delete_prefix("page:")
+    await cache.delete("page:about")
     return about
 
 

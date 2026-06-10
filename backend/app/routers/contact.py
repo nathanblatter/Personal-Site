@@ -4,40 +4,23 @@ from datetime import date
 from email.message import EmailMessage
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
 from app import models, schemas
 from app.auth import require_auth
 from app.cache import cache as app_cache
+from app.utils import get_client_ip, get_redis
 
 router = APIRouter(prefix="/contact", tags=["contact"])
 
 SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "25"))
 CONTACT_TO_EMAIL = os.getenv("CONTACT_TO_EMAIL", "nzb22@byu.edu")
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 DAILY_LIMIT = 100
 IP_LIMIT = 3
 IP_WINDOW = 15 * 60  # 15 minutes in seconds
-
-_redis: Redis | None = None
-
-def get_redis() -> Redis:
-    global _redis
-    if _redis is None:
-        _redis = Redis.from_url(REDIS_URL, decode_responses=True)
-    return _redis
-
-def _real_ip(request: Request) -> str:
-    # Cloudflare sets CF-Connecting-IP; fall back to X-Forwarded-For, then direct
-    return (
-        request.headers.get("CF-Connecting-IP")
-        or request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-        or request.client.host
-    )
 
 SINGLETON_ID = 1
 
@@ -53,7 +36,7 @@ async def submit_contact(payload: schemas.ContactSubmit, request: Request):
     redis = get_redis()
 
     # 2. IP rate limit: 3 submissions per 15 minutes
-    ip = _real_ip(request)
+    ip = get_client_ip(request)
     ip_key = f"contact:ip:{ip}"
     ip_count = await redis.incr(ip_key)
     if ip_count == 1:
