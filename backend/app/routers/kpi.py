@@ -176,6 +176,11 @@ class HealthIngestRequest(BaseModel):
     instagram_pickups: Optional[int] = None
 
 
+class WorkoutIngestRequest(BaseModel):
+    workout_type: str
+    notes: Optional[str] = None
+
+
 health_ingest_router = APIRouter(tags=["kpi"])
 
 
@@ -233,6 +238,39 @@ async def instagram_pickup(_: None = Depends(_verify_health_ingest_key)):
             "SELECT instagram_pickups FROM kpi_daily_log WHERE date = $1", today
         )
     return {"status": "ok", "date": today.isoformat(), "instagram_pickups_today": count}
+
+@health_ingest_router.post("/workout")
+async def workout_completion(
+        body: WorkoutIngestRequest,
+        _: None = Depends(_verify_health_ingest_key),
+):
+    """Store today's workout type and append optional notes without overwriting existing notes."""
+    today = date_type.today()
+    async with _KPI_POOL.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO kpi_daily_log (date, workout_type, notes)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (date) DO UPDATE
+              SET workout_type = CASE
+                    WHEN kpi_daily_log.workout_type IS NULL OR kpi_daily_log.workout_type = ''
+                    THEN EXCLUDED.workout_type
+                    ELSE kpi_daily_log.workout_type || ', ' || EXCLUDED.workout_type
+                END,
+                notes = CASE
+                    WHEN EXCLUDED.notes IS NULL OR EXCLUDED.notes = '' THEN kpi_daily_log.notes
+                    WHEN kpi_daily_log.notes IS NULL OR kpi_daily_log.notes = '' THEN EXCLUDED.notes
+                    ELSE kpi_daily_log.notes || E'\n' || EXCLUDED.notes
+                END
+            """,
+            today,
+            body.workout_type,
+            body.notes,
+        )
+        count = await conn.fetchval(
+            "SELECT workout_type FROM kpi_daily_log WHERE date = $1", today
+        )
+    return {"status": "ok", "date": today.isoformat(), "workout_type": count}
 
 @health_ingest_router.post("/temple")
 async def temple_visit(_: None = Depends(_verify_health_ingest_key)):
