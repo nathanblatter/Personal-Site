@@ -9,6 +9,7 @@ import asyncpg
 from datetime import date as date_type, datetime, time as time_type, timezone
 from typing import Optional
 from urllib.parse import urlparse, urlunparse
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
@@ -332,6 +333,7 @@ async def location_ingest(
 
 
 GITHUB_USERNAME = os.getenv("GITHUB_USERNAME", "nathanzbl")
+LOCAL_TZ = ZoneInfo(os.getenv("TZ", "America/Denver"))
 
 
 async def scrape_github_kpi() -> dict[str, int]:
@@ -361,7 +363,9 @@ async def scrape_github_kpi() -> dict[str, int]:
     # Aggregate commits and PRs by date
     daily: dict[str, dict[str, int]] = {}
     for ev in all_events:
-        date_str = ev["created_at"][:10]
+        # GitHub Events API timestamps are UTC; convert to local before bucketing by day
+        created = datetime.fromisoformat(ev["created_at"].replace("Z", "+00:00"))
+        date_str = created.astimezone(LOCAL_TZ).date().isoformat()
         if date_str not in daily:
             daily[date_str] = {"commits": 0, "prs": 0}
 

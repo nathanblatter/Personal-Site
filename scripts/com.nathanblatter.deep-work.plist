@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.nathanblatter.deep-work</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/nathanblatter/bin/deep-work-estimate.py</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>23</integer>
+    <key>Minute</key>
+    <integer>50</integer>
+  </dict>
+
+  <!-- Secrets (HEALTH_INGEST_API_KEY, ANTHROPIC_API_KEY) are sourced by the
+       script from backend/.env.prod — no credentials live in this plist. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>TZ</key>
+    <string>America/Denver</string>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/deep-work.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/deep-work.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>
