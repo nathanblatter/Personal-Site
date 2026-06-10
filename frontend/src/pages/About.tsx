@@ -15,7 +15,7 @@ const CERTIFICATIONS = [
     id: '32fb3752-e53f-4f0f-8699-0e4ac8c24897',
     name: 'Professional Scrum Master I',
     issuer: 'Scrum.org',
-    image: '/api/storage/download/certs/psm1.png',
+    image: 'https://nathanblatter.com/api/v1/storage/download/certs/psm1.png',
     verify_url: 'https://www.credly.com/badges/32fb3752-e53f-4f0f-8699-0e4ac8c24897/public_url',
   },
 ]
