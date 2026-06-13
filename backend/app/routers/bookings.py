@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import models, schemas
+from app import models, schemas, crm_utils
 from app.auth import require_auth, create_action_token, verify_action_token
 from app.database import get_db
 from app.email_service import (
@@ -257,7 +257,14 @@ async def create_booking(payload: schemas.BookingCreate, request: Request, db: A
     if not slot_valid:
         raise HTTPException(status_code=400, detail="Selected time slot is not available")
 
+    # Link/create a CRM contact (de-duplicated by email) for this visitor.
+    contact = await crm_utils.upsert_contact_by_email(
+        db, email=payload.visitor_email, name=payload.visitor_name,
+        source=models.ContactSource.booking,
+    )
+
     booking = models.Booking(
+        contact_id=contact.id,
         visitor_name=payload.visitor_name,
         visitor_email=payload.visitor_email,
         topic=payload.topic,
@@ -267,6 +274,10 @@ async def create_booking(payload: schemas.BookingCreate, request: Request, db: A
         created_at=datetime.now(ZoneInfo("UTC")),
     )
     db.add(booking)
+    await crm_utils.log_activity(
+        db, contact_id=contact.id, type=models.ActivityType.booking,
+        body_md=f"Booked a call: **{payload.topic}**", occurred_at=start_at,
+    )
     await db.commit()
     await db.refresh(booking)
 
@@ -424,7 +435,13 @@ async def admin_create_booking(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid start_at datetime")
 
+    contact = await crm_utils.upsert_contact_by_email(
+        db, email=payload.visitor_email, name=payload.visitor_name,
+        source=models.ContactSource.booking,
+    )
+
     booking = models.Booking(
+        contact_id=contact.id,
         visitor_name=payload.visitor_name,
         visitor_email=payload.visitor_email,
         topic=payload.topic,

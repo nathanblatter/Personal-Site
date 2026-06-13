@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app import models, schemas
+from app import models, schemas, crm_utils
 from app.auth import require_auth
 from app.cache import cache as app_cache
 from app.utils import get_client_ip, get_redis
@@ -28,7 +28,7 @@ SINGLETON_ID = 1
 # ── Contact form submission ───────────────────────────────────────────────────
 
 @router.post("/submit", status_code=status.HTTP_204_NO_CONTENT)
-async def submit_contact(payload: schemas.ContactSubmit, request: Request):
+async def submit_contact(payload: schemas.ContactSubmit, request: Request, db: AsyncSession = Depends(get_db)):
     # 1. Honeypot — bots fill hidden fields, humans don't
     if payload.honeypot:
         return  # silent 204, don't reveal detection
@@ -61,6 +61,18 @@ async def submit_contact(payload: schemas.ContactSubmit, request: Request):
         f"Name: {payload.name}\nEmail: {payload.email}\n\n{payload.message}"
     )
     await aiosmtplib.send(msg, hostname=SMTP_HOST, port=SMTP_PORT, use_tls=False, start_tls=False)
+
+    # Persist as a CRM contact + timeline activity (de-duplicated by email).
+    try:
+        contact = await crm_utils.upsert_contact_by_email(
+            db, email=payload.email, name=payload.name, source=models.ContactSource.contact_form,
+        )
+        await crm_utils.log_activity(
+            db, contact_id=contact.id, type=models.ActivityType.contact_form, body_md=payload.message,
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()
 
 
 # ── Contact meta singleton ────────────────────────────────────────────────────

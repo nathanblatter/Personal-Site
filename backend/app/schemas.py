@@ -1001,3 +1001,529 @@ class DashboardStats(BaseModel):
     recent_applications: List[ApplicationListItem]
     response_rate: float
     offer_rate: float
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Consulting CRM
+# ══════════════════════════════════════════════════════════════════════════════
+
+class ContactSource(str, Enum):
+    contact_form = "contact_form"
+    booking = "booking"
+    testimonial = "testimonial"
+    manual = "manual"
+    referral = "referral"
+    other = "other"
+
+
+class DealStage(str, Enum):
+    lead = "lead"
+    qualified = "qualified"
+    proposal = "proposal"
+    negotiation = "negotiation"
+    won = "won"
+    lost = "lost"
+
+
+class EngagementStatus(str, Enum):
+    active = "active"
+    paused = "paused"
+    completed = "completed"
+    cancelled = "cancelled"
+
+
+class BillingType(str, Enum):
+    hourly = "hourly"
+    fixed = "fixed"
+    retainer = "retainer"
+
+
+class ContractStatus(str, Enum):
+    draft = "draft"
+    sent = "sent"
+    accepted = "accepted"
+    declined = "declined"
+    void = "void"
+
+
+class InvoiceStatus(str, Enum):
+    draft = "draft"
+    sent = "sent"
+    paid = "paid"
+    partial = "partial"
+    overdue = "overdue"
+    void = "void"
+
+
+class PaymentMethod(str, Enum):
+    venmo = "venmo"
+    zelle = "zelle"
+    cash = "cash"
+    check = "check"
+    stripe = "stripe"
+    other = "other"
+
+
+class ActivityType(str, Enum):
+    note = "note"
+    email = "email"
+    call = "call"
+    meeting = "meeting"
+    contact_form = "contact_form"
+    booking = "booking"
+    status_change = "status_change"
+
+
+# ── Organizations ─────────────────────────────────────────────────────────────
+
+class OrganizationBase(BaseModel):
+    name: str
+    website_url: Optional[str] = None
+    industry: Optional[str] = None
+    logo_url: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class OrganizationCreate(OrganizationBase):
+    pass
+
+
+class OrganizationUpdate(BaseModel):
+    name: Optional[str] = None
+    website_url: Optional[str] = None
+    industry: Optional[str] = None
+    logo_url: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class OrganizationResponse(OrganizationBase):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+# ── Contacts ──────────────────────────────────────────────────────────────────
+
+class ContactBase(BaseModel):
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    title: Optional[str] = None
+    company_name: Optional[str] = None
+    organization_id: Optional[str] = None
+    source: Optional[ContactSource] = None
+    tags: List[str] = []
+    notes: Optional[str] = None
+
+
+class ContactCreate(ContactBase):
+    pass
+
+
+class ContactUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    title: Optional[str] = None
+    company_name: Optional[str] = None
+    organization_id: Optional[str] = None
+    source: Optional[ContactSource] = None
+    tags: Optional[List[str]] = None
+    notes: Optional[str] = None
+
+
+class ContactResponse(ContactBase):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class ActivityCreate(BaseModel):
+    type: ActivityType = ActivityType.note
+    body_md: Optional[str] = None
+    engagement_id: Optional[str] = None
+    occurred_at: Optional[datetime] = None
+
+
+class ActivityResponse(BaseModel):
+    id: str
+    contact_id: str
+    engagement_id: Optional[str] = None
+    type: ActivityType
+    body_md: Optional[str] = None
+    occurred_at: datetime
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class ContactBookingRef(BaseModel):
+    id: int
+    topic: str
+    start_at: datetime
+    status: str
+    model_config = {"from_attributes": True}
+
+
+class ContactDetail(ContactResponse):
+    organization: Optional[OrganizationResponse] = None
+    activities: List[ActivityResponse] = []
+    deals: List["DealResponse"] = []
+    engagements: List["EngagementResponse"] = []
+    bookings: List[ContactBookingRef] = []
+
+
+# ── Deals (pipeline) ──────────────────────────────────────────────────────────
+
+class DealBase(BaseModel):
+    contact_id: str
+    organization_id: Optional[str] = None
+    title: str
+    stage: DealStage = DealStage.lead
+    value_cents: Optional[int] = None
+    currency: str = "USD"
+    expected_close_date: Optional[date] = None
+    source: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class DealCreate(DealBase):
+    pass
+
+
+class DealUpdate(BaseModel):
+    organization_id: Optional[str] = None
+    title: Optional[str] = None
+    stage: Optional[DealStage] = None
+    value_cents: Optional[int] = None
+    currency: Optional[str] = None
+    expected_close_date: Optional[date] = None
+    source: Optional[str] = None
+    notes: Optional[str] = None
+    lost_reason: Optional[str] = None
+
+
+class DealStageUpdate(BaseModel):
+    stage: DealStage
+    lost_reason: Optional[str] = None
+
+
+class DealResponse(BaseModel):
+    id: str
+    contact_id: str
+    organization_id: Optional[str] = None
+    title: str
+    stage: DealStage
+    value_cents: Optional[int] = None
+    currency: str
+    expected_close_date: Optional[date] = None
+    source: Optional[str] = None
+    notes: Optional[str] = None
+    won_at: Optional[datetime] = None
+    lost_reason: Optional[str] = None
+    contact_name: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+# ── Engagements ───────────────────────────────────────────────────────────────
+
+class EngagementBase(BaseModel):
+    contact_id: str
+    organization_id: Optional[str] = None
+    deal_id: Optional[str] = None
+    title: str
+    status: EngagementStatus = EngagementStatus.active
+    billing_type: BillingType = BillingType.hourly
+    rate_cents: Optional[int] = None
+    fixed_amount_cents: Optional[int] = None
+    retainer_amount_cents: Optional[int] = None
+    retainer_period: Optional[str] = "monthly"
+    currency: str = "USD"
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    description: Optional[str] = None
+
+
+class EngagementCreate(EngagementBase):
+    pass
+
+
+class EngagementUpdate(BaseModel):
+    organization_id: Optional[str] = None
+    title: Optional[str] = None
+    status: Optional[EngagementStatus] = None
+    billing_type: Optional[BillingType] = None
+    rate_cents: Optional[int] = None
+    fixed_amount_cents: Optional[int] = None
+    retainer_amount_cents: Optional[int] = None
+    retainer_period: Optional[str] = None
+    currency: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    description: Optional[str] = None
+
+
+class EngagementResponse(BaseModel):
+    id: str
+    contact_id: str
+    organization_id: Optional[str] = None
+    deal_id: Optional[str] = None
+    title: str
+    status: EngagementStatus
+    billing_type: BillingType
+    rate_cents: Optional[int] = None
+    fixed_amount_cents: Optional[int] = None
+    retainer_amount_cents: Optional[int] = None
+    retainer_period: Optional[str] = None
+    currency: str
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    description: Optional[str] = None
+    contact_name: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+# ── Contracts ─────────────────────────────────────────────────────────────────
+
+class ContractBase(BaseModel):
+    engagement_id: str
+    title: str
+    scope_md: Optional[str] = None
+    terms_md: Optional[str] = None
+    total_value_cents: Optional[int] = None
+    currency: str = "USD"
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    file_url: Optional[str] = None
+
+
+class ContractCreate(ContractBase):
+    pass
+
+
+class ContractUpdate(BaseModel):
+    title: Optional[str] = None
+    scope_md: Optional[str] = None
+    terms_md: Optional[str] = None
+    total_value_cents: Optional[int] = None
+    currency: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    file_url: Optional[str] = None
+    status: Optional[ContractStatus] = None
+
+
+class ContractResponse(BaseModel):
+    id: str
+    engagement_id: str
+    title: str
+    scope_md: Optional[str] = None
+    terms_md: Optional[str] = None
+    total_value_cents: Optional[int] = None
+    currency: str
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    status: ContractStatus
+    file_url: Optional[str] = None
+    public_token: Optional[str] = None
+    sent_at: Optional[datetime] = None
+    accepted_at: Optional[datetime] = None
+    accepted_name: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class ContractPublic(BaseModel):
+    """Client-facing view via magic link."""
+    title: str
+    scope_md: Optional[str] = None
+    terms_md: Optional[str] = None
+    total_value_cents: Optional[int] = None
+    currency: str
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    status: ContractStatus
+    accepted_at: Optional[datetime] = None
+    accepted_name: Optional[str] = None
+    consultant_name: str = "Nathan Blatter"
+
+
+class ContractAccept(BaseModel):
+    accepted_name: str
+
+
+# ── Time entries ──────────────────────────────────────────────────────────────
+
+class TimeEntryBase(BaseModel):
+    engagement_id: str
+    entry_date: date
+    minutes: int
+    description: Optional[str] = None
+    billable: bool = True
+    rate_cents_override: Optional[int] = None
+
+
+class TimeEntryCreate(TimeEntryBase):
+    pass
+
+
+class TimeEntryUpdate(BaseModel):
+    entry_date: Optional[date] = None
+    minutes: Optional[int] = None
+    description: Optional[str] = None
+    billable: Optional[bool] = None
+    rate_cents_override: Optional[int] = None
+
+
+class TimeEntryResponse(BaseModel):
+    id: str
+    engagement_id: str
+    entry_date: date
+    minutes: int
+    description: Optional[str] = None
+    billable: bool
+    rate_cents_override: Optional[int] = None
+    invoice_id: Optional[str] = None
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
+# ── Invoices ──────────────────────────────────────────────────────────────────
+
+class InvoiceLineItemBase(BaseModel):
+    description: str
+    quantity: float = 1
+    unit_price_cents: int = 0
+    amount_cents: int = 0
+    sort_order: int = 0
+
+
+class InvoiceLineItemResponse(InvoiceLineItemBase):
+    id: str
+    model_config = {"from_attributes": True}
+
+
+class PaymentResponse(BaseModel):
+    id: str
+    amount_cents: int
+    method: Optional[PaymentMethod] = None
+    reference: Optional[str] = None
+    paid_at: datetime
+    note: Optional[str] = None
+    model_config = {"from_attributes": True}
+
+
+class InvoiceCreate(BaseModel):
+    engagement_id: str
+    issue_date: Optional[date] = None
+    due_date: Optional[date] = None
+    currency: str = "USD"
+    tax_cents: int = 0
+    notes: Optional[str] = None
+    line_items: List[InvoiceLineItemBase] = []
+
+
+class InvoiceUpdate(BaseModel):
+    status: Optional[InvoiceStatus] = None
+    issue_date: Optional[date] = None
+    due_date: Optional[date] = None
+    tax_cents: Optional[int] = None
+    notes: Optional[str] = None
+    line_items: Optional[List[InvoiceLineItemBase]] = None
+
+
+class InvoiceGenerate(BaseModel):
+    """Auto-build an invoice from an engagement's billing model."""
+    engagement_id: str
+    mode: BillingType                          # hourly | fixed | retainer
+    due_date: Optional[date] = None
+    tax_cents: int = 0
+    period_start: Optional[date] = None        # for retainer
+    period_end: Optional[date] = None
+
+
+class PaymentCreate(BaseModel):
+    amount_cents: int
+    method: Optional[PaymentMethod] = PaymentMethod.venmo
+    reference: Optional[str] = None
+    paid_at: Optional[datetime] = None
+    note: Optional[str] = None
+
+
+class InvoiceResponse(BaseModel):
+    id: str
+    engagement_id: str
+    contact_id: Optional[str] = None
+    organization_id: Optional[str] = None
+    number: str
+    status: InvoiceStatus
+    issue_date: date
+    due_date: Optional[date] = None
+    currency: str
+    subtotal_cents: int
+    tax_cents: int
+    total_cents: int
+    amount_paid_cents: int
+    is_retainer: bool
+    period_start: Optional[date] = None
+    period_end: Optional[date] = None
+    notes: Optional[str] = None
+    public_token: Optional[str] = None
+    sent_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    contact_name: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    line_items: List[InvoiceLineItemResponse] = []
+    payments: List[PaymentResponse] = []
+    model_config = {"from_attributes": True}
+
+
+class InvoicePublic(BaseModel):
+    """Client-facing invoice via magic link."""
+    number: str
+    status: InvoiceStatus
+    issue_date: date
+    due_date: Optional[date] = None
+    currency: str
+    subtotal_cents: int
+    tax_cents: int
+    total_cents: int
+    amount_paid_cents: int
+    notes: Optional[str] = None
+    line_items: List[InvoiceLineItemResponse] = []
+    bill_to_name: Optional[str] = None
+    bill_to_company: Optional[str] = None
+    consultant_name: str = "Nathan Blatter"
+    consultant_email: str = "nzb22@byu.edu"
+
+
+# ── Engagement detail (children embedded) ─────────────────────────────────────
+
+class EngagementDetail(EngagementResponse):
+    contracts: List[ContractResponse] = []
+    time_entries: List[TimeEntryResponse] = []
+    invoices: List[InvoiceResponse] = []
+
+
+# ── CRM dashboard ─────────────────────────────────────────────────────────────
+
+class CrmDashboard(BaseModel):
+    pipeline_counts: dict                 # stage -> count
+    pipeline_value_cents: int             # open deals (excl. won/lost)
+    outstanding_ar_cents: int             # unpaid invoice balances
+    paid_this_month_cents: int
+    mrr_cents: int                        # sum of active retainer amounts
+    unbilled_minutes: int
+    contacts_count: int
+    active_engagements: int
+    overdue_invoices: List[InvoiceResponse] = []
+
+
+ContactDetail.model_rebuild()

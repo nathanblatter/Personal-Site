@@ -1,7 +1,7 @@
 import enum
 from sqlalchemy import (
     Column, Integer, BigInteger, String, Boolean, JSON, Text, Date,
-    DateTime, ForeignKey, Enum as SAEnum, UniqueConstraint,
+    DateTime, ForeignKey, Enum as SAEnum, UniqueConstraint, Numeric,
 )
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import relationship
@@ -57,6 +57,7 @@ class TestimonialRequest(Base):
     __tablename__ = "testimonial_requests"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    contact_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_contact.id", ondelete="SET NULL"), nullable=True)
     slug = Column(String, unique=True, index=True, nullable=False)
     requester_name = Column(String, nullable=False)
     requester_email = Column(String, nullable=True)
@@ -434,6 +435,7 @@ class Booking(Base):
     __tablename__ = "bookings"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    contact_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_contact.id", ondelete="SET NULL"), nullable=True)
     visitor_name = Column(String, nullable=False)
     visitor_email = Column(String, nullable=False)
     topic = Column(String, nullable=False)
@@ -490,3 +492,275 @@ class ClaudeUsageDay(Base):
     cost_cents = Column(Integer, nullable=False, default=0)
     sessions = Column(Integer, nullable=False, default=0)
     snapshotted_at = Column(String, nullable=False)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Consulting CRM
+# ══════════════════════════════════════════════════════════════════════════════
+
+class ContactSource(str, enum.Enum):
+    contact_form = "contact_form"
+    booking = "booking"
+    testimonial = "testimonial"
+    manual = "manual"
+    referral = "referral"
+    other = "other"
+
+
+class DealStage(str, enum.Enum):
+    lead = "lead"
+    qualified = "qualified"
+    proposal = "proposal"
+    negotiation = "negotiation"
+    won = "won"
+    lost = "lost"
+
+
+class EngagementStatus(str, enum.Enum):
+    active = "active"
+    paused = "paused"
+    completed = "completed"
+    cancelled = "cancelled"
+
+
+class BillingType(str, enum.Enum):
+    hourly = "hourly"
+    fixed = "fixed"
+    retainer = "retainer"
+
+
+class ContractStatus(str, enum.Enum):
+    draft = "draft"
+    sent = "sent"
+    accepted = "accepted"
+    declined = "declined"
+    void = "void"
+
+
+class InvoiceStatus(str, enum.Enum):
+    draft = "draft"
+    sent = "sent"
+    paid = "paid"
+    partial = "partial"
+    overdue = "overdue"
+    void = "void"
+
+
+class PaymentMethod(str, enum.Enum):
+    venmo = "venmo"
+    zelle = "zelle"
+    cash = "cash"
+    check = "check"
+    stripe = "stripe"
+    other = "other"
+
+
+class ActivityType(str, enum.Enum):
+    note = "note"
+    email = "email"
+    call = "call"
+    meeting = "meeting"
+    contact_form = "contact_form"
+    booking = "booking"
+    status_change = "status_change"
+
+
+class Organization(Base):
+    __tablename__ = "crm_organization"
+
+    id = Column(PgUUID(as_uuid=False), primary_key=True, server_default="uuid_generate_v4()")
+    name = Column(String, nullable=False)
+    website_url = Column(String, nullable=True)
+    industry = Column(String, nullable=True)
+    logo_url = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False)
+
+    contacts = relationship("Contact", back_populates="organization")
+
+
+class Contact(Base):
+    __tablename__ = "crm_contact"
+
+    id = Column(PgUUID(as_uuid=False), primary_key=True, server_default="uuid_generate_v4()")
+    organization_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_organization.id", ondelete="SET NULL"), nullable=True)
+    name = Column(String, nullable=False)
+    email = Column(String, nullable=True, index=True)
+    phone = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    company_name = Column(String, nullable=True)          # free-text fallback when no org
+    source = Column(SAEnum(ContactSource, name="crm_contact_source", create_constraint=False), nullable=True)
+    tags = Column(JSON, nullable=False, default=list)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False)
+
+    organization = relationship("Organization", back_populates="contacts")
+    deals = relationship("Deal", back_populates="contact", cascade="all, delete-orphan")
+    engagements = relationship("Engagement", back_populates="contact", cascade="all, delete-orphan")
+    activities = relationship("Activity", back_populates="contact", cascade="all, delete-orphan")
+
+
+class Deal(Base):
+    __tablename__ = "crm_deal"
+
+    id = Column(PgUUID(as_uuid=False), primary_key=True, server_default="uuid_generate_v4()")
+    contact_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_contact.id", ondelete="CASCADE"), nullable=False)
+    organization_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_organization.id", ondelete="SET NULL"), nullable=True)
+    title = Column(String, nullable=False)
+    stage = Column(SAEnum(DealStage, name="crm_deal_stage", create_constraint=False), nullable=False, server_default="lead")
+    value_cents = Column(BigInteger, nullable=True)
+    currency = Column(String(3), nullable=False, server_default="USD")
+    expected_close_date = Column(Date, nullable=True)
+    source = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    won_at = Column(DateTime(timezone=True), nullable=True)
+    lost_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False)
+
+    contact = relationship("Contact", back_populates="deals")
+    engagement = relationship("Engagement", back_populates="deal", uselist=False)
+
+
+class Engagement(Base):
+    __tablename__ = "crm_engagement"
+
+    id = Column(PgUUID(as_uuid=False), primary_key=True, server_default="uuid_generate_v4()")
+    contact_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_contact.id", ondelete="CASCADE"), nullable=False)
+    organization_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_organization.id", ondelete="SET NULL"), nullable=True)
+    deal_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_deal.id", ondelete="SET NULL"), nullable=True)
+    title = Column(String, nullable=False)
+    status = Column(SAEnum(EngagementStatus, name="crm_engagement_status", create_constraint=False), nullable=False, server_default="active")
+    billing_type = Column(SAEnum(BillingType, name="crm_billing_type", create_constraint=False), nullable=False, server_default="hourly")
+    rate_cents = Column(BigInteger, nullable=True)               # hourly rate
+    fixed_amount_cents = Column(BigInteger, nullable=True)       # fixed-fee total
+    retainer_amount_cents = Column(BigInteger, nullable=True)    # monthly retainer
+    retainer_period = Column(String, nullable=True, server_default="monthly")
+    currency = Column(String(3), nullable=False, server_default="USD")
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False)
+
+    contact = relationship("Contact", back_populates="engagements")
+    deal = relationship("Deal", back_populates="engagement")
+    contracts = relationship("Contract", back_populates="engagement", cascade="all, delete-orphan")
+    time_entries = relationship("TimeEntry", back_populates="engagement", cascade="all, delete-orphan")
+    invoices = relationship("Invoice", back_populates="engagement", cascade="all, delete-orphan")
+
+
+class Contract(Base):
+    __tablename__ = "crm_contract"
+
+    id = Column(PgUUID(as_uuid=False), primary_key=True, server_default="uuid_generate_v4()")
+    engagement_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_engagement.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String, nullable=False)
+    scope_md = Column(Text, nullable=True)
+    terms_md = Column(Text, nullable=True)
+    total_value_cents = Column(BigInteger, nullable=True)
+    currency = Column(String(3), nullable=False, server_default="USD")
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
+    status = Column(SAEnum(ContractStatus, name="crm_contract_status", create_constraint=False), nullable=False, server_default="draft")
+    file_url = Column(String, nullable=True)                    # uploaded signed PDF
+    public_token = Column(String, nullable=True, unique=True)   # magic-link view/accept
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    accepted_at = Column(DateTime(timezone=True), nullable=True)
+    accepted_name = Column(String, nullable=True)
+    accepted_ip = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False)
+
+    engagement = relationship("Engagement", back_populates="contracts")
+
+
+class TimeEntry(Base):
+    __tablename__ = "crm_time_entry"
+
+    id = Column(PgUUID(as_uuid=False), primary_key=True, server_default="uuid_generate_v4()")
+    engagement_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_engagement.id", ondelete="CASCADE"), nullable=False)
+    entry_date = Column(Date, nullable=False)
+    minutes = Column(Integer, nullable=False)
+    description = Column(Text, nullable=True)
+    billable = Column(Boolean, nullable=False, server_default="true")
+    rate_cents_override = Column(BigInteger, nullable=True)
+    invoice_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_invoice.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+
+    engagement = relationship("Engagement", back_populates="time_entries")
+
+
+class Invoice(Base):
+    __tablename__ = "crm_invoice"
+
+    id = Column(PgUUID(as_uuid=False), primary_key=True, server_default="uuid_generate_v4()")
+    engagement_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_engagement.id", ondelete="CASCADE"), nullable=False)
+    contact_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_contact.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_organization.id", ondelete="SET NULL"), nullable=True)
+    number = Column(String, nullable=False, unique=True)
+    status = Column(SAEnum(InvoiceStatus, name="crm_invoice_status", create_constraint=False), nullable=False, server_default="draft")
+    issue_date = Column(Date, nullable=False)
+    due_date = Column(Date, nullable=True)
+    currency = Column(String(3), nullable=False, server_default="USD")
+    subtotal_cents = Column(BigInteger, nullable=False, server_default="0")
+    tax_cents = Column(BigInteger, nullable=False, server_default="0")
+    total_cents = Column(BigInteger, nullable=False, server_default="0")
+    amount_paid_cents = Column(BigInteger, nullable=False, server_default="0")
+    is_retainer = Column(Boolean, nullable=False, server_default="false")
+    period_start = Column(Date, nullable=True)
+    period_end = Column(Date, nullable=True)
+    notes = Column(Text, nullable=True)
+    public_token = Column(String, nullable=True, unique=True)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False)
+
+    engagement = relationship("Engagement", back_populates="invoices")
+    line_items = relationship("InvoiceLineItem", back_populates="invoice", cascade="all, delete-orphan")
+    payments = relationship("Payment", back_populates="invoice", cascade="all, delete-orphan")
+
+
+class InvoiceLineItem(Base):
+    __tablename__ = "crm_invoice_line_item"
+
+    id = Column(PgUUID(as_uuid=False), primary_key=True, server_default="uuid_generate_v4()")
+    invoice_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_invoice.id", ondelete="CASCADE"), nullable=False)
+    description = Column(String, nullable=False)
+    quantity = Column(Numeric(10, 2), nullable=False, server_default="1")
+    unit_price_cents = Column(BigInteger, nullable=False, server_default="0")
+    amount_cents = Column(BigInteger, nullable=False, server_default="0")
+    sort_order = Column(Integer, nullable=False, server_default="0")
+
+    invoice = relationship("Invoice", back_populates="line_items")
+
+
+class Payment(Base):
+    __tablename__ = "crm_payment"
+
+    id = Column(PgUUID(as_uuid=False), primary_key=True, server_default="uuid_generate_v4()")
+    invoice_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_invoice.id", ondelete="CASCADE"), nullable=False)
+    amount_cents = Column(BigInteger, nullable=False)
+    method = Column(SAEnum(PaymentMethod, name="crm_payment_method", create_constraint=False), nullable=True)
+    reference = Column(String, nullable=True)
+    paid_at = Column(DateTime(timezone=True), nullable=False)
+    note = Column(Text, nullable=True)
+
+    invoice = relationship("Invoice", back_populates="payments")
+
+
+class Activity(Base):
+    __tablename__ = "crm_activity"
+
+    id = Column(PgUUID(as_uuid=False), primary_key=True, server_default="uuid_generate_v4()")
+    contact_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_contact.id", ondelete="CASCADE"), nullable=False)
+    engagement_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_engagement.id", ondelete="SET NULL"), nullable=True)
+    type = Column(SAEnum(ActivityType, name="crm_activity_type", create_constraint=False), nullable=False, server_default="note")
+    body_md = Column(Text, nullable=True)
+    occurred_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+
+    contact = relationship("Contact", back_populates="activities")

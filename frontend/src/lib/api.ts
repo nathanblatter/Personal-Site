@@ -455,6 +455,237 @@ export interface BioPagePublicResponse {
   socials: SocialResponse[]
 }
 
+// ── CRM ──────────────────────────────────────────────────────────────────────
+
+export type ContactSource = 'contact_form' | 'booking' | 'testimonial' | 'manual' | 'referral' | 'other'
+export type DealStage = 'lead' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost'
+export type EngagementStatus = 'active' | 'paused' | 'completed' | 'cancelled'
+export type BillingType = 'hourly' | 'fixed' | 'retainer'
+export type ContractStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'void'
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'partial' | 'overdue' | 'void'
+export type PaymentMethod = 'venmo' | 'zelle' | 'cash' | 'check' | 'stripe' | 'other'
+export type ActivityType = 'note' | 'email' | 'call' | 'meeting' | 'contact_form' | 'booking' | 'status_change'
+
+export const DEAL_STAGES: DealStage[] = ['lead', 'qualified', 'proposal', 'negotiation', 'won', 'lost']
+
+export interface OrganizationResponse {
+  id: string
+  name: string
+  website_url?: string | null
+  industry?: string | null
+  logo_url?: string | null
+  notes?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ContactResponse {
+  id: string
+  name: string
+  email?: string | null
+  phone?: string | null
+  title?: string | null
+  company_name?: string | null
+  organization_id?: string | null
+  source?: ContactSource | null
+  tags: string[]
+  notes?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ActivityResponse {
+  id: string
+  contact_id: string
+  engagement_id?: string | null
+  type: ActivityType
+  body_md?: string | null
+  occurred_at: string
+  created_at: string
+}
+
+export interface ContactBookingRef {
+  id: number
+  topic: string
+  start_at: string
+  status: string
+}
+
+export interface ContactDetail extends ContactResponse {
+  organization?: OrganizationResponse | null
+  activities: ActivityResponse[]
+  deals: DealResponse[]
+  engagements: EngagementResponse[]
+  bookings: ContactBookingRef[]
+}
+
+export interface DealResponse {
+  id: string
+  contact_id: string
+  organization_id?: string | null
+  title: string
+  stage: DealStage
+  value_cents?: number | null
+  currency: string
+  expected_close_date?: string | null
+  source?: string | null
+  notes?: string | null
+  won_at?: string | null
+  lost_reason?: string | null
+  contact_name?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EngagementResponse {
+  id: string
+  contact_id: string
+  organization_id?: string | null
+  deal_id?: string | null
+  title: string
+  status: EngagementStatus
+  billing_type: BillingType
+  rate_cents?: number | null
+  fixed_amount_cents?: number | null
+  retainer_amount_cents?: number | null
+  retainer_period?: string | null
+  currency: string
+  start_date?: string | null
+  end_date?: string | null
+  description?: string | null
+  contact_name?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ContractResponse {
+  id: string
+  engagement_id: string
+  title: string
+  scope_md?: string | null
+  terms_md?: string | null
+  total_value_cents?: number | null
+  currency: string
+  start_date?: string | null
+  end_date?: string | null
+  status: ContractStatus
+  file_url?: string | null
+  public_token?: string | null
+  sent_at?: string | null
+  accepted_at?: string | null
+  accepted_name?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ContractPublic {
+  title: string
+  scope_md?: string | null
+  terms_md?: string | null
+  total_value_cents?: number | null
+  currency: string
+  start_date?: string | null
+  end_date?: string | null
+  status: ContractStatus
+  accepted_at?: string | null
+  accepted_name?: string | null
+  consultant_name: string
+}
+
+export interface TimeEntryResponse {
+  id: string
+  engagement_id: string
+  entry_date: string
+  minutes: number
+  description?: string | null
+  billable: boolean
+  rate_cents_override?: number | null
+  invoice_id?: string | null
+  created_at: string
+}
+
+export interface InvoiceLineItem {
+  id?: string
+  description: string
+  quantity: number
+  unit_price_cents: number
+  amount_cents: number
+  sort_order?: number
+}
+
+export interface PaymentResponse {
+  id: string
+  amount_cents: number
+  method?: PaymentMethod | null
+  reference?: string | null
+  paid_at: string
+  note?: string | null
+}
+
+export interface InvoiceResponse {
+  id: string
+  engagement_id: string
+  contact_id?: string | null
+  organization_id?: string | null
+  number: string
+  status: InvoiceStatus
+  issue_date: string
+  due_date?: string | null
+  currency: string
+  subtotal_cents: number
+  tax_cents: number
+  total_cents: number
+  amount_paid_cents: number
+  is_retainer: boolean
+  period_start?: string | null
+  period_end?: string | null
+  notes?: string | null
+  public_token?: string | null
+  sent_at?: string | null
+  paid_at?: string | null
+  contact_name?: string | null
+  created_at: string
+  updated_at: string
+  line_items: InvoiceLineItem[]
+  payments: PaymentResponse[]
+}
+
+export interface InvoicePublic {
+  number: string
+  status: InvoiceStatus
+  issue_date: string
+  due_date?: string | null
+  currency: string
+  subtotal_cents: number
+  tax_cents: number
+  total_cents: number
+  amount_paid_cents: number
+  notes?: string | null
+  line_items: InvoiceLineItem[]
+  bill_to_name?: string | null
+  bill_to_company?: string | null
+  consultant_name: string
+  consultant_email: string
+}
+
+export interface EngagementDetail extends EngagementResponse {
+  contracts: ContractResponse[]
+  time_entries: TimeEntryResponse[]
+  invoices: InvoiceResponse[]
+}
+
+export interface CrmDashboard {
+  pipeline_counts: Record<string, number>
+  pipeline_value_cents: number
+  outstanding_ar_cents: number
+  paid_this_month_cents: number
+  mrr_cents: number
+  unbilled_minutes: number
+  contacts_count: number
+  active_engagements: number
+  overdue_invoices: InvoiceResponse[]
+}
+
 // ── API client ─────────────────────────────────────────────────────────────
 
 export const api = {
@@ -725,6 +956,94 @@ export const api = {
       get: () => request<BioPageSettingsResponse>('GET', '/bio/settings'),
       update: (data: Partial<BioPageSettingsResponse>) =>
         request<BioPageSettingsResponse>('PUT', '/bio/settings', data),
+    },
+  },
+
+  crm: {
+    dashboard: () => request<CrmDashboard>('GET', '/crm/dashboard'),
+
+    organizations: {
+      list: () => request<OrganizationResponse[]>('GET', '/crm/organizations'),
+      create: (data: Partial<OrganizationResponse>) =>
+        request<OrganizationResponse>('POST', '/crm/organizations', data),
+      update: (id: string, data: Partial<OrganizationResponse>) =>
+        request<OrganizationResponse>('PUT', `/crm/organizations/${id}`, data),
+      delete: (id: string) => request<void>('DELETE', `/crm/organizations/${id}`),
+    },
+
+    contacts: {
+      list: (q?: string) =>
+        request<ContactResponse[]>('GET', q ? `/crm/contacts?q=${encodeURIComponent(q)}` : '/crm/contacts'),
+      get: (id: string) => request<ContactDetail>('GET', `/crm/contacts/${id}`),
+      create: (data: Partial<ContactResponse>) =>
+        request<ContactResponse>('POST', '/crm/contacts', data),
+      update: (id: string, data: Partial<ContactResponse>) =>
+        request<ContactResponse>('PUT', `/crm/contacts/${id}`, data),
+      delete: (id: string) => request<void>('DELETE', `/crm/contacts/${id}`),
+      addActivity: (id: string, data: { type: ActivityType; body_md?: string; engagement_id?: string }) =>
+        request<ActivityResponse>('POST', `/crm/contacts/${id}/activities`, data),
+    },
+
+    deals: {
+      list: () => request<DealResponse[]>('GET', '/crm/deals'),
+      create: (data: Partial<DealResponse>) => request<DealResponse>('POST', '/crm/deals', data),
+      update: (id: string, data: Partial<DealResponse>) =>
+        request<DealResponse>('PUT', `/crm/deals/${id}`, data),
+      setStage: (id: string, data: { stage: DealStage; lost_reason?: string }) =>
+        request<{ deal: DealResponse; engagement?: EngagementResponse }>('POST', `/crm/deals/${id}/stage`, data),
+      delete: (id: string) => request<void>('DELETE', `/crm/deals/${id}`),
+    },
+
+    engagements: {
+      list: () => request<EngagementResponse[]>('GET', '/crm/engagements'),
+      get: (id: string) => request<EngagementDetail>('GET', `/crm/engagements/${id}`),
+      create: (data: Partial<EngagementResponse>) =>
+        request<EngagementResponse>('POST', '/crm/engagements', data),
+      update: (id: string, data: Partial<EngagementResponse>) =>
+        request<EngagementResponse>('PUT', `/crm/engagements/${id}`, data),
+      delete: (id: string) => request<void>('DELETE', `/crm/engagements/${id}`),
+    },
+
+    contracts: {
+      create: (data: Partial<ContractResponse>) =>
+        request<ContractResponse>('POST', '/crm/contracts', data),
+      update: (id: string, data: Partial<ContractResponse>) =>
+        request<ContractResponse>('PUT', `/crm/contracts/${id}`, data),
+      send: (id: string) => request<ContractResponse>('POST', `/crm/contracts/${id}/send`),
+      delete: (id: string) => request<void>('DELETE', `/crm/contracts/${id}`),
+    },
+
+    timeEntries: {
+      list: (engagementId: string, unbilled = false) =>
+        request<TimeEntryResponse[]>('GET', `/crm/time-entries?engagement_id=${engagementId}${unbilled ? '&unbilled=true' : ''}`),
+      create: (data: { engagement_id: string; entry_date: string; minutes: number; description?: string; billable?: boolean; rate_cents_override?: number }) =>
+        request<TimeEntryResponse>('POST', '/crm/time-entries', data),
+      update: (id: string, data: Partial<TimeEntryResponse>) =>
+        request<TimeEntryResponse>('PUT', `/crm/time-entries/${id}`, data),
+      delete: (id: string) => request<void>('DELETE', `/crm/time-entries/${id}`),
+    },
+
+    invoices: {
+      list: (engagementId?: string) =>
+        request<InvoiceResponse[]>('GET', engagementId ? `/crm/invoices?engagement_id=${engagementId}` : '/crm/invoices'),
+      create: (data: { engagement_id: string; issue_date?: string; due_date?: string; currency?: string; tax_cents?: number; notes?: string; line_items?: InvoiceLineItem[] }) =>
+        request<InvoiceResponse>('POST', '/crm/invoices', data),
+      generate: (data: { engagement_id: string; mode: BillingType; due_date?: string; tax_cents?: number; period_start?: string; period_end?: string }) =>
+        request<InvoiceResponse>('POST', '/crm/invoices/generate', data),
+      update: (id: string, data: { status?: InvoiceStatus; issue_date?: string; due_date?: string; tax_cents?: number; notes?: string; line_items?: InvoiceLineItem[] }) =>
+        request<InvoiceResponse>('PUT', `/crm/invoices/${id}`, data),
+      send: (id: string) => request<InvoiceResponse>('POST', `/crm/invoices/${id}/send`),
+      recordPayment: (id: string, data: { amount_cents: number; method?: PaymentMethod; reference?: string; note?: string }) =>
+        request<InvoiceResponse>('POST', `/crm/invoices/${id}/payments`, data),
+      delete: (id: string) => request<void>('DELETE', `/crm/invoices/${id}`),
+      pdfUrl: (id: string) => `${API_BASE}/crm/invoices/${id}/pdf`,
+    },
+
+    public: {
+      getInvoice: (token: string) => request<InvoicePublic>('GET', `/crm/public/invoices/${token}`),
+      getContract: (token: string) => request<ContractPublic>('GET', `/crm/public/contracts/${token}`),
+      acceptContract: (token: string, data: { accepted_name: string }) =>
+        request<ContractPublic>('POST', `/crm/public/contracts/${token}/accept`, data),
     },
   },
 }

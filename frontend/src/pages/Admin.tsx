@@ -17,6 +17,7 @@ import {
   Link2,
   HardDrive,
   Calendar,
+  Handshake,
 } from 'lucide-react'
 import {
   api,
@@ -45,6 +46,7 @@ import LinksSection from './admin/LinksSection'
 import BookingsSection from './admin/BookingsSection'
 import BioSection from './admin/BioSection'
 import InternshipsSection from './admin/InternshipsSection'
+import ConsultingSection from './admin/ConsultingSection'
 
 /* ═══════════════════════════════════════════════
    SIDEBAR NAV CONFIG
@@ -62,6 +64,7 @@ const sections = [
   { id: 'files', label: 'Files', icon: HardDrive },
   { id: 'links', label: 'Links', icon: Link2 },
   { id: 'bookings', label: 'Bookings', icon: Calendar },
+  { id: 'consulting', label: 'Consulting', icon: Handshake },
   { id: 'bio', label: 'Link in Bio', icon: Link2 },
   { id: 'internships', label: 'Internships', icon: Target },
 ]
@@ -169,6 +172,7 @@ export default function Admin() {
       />
     ),
     bookings: () => <BookingsSection showToast={showToast} showError={showError} />,
+    consulting: () => <ConsultingSection showToast={showToast} showError={showError} />,
     bio: () => <BioSection showToast={showToast} showError={showError} />,
     internships: () => <InternshipsSection showToast={showToast} showError={showError} />,
   }

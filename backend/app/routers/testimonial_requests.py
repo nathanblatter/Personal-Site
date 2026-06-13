@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database import get_db
-from app import models, schemas
+from app import models, schemas, crm_utils
 from app.auth import require_auth
 from app.email_service import send_testimonial_request_email
 
@@ -71,6 +71,13 @@ async def create_request(payload: schemas.TestimonialRequestCreate, db: AsyncSes
         raise HTTPException(status_code=409, detail="Slug already in use")
 
     req = models.TestimonialRequest(**payload.model_dump(), status="pending", created_at=_now())
+    # Link/create a CRM contact (de-duplicated by email) for the requester.
+    if req.requester_email:
+        contact = await crm_utils.upsert_contact_by_email(
+            db, email=req.requester_email, name=req.requester_name,
+            source=models.ContactSource.testimonial, title=req.requester_role,
+        )
+        req.contact_id = contact.id
     db.add(req)
     await db.commit()
     await db.refresh(req)
