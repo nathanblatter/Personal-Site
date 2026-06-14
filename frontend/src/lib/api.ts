@@ -593,6 +593,30 @@ export interface ContractPublic {
   consultant_signed_name?: string | null
   consultant_signed_at?: string | null
   client_name?: string | null
+  signer_email?: string | null
+  email_verified_at?: string | null
+  document_sha256?: string | null
+  requires_email_verification?: boolean
+}
+
+export interface ContractEventPublic {
+  type: string
+  actor_name?: string | null
+  actor_email?: string | null
+  ip?: string | null
+  occurred_at: string
+}
+
+export interface ContractCertificate {
+  title: string
+  document_sha256?: string | null
+  consultant_name: string
+  consultant_signed_at?: string | null
+  client_name?: string | null
+  client_signed_at?: string | null
+  signer_email?: string | null
+  status: ContractStatus
+  events: ContractEventPublic[]
 }
 
 export interface TimeEntryResponse {
@@ -1046,8 +1070,13 @@ export const api = {
     public: {
       getInvoice: (token: string) => request<InvoicePublic>('GET', `/crm/public/invoices/${token}`),
       getContract: (token: string) => request<ContractPublic>('GET', `/crm/public/contracts/${token}`),
-      acceptContract: (token: string, data: { accepted_name: string }) =>
+      acceptContract: (token: string, data: { accepted_name: string; email: string }) =>
         request<ContractPublic>('POST', `/crm/public/contracts/${token}/accept`, data),
+      verifyStart: (token: string, email: string) =>
+        request<{ ok: boolean }>('POST', `/crm/public/contracts/${token}/verify/start`, { email }),
+      verifyConfirm: (token: string, email: string, code: string) =>
+        request<{ verified: boolean; email: string }>('POST', `/crm/public/contracts/${token}/verify/confirm`, { email, code }),
+      getCertificate: (token: string) => request<ContractCertificate>('GET', `/crm/public/contracts/${token}/certificate`),
       contractPdfUrl: (token: string) => `${API_BASE}/crm/public/contracts/${token}/pdf`,
     },
   },

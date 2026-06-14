@@ -1336,6 +1336,9 @@ class ContractResponse(BaseModel):
     consultant_signed_at: Optional[datetime] = None
     accepted_at: Optional[datetime] = None
     accepted_name: Optional[str] = None
+    signer_email: Optional[str] = None
+    email_verified_at: Optional[datetime] = None
+    document_sha256: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     model_config = {"from_attributes": True}
@@ -1357,11 +1360,46 @@ class ContractPublic(BaseModel):
     consultant_signed_name: Optional[str] = None
     consultant_signed_at: Optional[datetime] = None
     client_name: Optional[str] = None
+    signer_email: Optional[str] = None
+    email_verified_at: Optional[datetime] = None
+    document_sha256: Optional[str] = None
+    requires_email_verification: bool = True
     model_config = {"from_attributes": True}
 
 
 class ContractAccept(BaseModel):
     accepted_name: str
+    email: str
+
+
+class ContractVerifyStart(BaseModel):
+    email: str
+
+
+class ContractVerifyConfirm(BaseModel):
+    email: str
+    code: str
+
+
+class ContractEventPublic(BaseModel):
+    type: str
+    actor_name: Optional[str] = None
+    actor_email: Optional[str] = None
+    ip: Optional[str] = None
+    occurred_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class ContractCertificate(BaseModel):
+    title: str
+    document_sha256: Optional[str] = None
+    consultant_name: str = "Nathan Blatter"
+    consultant_signed_at: Optional[datetime] = None
+    client_name: Optional[str] = None
+    client_signed_at: Optional[datetime] = None
+    signer_email: Optional[str] = None
+    status: ContractStatus
+    events: List[ContractEventPublic] = []
 
 
 # ── Time entries ──────────────────────────────────────────────────────────────

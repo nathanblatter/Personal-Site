@@ -5,6 +5,7 @@ All admin endpoints require auth. Client-facing magic-link endpoints live under
 /crm/public/* and are intentionally unauthenticated (guarded by an unguessable
 per-record token).
 """
+import secrets
 from datetime import datetime, timezone, date, timedelta
 from typing import List, Optional
 
@@ -16,9 +17,22 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app import models, schemas, crm_utils
 from app.auth import require_auth
-from app.utils import get_client_ip
+from app.utils import get_client_ip, get_redis
+from app.email_service import send_contract_otp_email
 
 router = APIRouter(prefix="/crm", tags=["crm"])
+
+OTP_TTL = 600          # 10 minutes
+OTP_VERIFIED_TTL = 1800  # 30 minutes to complete signing after verifying
+
+
+async def _log_contract(db, contract_id, type, request=None, **kw):
+    return await crm_utils.log_contract_event(
+        db, contract_id=contract_id, type=type,
+        ip=get_client_ip(request) if request else None,
+        user_agent=request.headers.get("user-agent") if request else None,
+        **kw,
+    )
 
 
 def _now() -> datetime:
@@ -377,6 +391,8 @@ async def create_contract(payload: schemas.ContractCreate, db: AsyncSession = De
     now = _now()
     contract = models.Contract(**payload.model_dump(), created_at=now, updated_at=now)
     db.add(contract)
+    await db.flush()
+    await _log_contract(db, contract.id, "created", actor_name=CONSULTANT_NAME, meta={"title": contract.title})
     await db.commit()
     await db.refresh(contract)
     return contract
@@ -399,7 +415,7 @@ CONSULTANT_NAME = "Nathan Blatter"
 
 
 @router.post("/contracts/{contract_id}/send", response_model=schemas.ContractResponse)
-async def send_contract(contract_id: str, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+async def send_contract(contract_id: str, request: Request, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
     """Mint a public token and mark the contract as sent. Sending counts as the
     consultant's own signature (you wouldn't send it if you didn't agree), so we
     auto-counter-sign here. Returns the contract (the frontend builds the
@@ -415,20 +431,31 @@ async def send_contract(contract_id: str, db: AsyncSession = Depends(get_db), _:
     if not contract.consultant_signed_at:
         contract.consultant_signed_name = CONSULTANT_NAME
         contract.consultant_signed_at = now
+        await _log_contract(db, contract.id, "signed", request, actor_name=CONSULTANT_NAME,
+                            meta={"party": "consultant"})
+    await _log_contract(db, contract.id, "sent", request, actor_name=CONSULTANT_NAME)
     contract.updated_at = now
     await db.commit()
     await db.refresh(contract)
     return contract
 
 
+async def _render_contract(db: AsyncSession, contract: models.Contract) -> bytes:
+    """Serve the frozen executed PDF when present (tamper-evident); otherwise
+    render live from current data."""
+    if contract.executed_pdf:
+        return bytes(contract.executed_pdf)
+    from app.crm_pdf import render_contract_pdf
+    contact = await _contract_contact(db, contract)
+    return render_contract_pdf(contract, contact)
+
+
 @router.get("/contracts/{contract_id}/pdf")
 async def contract_pdf(contract_id: str, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
-    from app.crm_pdf import render_contract_pdf
     contract = await db.get(models.Contract, contract_id)
     if not contract:
         raise HTTPException(404, "Contract not found")
-    contact = await _contract_contact(db, contract)
-    pdf = render_contract_pdf(contract, contact)
+    pdf = await _render_contract(db, contract)
     return Response(content=pdf, media_type="application/pdf", headers={
         "Content-Disposition": f'inline; filename="{_slug(contract.title)}.pdf"'
     })
@@ -844,27 +871,117 @@ async def _contract_public(db: AsyncSession, contract: models.Contract) -> schem
     return pub
 
 
-@router.get("/public/contracts/{token}", response_model=schemas.ContractPublic)
-async def public_contract(token: str, db: AsyncSession = Depends(get_db)):
+async def _get_contract_by_token(db: AsyncSession, token: str) -> models.Contract:
     res = await db.execute(select(models.Contract).where(models.Contract.public_token == token))
     contract = res.scalars().first()
     if not contract:
         raise HTTPException(404, "Contract not found")
+    return contract
+
+
+@router.get("/public/contracts/{token}", response_model=schemas.ContractPublic)
+async def public_contract(token: str, request: Request, db: AsyncSession = Depends(get_db)):
+    contract = await _get_contract_by_token(db, token)
+    # Log a "viewed" event, de-duplicated per IP per day.
+    try:
+        ip = get_client_ip(request)
+        redis = get_redis()
+        if await redis.set(f"crm:view:{token}:{ip}", "1", ex=86400, nx=True):
+            await _log_contract(db, contract.id, "viewed", request)
+            await db.commit()
+    except Exception:
+        await db.rollback()
     return await _contract_public(db, contract)
 
 
 @router.get("/public/contracts/{token}/pdf")
 async def public_contract_pdf(token: str, db: AsyncSession = Depends(get_db)):
-    from app.crm_pdf import render_contract_pdf
-    res = await db.execute(select(models.Contract).where(models.Contract.public_token == token))
+    contract = await _get_contract_by_token(db, token)
+    pdf = await _render_contract(db, contract)
+    return Response(content=pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'inline; filename="{_slug(contract.title)}.pdf"'
+    })
+
+
+@router.get("/public/contracts/{token}/certificate", response_model=schemas.ContractCertificate)
+async def public_contract_certificate(token: str, db: AsyncSession = Depends(get_db)):
+    res = await db.execute(
+        select(models.Contract).where(models.Contract.public_token == token)
+        .options(selectinload(models.Contract.events))
+    )
     contract = res.scalars().first()
     if not contract:
         raise HTTPException(404, "Contract not found")
     contact = await _contract_contact(db, contract)
-    pdf = render_contract_pdf(contract, contact)
-    return Response(content=pdf, media_type="application/pdf", headers={
-        "Content-Disposition": f'inline; filename="{_slug(contract.title)}.pdf"'
-    })
+    events = sorted(contract.events, key=lambda e: e.occurred_at)
+    return schemas.ContractCertificate(
+        title=contract.title, document_sha256=contract.document_sha256,
+        consultant_name=contract.consultant_signed_name or CONSULTANT_NAME,
+        consultant_signed_at=contract.consultant_signed_at,
+        client_name=(contact.company_name or contact.name) if contact else None,
+        client_signed_at=contract.accepted_at, signer_email=contract.signer_email,
+        status=contract.status,
+        events=[schemas.ContractEventPublic.model_validate(e) for e in events],
+    )
+
+
+# ── Email OTP identity verification ──────────────────────────────────────────
+
+def _otp_keys(token: str, email: str):
+    e = email.strip().lower()
+    return e, f"crm:otp:{token}:{e}", f"crm:otp:att:{token}:{e}", f"crm:otp:ok:{token}:{e}"
+
+
+@router.post("/public/contracts/{token}/verify/start")
+async def verify_start(token: str, payload: schemas.ContractVerifyStart, request: Request, db: AsyncSession = Depends(get_db)):
+    contract = await _get_contract_by_token(db, token)
+    if contract.status != models.ContractStatus.sent:
+        raise HTTPException(400, "This contract is not open for signing")
+    email = payload.email.strip()
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(400, "Enter a valid email address")
+
+    redis = get_redis()
+    ip = get_client_ip(request)
+    ip_key = f"crm:otp:ip:{ip}"
+    n = await redis.incr(ip_key)
+    if n == 1:
+        await redis.expire(ip_key, 900)
+    if n > 8:
+        raise HTTPException(429, "Too many attempts. Please try again later.")
+
+    e, code_key, att_key, _ = _otp_keys(token, email)
+    code = f"{secrets.randbelow(1000000):06d}"
+    await redis.set(code_key, code, ex=OTP_TTL)
+    await redis.delete(att_key)
+    await send_contract_otp_email(email, code, contract.title)
+    await _log_contract(db, contract.id, "otp_sent", request, actor_email=e)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/public/contracts/{token}/verify/confirm")
+async def verify_confirm(token: str, payload: schemas.ContractVerifyConfirm, request: Request, db: AsyncSession = Depends(get_db)):
+    contract = await _get_contract_by_token(db, token)
+    e, code_key, att_key, ok_key = _otp_keys(token, payload.email)
+    redis = get_redis()
+
+    attempts = await redis.incr(att_key)
+    if attempts == 1:
+        await redis.expire(att_key, OTP_TTL)
+    if attempts > 6:
+        await redis.delete(code_key)
+        raise HTTPException(429, "Too many incorrect attempts. Request a new code.")
+
+    stored = await redis.get(code_key)
+    if not stored or stored != payload.code.strip():
+        raise HTTPException(400, "Incorrect or expired code")
+
+    await redis.delete(code_key, att_key)
+    await redis.set(ok_key, "1", ex=OTP_VERIFIED_TTL)
+    await _log_contract(db, contract.id, "email_verified", request, actor_email=e)
+    await db.commit()
+    return {"verified": True, "email": e}
 
 
 @router.post("/public/contracts/{token}/accept", response_model=schemas.ContractPublic)
@@ -880,22 +997,47 @@ async def accept_contract(token: str, payload: schemas.ContractAccept, request: 
         return await _contract_public(db, contract)
     if contract.status not in (models.ContractStatus.sent,):
         raise HTTPException(400, "This contract is not open for acceptance")
+
+    # Require a verified email (identity assurance).
+    e, _, _, ok_key = _otp_keys(token, payload.email)
+    if not await get_redis().get(ok_key):
+        raise HTTPException(403, "Please verify your email before signing")
+
     now = _now()
     contract.status = models.ContractStatus.accepted
     contract.accepted_at = now
     contract.accepted_name = payload.accepted_name
     contract.accepted_ip = get_client_ip(request)
-    # Ensure the consultant counter-signature exists (defensive; normally set at send).
+    contract.signer_email = e
+    contract.email_verified_at = now
     if not contract.consultant_signed_at:
         contract.consultant_signed_name = CONSULTANT_NAME
         contract.consultant_signed_at = now
     contract.updated_at = now
+
+    await _log_contract(db, contract.id, "signed", request, actor_name=payload.accepted_name,
+                        actor_email=e, meta={"party": "client"})
     if contract.engagement:
         await crm_utils.log_activity(
             db, contact_id=contract.engagement.contact_id, type=models.ActivityType.status_change,
             engagement_id=contract.engagement_id,
-            body_md=f"Contract **{contract.title}** signed by {payload.accepted_name}",
+            body_md=f"Contract **{contract.title}** signed by {payload.accepted_name} ({e})",
         )
+
+    # Tamper-evidence: fingerprint the content, then freeze the executed PDF
+    # (with its certificate of completion) so it can never be silently re-generated.
+    await db.flush()
+    contact = await _contract_contact(db, contract)
+    contract.document_sha256 = crm_utils.contract_fingerprint(contract, contact)
+    ev_res = await db.execute(
+        select(models.ContractEvent).where(models.ContractEvent.contract_id == contract.id)
+        .order_by(models.ContractEvent.occurred_at)
+    )
+    events = ev_res.scalars().all()
+    from app.crm_pdf import render_contract_pdf
+    contract.executed_pdf = render_contract_pdf(contract, contact, events=events, doc_hash=contract.document_sha256)
+
     await db.commit()
     await db.refresh(contract)
+    await get_redis().delete(ok_key)
     return await _contract_public(db, contract)

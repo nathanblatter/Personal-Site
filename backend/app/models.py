@@ -1,7 +1,7 @@
 import enum
 from sqlalchemy import (
     Column, Integer, BigInteger, String, Boolean, JSON, Text, Date,
-    DateTime, ForeignKey, Enum as SAEnum, UniqueConstraint, Numeric,
+    DateTime, ForeignKey, Enum as SAEnum, UniqueConstraint, Numeric, LargeBinary,
 )
 from sqlalchemy.dialects.postgresql import UUID as PgUUID
 from sqlalchemy.orm import relationship
@@ -673,10 +673,32 @@ class Contract(Base):
     accepted_at = Column(DateTime(timezone=True), nullable=True)
     accepted_name = Column(String, nullable=True)
     accepted_ip = Column(String, nullable=True)
+    signer_email = Column(String, nullable=True)                # email the client verified before signing
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
+    document_sha256 = Column(String, nullable=True)             # content fingerprint at execution
+    executed_pdf = Column(LargeBinary, nullable=True)           # frozen, immutable executed document
     created_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
 
     engagement = relationship("Engagement", back_populates="contracts")
+    events = relationship("ContractEvent", back_populates="contract", cascade="all, delete-orphan")
+
+
+class ContractEvent(Base):
+    """Append-only audit trail for a contract — powers the certificate of completion."""
+    __tablename__ = "crm_contract_event"
+
+    id = Column(PgUUID(as_uuid=False), primary_key=True, server_default="uuid_generate_v4()")
+    contract_id = Column(PgUUID(as_uuid=False), ForeignKey("crm_contract.id", ondelete="CASCADE"), nullable=False)
+    type = Column(String, nullable=False)                       # created|sent|viewed|otp_sent|email_verified|signed
+    actor_name = Column(String, nullable=True)
+    actor_email = Column(String, nullable=True)
+    ip = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    meta = Column(JSON, nullable=True)
+    occurred_at = Column(DateTime(timezone=True), nullable=False)
+
+    contract = relationship("Contract", back_populates="events")
 
 
 class TimeEntry(Base):

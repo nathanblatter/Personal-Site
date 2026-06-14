@@ -143,6 +143,27 @@ async def _send_mime(to: str, subject: str, text_body: str, html_body: str,
         return False
 
 
+async def send_contract_otp_email(to: str, code: str, contract_title: str) -> bool:
+    """Send a 6-digit verification code for signing a contract."""
+    subject = f"Your code to sign “{contract_title}”: {code}"
+    text = (
+        f"Your verification code to sign “{contract_title}” is:\n\n"
+        f"    {code}\n\n"
+        f"Enter this code on the signing page to confirm your identity. "
+        f"It expires in 10 minutes. If you didn’t request this, you can ignore this email."
+    )
+    html = f"""\
+<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:440px;margin:0 auto;padding:8px">
+  <p style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#8c95a6;margin:0 0 6px">Signature verification</p>
+  <p style="font-size:15px;color:#2d3342;margin:0 0 18px">Use this code to confirm your identity and sign
+    <strong>{contract_title}</strong>.</p>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:34px;letter-spacing:.3em;font-weight:700;
+              color:#3b6cf5;background:#eef3ff;border-radius:12px;padding:18px;text-align:center">{code}</div>
+  <p style="font-size:13px;color:#8c95a6;margin:18px 0 0">Expires in 10 minutes. If you didn’t request this, ignore this email.</p>
+</div>"""
+    return await _send_mime(to, subject, text, html)
+
+
 def _fmt_time(dt: datetime, tz_name: str) -> str:
     """Format datetime in a given timezone for display."""
     from zoneinfo import ZoneInfo

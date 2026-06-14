@@ -6,13 +6,14 @@ numerals (Courier for JetBrains Mono), hairline rules, a large serif total,
 and rotated status stamps.
 """
 import io
+from datetime import timezone
 from functools import partial
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, PageBreak
 from reportlab.lib.colors import HexColor
 
 # ── Brand palette (matches frontend index.css) ───────────────────────────────
@@ -284,17 +285,25 @@ def _contract_decorate(canvas, doc, executed):
         canvas.restoreState()
 
 
-def _sig_cell(role, name, signed_at):
+def _ts(dt) -> str:
+    """Precise UTC signature timestamp, e.g. 'Jun 13, 2026 · 18:32:07 UTC'."""
+    if not dt:
+        return ""
+    return dt.astimezone(timezone.utc).strftime("%b %d, %Y · %H:%M:%S UTC")
+
+
+def _sig_cell(role, name, signed_at, email=None):
     signed = bool(signed_at)
     sig = Paragraph(_esc(name), s_c_sig) if signed else Paragraph("Awaiting signature", s_c_sig_pending)
-    date_txt = ("Signed " + signed_at.strftime("%b %d, %Y")) if signed else "Pending"
     rows = [
         [sig],
         [HRFlowable(width=2.5 * inch, thickness=0.75, color=INK, spaceBefore=2, spaceAfter=4)],
         [Paragraph(role.upper(), s_c_section)],
         [Paragraph(_esc(name) if signed else "—", s_c_sigmeta)],
-        [Paragraph(date_txt, s_c_sigdate)],
     ]
+    if signed and email:
+        rows.append([Paragraph(_esc(email), s_c_sigdate)])
+    rows.append([Paragraph(("Signed " + _ts(signed_at)) if signed else "Pending", s_c_sigdate)])
     return Table(rows, colWidths=[2.7 * inch], style=TableStyle([
         ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
         ("TOPPADDING", (0, 0), (0, 0), 6), ("BOTTOMPADDING", (0, 0), (0, 0), 0),
@@ -303,7 +312,91 @@ def _sig_cell(role, name, signed_at):
     ]))
 
 
-def render_contract_pdf(contract, contact=None) -> bytes:
+# ── Certificate of completion ────────────────────────────────────────────────
+
+s_cert_kicker = ParagraphStyle("certk", fontName=SANS_B, fontSize=8, textColor=TEAL, leading=11, spaceAfter=3)
+s_cert_title = ParagraphStyle("certt", fontName=SERIF, fontSize=24, textColor=INK, leading=28)
+s_cert_hashlabel = ParagraphStyle("certhl", fontName=SANS_B, fontSize=7, textColor=STEEL, leading=11)
+s_cert_hash = ParagraphStyle("certh", fontName=MONO, fontSize=8.5, textColor=INK, leading=13)
+s_cert_note = ParagraphStyle("certn", fontName=SANS, fontSize=8.5, textColor=STEEL, leading=12)
+s_cert_th = ParagraphStyle("certth", fontName=SANS_B, fontSize=7, textColor=STEEL, leading=10)
+s_cert_td = ParagraphStyle("certtd", fontName=SANS, fontSize=8.5, textColor=INK, leading=12)
+s_cert_td_mono = ParagraphStyle("certtdm", fontName=MONO, fontSize=7.5, textColor=SLATE, leading=12)
+
+_EVENT_LABELS = {
+    "created": "Document created",
+    "sent": "Sent for signature",
+    "viewed": "Document viewed",
+    "otp_sent": "Verification code sent",
+    "email_verified": "Email verified",
+    "signed": "Signed",
+}
+
+
+def _certificate_flowables(contract, contact, events, doc_hash):
+    client = (contact.company_name or contact.name) if contact else (contract.accepted_name or "Client")
+    out = [PageBreak(),
+           Paragraph("AUDIT TRAIL", s_cert_kicker),
+           Paragraph("Certificate of Completion", s_cert_title),
+           Spacer(1, 14),
+           HRFlowable(width="100%", thickness=0.75, color=MIST, spaceAfter=14)]
+
+    # Document fingerprint
+    out.append(Paragraph("DOCUMENT FINGERPRINT (SHA-256)", s_cert_hashlabel))
+    out.append(Spacer(1, 2))
+    out.append(Paragraph(doc_hash or "—", s_cert_hash))
+    out.append(Spacer(1, 4))
+    out.append(Paragraph(
+        "This fingerprint is computed from the agreement’s content and both signatures. "
+        "Any later change to the terms, parties, or signatures produces a different fingerprint, "
+        "making tampering detectable.", s_cert_note))
+    out.append(Spacer(1, 16))
+
+    # Signers
+    out.append(Paragraph("SIGNERS", s_cert_hashlabel))
+    out.append(Spacer(1, 4))
+    signer_rows = [
+        [Paragraph("Consultant", s_cert_td), Paragraph(_esc(contract.consultant_signed_name or CONSULTANT_NAME), s_cert_td),
+         Paragraph("", s_cert_td), Paragraph(_ts(contract.consultant_signed_at), s_cert_td_mono)],
+        [Paragraph("Client", s_cert_td), Paragraph(_esc(contract.accepted_name or client), s_cert_td),
+         Paragraph(_esc(contract.signer_email or ""), s_cert_td_mono), Paragraph(_ts(contract.accepted_at), s_cert_td_mono)],
+    ]
+    signers = Table([[Paragraph("ROLE", s_cert_th), Paragraph("NAME", s_cert_th),
+                      Paragraph("VERIFIED EMAIL", s_cert_th), Paragraph("SIGNED (UTC)", s_cert_th)]] + signer_rows,
+                    colWidths=[0.9 * inch, 1.7 * inch, 1.9 * inch, 1.8 * inch])
+    sty = [("LINEBELOW", (0, 0), (-1, 0), 0.5, MIST), ("LINEBELOW", (0, 1), (-1, -2), 0.4, MIST),
+           ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+           ("LEFTPADDING", (0, 0), (-1, -1), 0), ("VALIGN", (0, 0), (-1, -1), "TOP")]
+    signers.setStyle(TableStyle(sty))
+    out.append(signers)
+    out.append(Spacer(1, 18))
+
+    # Event history
+    out.append(Paragraph("EVENT HISTORY", s_cert_hashlabel))
+    out.append(Spacer(1, 4))
+    rows = [[Paragraph("TIMESTAMP (UTC)", s_cert_th), Paragraph("EVENT", s_cert_th),
+             Paragraph("PARTY", s_cert_th), Paragraph("IP ADDRESS", s_cert_th)]]
+    for e in events or []:
+        label = _EVENT_LABELS.get(e.type, e.type)
+        party = e.actor_name or e.actor_email or "—"
+        rows.append([
+            Paragraph(_ts(e.occurred_at), s_cert_td_mono),
+            Paragraph(label, s_cert_td),
+            Paragraph(_esc(party), s_cert_td_mono),
+            Paragraph(e.ip or "—", s_cert_td_mono),
+        ])
+    hist = Table(rows, colWidths=[1.8 * inch, 1.7 * inch, 1.7 * inch, 1.1 * inch])
+    hsty = [("LINEBELOW", (0, 0), (-1, 0), 0.5, MIST),
+            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("VALIGN", (0, 0), (-1, -1), "TOP")]
+    for r in range(1, len(rows)):
+        hsty.append(("LINEBELOW", (0, r), (-1, r), 0.3, HexColor("#eef1f6")))
+    hist.setStyle(TableStyle(hsty))
+    out.append(hist)
+    return out
+
+
+def render_contract_pdf(contract, contact=None, events=None, doc_hash=None) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=letter,
@@ -368,7 +461,7 @@ def render_contract_pdf(contract, contact=None) -> bytes:
     # Signature block
     sigs = Table(
         [[_sig_cell("Consultant", contract.consultant_signed_name or CONSULTANT_NAME, contract.consultant_signed_at),
-          _sig_cell("Client", contract.accepted_name or client, contract.accepted_at)]],
+          _sig_cell("Client", contract.accepted_name or client, contract.accepted_at, email=contract.signer_email)]],
         colWidths=[3.0 * inch, 3.0 * inch],
     )
     sigs.setStyle(TableStyle([("LEFTPADDING", (0, 0), (0, 0), 0), ("LEFTPADDING", (1, 0), (1, 0), 24),
@@ -376,6 +469,14 @@ def render_contract_pdf(contract, contact=None) -> bytes:
     story.append(sigs)
 
     executed = bool(contract.accepted_at and contract.consultant_signed_at)
+    if executed:
+        # Print the document fingerprint at the foot of the agreement page too.
+        if doc_hash:
+            story.append(Spacer(1, 18))
+            story.append(Paragraph(f'<font face="Courier" size="7" color="#8c95a6">Document fingerprint (SHA-256): {doc_hash}</font>',
+                                   ParagraphStyle("fp", fontName=MONO, fontSize=7, textColor=STEEL, leading=10)))
+        story += _certificate_flowables(contract, contact, events, doc_hash)
+
     deco = partial(_contract_decorate, executed=executed)
     doc.build(story, onFirstPage=deco, onLaterPages=deco)
     return buf.getvalue()

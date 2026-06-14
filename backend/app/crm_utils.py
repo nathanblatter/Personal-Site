@@ -3,6 +3,8 @@
 Central place for contact de-duplication, invoice numbering, magic-link tokens,
 and building invoices from engagements (hourly / fixed / retainer).
 """
+import hashlib
+import json
 import secrets
 from datetime import datetime, timezone, date
 from typing import Optional
@@ -118,6 +120,57 @@ async def next_invoice_number(db: AsyncSession) -> str:
     )
     count = result.scalar_one() or 0
     return f"{prefix}{count + 1:04d}"
+
+
+def _iso(dt: Optional[datetime]) -> Optional[str]:
+    return dt.isoformat() if dt else None
+
+
+def contract_fingerprint(contract: models.Contract, contact=None) -> str:
+    """Deterministic SHA-256 over the agreement's binding content + signatures.
+
+    Re-computing this from the DB later and comparing against the stored value
+    detects any post-execution tampering with terms, parties, or signatures.
+    Hashes content (not PDF bytes), so it is reproducible.
+    """
+    payload = {
+        "title": contract.title or "",
+        "scope": contract.scope_md or "",
+        "terms": contract.terms_md or "",
+        "value_cents": contract.total_value_cents,
+        "currency": contract.currency,
+        "start_date": str(contract.start_date) if contract.start_date else None,
+        "end_date": str(contract.end_date) if contract.end_date else None,
+        "consultant_name": contract.consultant_signed_name,
+        "consultant_signed_at": _iso(contract.consultant_signed_at),
+        "client_name": contract.accepted_name,
+        "client_signed_at": _iso(contract.accepted_at),
+        "signer_email": (contract.signer_email or "").lower(),
+        "client": (contact.company_name or contact.name) if contact else None,
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+async def log_contract_event(
+    db: AsyncSession,
+    *,
+    contract_id: str,
+    type: str,
+    actor_name: Optional[str] = None,
+    actor_email: Optional[str] = None,
+    ip: Optional[str] = None,
+    user_agent: Optional[str] = None,
+    meta: Optional[dict] = None,
+) -> models.ContractEvent:
+    """Append an immutable audit-trail entry. Does not commit."""
+    ev = models.ContractEvent(
+        contract_id=contract_id, type=type, actor_name=actor_name, actor_email=actor_email,
+        ip=ip, user_agent=(user_agent or "")[:500] or None, meta=meta, occurred_at=_now(),
+    )
+    db.add(ev)
+    await db.flush()
+    return ev
 
 
 def recalc_invoice_totals(invoice: models.Invoice) -> None:
