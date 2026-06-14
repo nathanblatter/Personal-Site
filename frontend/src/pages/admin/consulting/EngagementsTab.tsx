@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Plus, Trash2, FileText, Clock, Receipt, Link as LinkIcon, Check } from 'lucide-react'
+import { Plus, Trash2, FileText, Clock, Receipt, Link as LinkIcon, Check, Pencil, X } from 'lucide-react'
 import {
   api, type EngagementDetail, type EngagementResponse, type BillingType, type ContractResponse,
 } from '../../../lib/api'
 import { AdminInput, AdminSelect, AdminTextarea } from '../AdminShared'
-import { fmtCents, dollarsToCents, fmtMinutes, fmtDate, Pill } from './crmShared'
+import { fmtCents, dollarsToCents, centsToDollars, fmtMinutes, fmtDate, Pill } from './crmShared'
 import type { CrmShared } from '../ConsultingSection'
+
+type ContractFields = Pick<ContractResponse, 'title' | 'scope_md' | 'terms_md' | 'total_value_cents' | 'start_date' | 'end_date'>
 
 const BILLING_OPTS = [
   { value: 'hourly', label: 'Hourly' },
@@ -77,8 +79,8 @@ export default function EngagementsTab({ shared }: { shared: CrmShared }) {
 function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: EngagementDetail; shared: CrmShared; onBack: () => void; refresh: () => Promise<void> }) {
   const { showToast, showError } = shared
   const [te, setTe] = useState({ entry_date: new Date().toISOString().slice(0, 10), hours: '', description: '' })
-  const [contractTitle, setContractTitle] = useState('')
-  const [contractScope, setContractScope] = useState('')
+  const [creatingContract, setCreatingContract] = useState(false)
+  const [editingContractId, setEditingContractId] = useState<string | null>(null)
   const [copied, setCopied] = useState('')
 
   const unbilledMin = detail.time_entries.filter(t => t.billable && !t.invoice_id).reduce((s, t) => s + t.minutes, 0)
@@ -98,13 +100,21 @@ function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: Eng
     try { await api.crm.timeEntries.delete(id); await refresh() } catch (e) { showError((e as Error).message) }
   }
 
-  const addContract = async () => {
-    if (!contractTitle.trim()) { showError('Contract title required'); return }
+  const addContract = async (data: ContractFields) => {
     try {
-      await api.crm.contracts.create({ engagement_id: detail.id, title: contractTitle.trim(), scope_md: contractScope })
-      setContractTitle(''); setContractScope('')
+      await api.crm.contracts.create({ engagement_id: detail.id, ...data })
+      setCreatingContract(false)
       await refresh()
       showToast('Contract drafted')
+    } catch (e) { showError((e as Error).message) }
+  }
+
+  const saveContract = async (id: string, data: ContractFields) => {
+    try {
+      await api.crm.contracts.update(id, data)
+      setEditingContractId(null)
+      await refresh()
+      showToast('Contract updated')
     } catch (e) { showError((e as Error).message) }
   }
 
@@ -182,29 +192,47 @@ function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: Eng
       <div className="bg-snow border border-mist rounded-xl p-5">
         <div className="flex items-center gap-2 mb-3 text-steel">
           <FileText size={15} /><span className="font-mono text-[10px] uppercase tracking-wider">Contracts</span>
+          {!creatingContract && (
+            <button onClick={() => { setCreatingContract(true); setEditingContractId(null) }} className="ml-auto inline-flex items-center gap-1 text-xs text-blue hover:underline">
+              <Plus size={13} /> New contract
+            </button>
+          )}
         </div>
-        <div className="space-y-2 mb-4">
-          {detail.contracts.map(c => (
-            <div key={c.id} className="flex items-center gap-2 text-sm border border-mist rounded-lg px-3 py-2">
-              <span className="text-ink flex-1 truncate">{c.title}</span>
-              <Pill label={c.status} kind="contract" />
-              {c.public_token && (
-                <button onClick={() => copyLink(`${window.location.origin}/contract/${c.public_token}`, c.id)} className="text-steel hover:text-blue" title="Copy link">
-                  {copied === c.id ? <Check size={13} className="text-teal" /> : <LinkIcon size={13} />}
-                </button>
-              )}
-              {c.status === 'draft' && <button onClick={() => sendContract(c)} className="text-xs text-blue hover:underline">Send</button>}
-              <a href={api.crm.contracts.pdfUrl(c.id)} target="_blank" rel="noopener noreferrer" className="text-steel hover:text-blue" title="PDF"><FileText size={13} /></a>
-              <button onClick={() => delContract(c.id)} className="text-silver hover:text-ember"><Trash2 size={13} /></button>
+
+        <div className="space-y-2 mb-2">
+          {detail.contracts.map(c => editingContractId === c.id ? (
+            <ContractForm key={c.id} initial={c} submitLabel="Save changes"
+              onSubmit={d => saveContract(c.id, d)} onCancel={() => setEditingContractId(null)} />
+          ) : (
+            <div key={c.id} className="border border-mist rounded-lg px-3 py-2.5">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-ink font-medium truncate">{c.title}</span>
+                <Pill label={c.status} kind="contract" />
+                {c.public_token && (
+                  <button onClick={() => copyLink(`${window.location.origin}/contract/${c.public_token}`, c.id)} className="text-steel hover:text-blue" title="Copy link">
+                    {copied === c.id ? <Check size={13} className="text-teal" /> : <LinkIcon size={13} />}
+                  </button>
+                )}
+                {c.status === 'draft' && <button onClick={() => sendContract(c)} className="text-xs text-blue hover:underline">Send</button>}
+                {c.status !== 'accepted' && (
+                  <button onClick={() => { setEditingContractId(c.id); setCreatingContract(false) }} className="text-steel hover:text-blue" title="Edit"><Pencil size={13} /></button>
+                )}
+                <a href={api.crm.contracts.pdfUrl(c.id)} target="_blank" rel="noopener noreferrer" className="text-steel hover:text-blue" title="PDF"><FileText size={13} /></a>
+                <button onClick={() => delContract(c.id)} className="text-silver hover:text-ember" title="Delete"><Trash2 size={13} /></button>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5 font-mono text-[10px] text-steel">
+                <span>EFFECTIVE {c.start_date ? fmtDate(c.start_date) : 'On signing'}</span>
+                <span>TERM {c.start_date && c.end_date ? `${fmtDate(c.start_date)} – ${fmtDate(c.end_date)}` : 'Until completion'}</span>
+                <span>VALUE {c.total_value_cents ? fmtCents(c.total_value_cents) : 'As agreed'}</span>
+              </div>
             </div>
           ))}
-          {detail.contracts.length === 0 && <div className="text-xs text-silver">No contracts</div>}
+          {detail.contracts.length === 0 && !creatingContract && <div className="text-xs text-silver">No contracts</div>}
         </div>
-        <div className="space-y-2 border-t border-mist pt-3">
-          <AdminInput label="New contract title" value={contractTitle} onChange={setContractTitle} placeholder="Statement of Work" />
-          <AdminTextarea label="Scope" value={contractScope} onChange={setContractScope} rows={3} />
-          <button onClick={addContract} className="px-3 py-2 bg-cloud text-steel rounded-lg hover:bg-blue-wash hover:text-blue text-sm">Draft contract</button>
-        </div>
+
+        {creatingContract && (
+          <ContractForm submitLabel="Draft contract" onSubmit={addContract} onCancel={() => setCreatingContract(false)} />
+        )}
       </div>
 
       {/* Invoices */}
@@ -229,6 +257,50 @@ function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: Eng
           {detail.invoices.length === 0 && <div className="text-xs text-silver">No invoices — generate one above, then manage it in the Invoices tab</div>}
         </div>
       </div>
+    </div>
+  )
+}
+
+function ContractForm({ initial, submitLabel, onSubmit, onCancel }: {
+  initial?: ContractFields
+  submitLabel: string
+  onSubmit: (data: ContractFields) => void
+  onCancel: () => void
+}) {
+  const [title, setTitle] = useState(initial?.title ?? '')
+  const [value, setValue] = useState(centsToDollars(initial?.total_value_cents))
+  const [start, setStart] = useState(initial?.start_date ?? '')
+  const [end, setEnd] = useState(initial?.end_date ?? '')
+  const [scope, setScope] = useState(initial?.scope_md ?? '')
+  const [terms, setTerms] = useState(initial?.terms_md ?? '')
+
+  const submit = () => {
+    if (!title.trim()) return
+    onSubmit({
+      title: title.trim(),
+      total_value_cents: value.trim() ? dollarsToCents(value) : null,
+      start_date: start || null,
+      end_date: end || null,
+      scope_md: scope.trim() || null,
+      terms_md: terms.trim() || null,
+    })
+  }
+
+  return (
+    <div className="border border-blue/20 bg-blue-wash/30 rounded-lg p-4 space-y-3">
+      <AdminInput label="Title" value={title} onChange={setTitle} placeholder="Statement of Work" />
+      <div className="grid grid-cols-3 gap-3">
+        <AdminInput label="Compensation ($)" value={value} onChange={setValue} placeholder="As agreed" />
+        <AdminInput label="Effective / Start" value={start} onChange={setStart} type="date" />
+        <AdminInput label="End" value={end} onChange={setEnd} type="date" />
+      </div>
+      <AdminTextarea label="Scope of work" value={scope} onChange={setScope} rows={4} />
+      <AdminTextarea label="Terms & conditions" value={terms} onChange={setTerms} rows={4} />
+      <div className="flex items-center gap-2">
+        <button onClick={submit} disabled={!title.trim()} className="px-3.5 py-2 bg-blue text-white rounded-lg text-sm font-medium hover:bg-blue/90 disabled:opacity-40">{submitLabel}</button>
+        <button onClick={onCancel} className="inline-flex items-center gap-1 px-3 py-2 text-steel hover:text-ink text-sm"><X size={14} /> Cancel</button>
+      </div>
+      <p className="text-[11px] text-steel">Leave a field blank to show its default on the contract (e.g. “On signing”, “Until completion”, “As agreed”).</p>
     </div>
   )
 }
