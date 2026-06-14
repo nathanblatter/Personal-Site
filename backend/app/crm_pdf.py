@@ -1,9 +1,9 @@
-"""Generate invoice PDFs for the consulting CRM (reportlab).
+"""Generate invoice & contract PDFs for the consulting CRM (reportlab).
 
-Designed to mirror the client-facing web invoice: an editorial serif wordmark
+Designed to mirror the client-facing web documents: an editorial serif wordmark
 (Times stands in for Instrument Serif), a blue accent ribbon, monospaced
 numerals (Courier for JetBrains Mono), hairline rules, a large serif total,
-and a rotated PAID / OVERDUE stamp.
+and rotated status stamps.
 """
 import io
 from functools import partial
@@ -11,7 +11,7 @@ from functools import partial
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from reportlab.lib.styles import ParagraphStyle
-from reportlab.lib.enums import TA_RIGHT, TA_LEFT
+from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.colors import HexColor
 
@@ -241,5 +241,141 @@ def render_invoice_pdf(invoice, contact=None) -> bytes:
     story.append(Paragraph("Thank you for your business.", ParagraphStyle("thankc", parent=s_thanks, alignment=1)))
 
     deco = partial(_decorate, status=invoice.status.value)
+    doc.build(story, onFirstPage=deco, onLaterPages=deco)
+    return buf.getvalue()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Contracts
+# ══════════════════════════════════════════════════════════════════════════════
+
+s_c_kicker = ParagraphStyle("ckicker", fontName=SANS_B, fontSize=8, textColor=BLUE, leading=11, spaceAfter=4)
+s_c_title = ParagraphStyle("ctitle", fontName=SERIF, fontSize=28, textColor=INK, leading=32)
+s_c_section = ParagraphStyle("csection", fontName=SANS_B, fontSize=8, textColor=STEEL, leading=12, spaceAfter=4)
+s_c_body = ParagraphStyle("cbody", fontName=SANS, fontSize=10, textColor=SLATE, leading=15)
+s_c_body_ink = ParagraphStyle("cbodyink", fontName=SANS, fontSize=10, textColor=INK, leading=15)
+s_c_sig = ParagraphStyle("csig", fontName="Times-Italic", fontSize=22, textColor=INK, leading=24)
+s_c_sig_pending = ParagraphStyle("csigp", fontName="Times-Italic", fontSize=14, textColor=SILVER, leading=24)
+s_c_sigmeta = ParagraphStyle("csigmeta", fontName=SANS, fontSize=9, textColor=INK, leading=12)
+s_c_sigdate = ParagraphStyle("csigdate", fontName=MONO, fontSize=7.5, textColor=STEEL, leading=11)
+
+
+def _esc(text):
+    return (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
+
+
+def _contract_decorate(canvas, doc, executed):
+    w, h = letter
+    seg = w / 3.0
+    for i, col in enumerate((BLUE_DIM, BLUE, BLUE_GLOW)):
+        canvas.setFillColor(col)
+        canvas.rect(i * seg, h - 6, seg, 6, fill=1, stroke=0)
+    if executed:
+        canvas.saveState()
+        canvas.translate(w - 1.95 * inch, h - 1.7 * inch)
+        canvas.rotate(-14)
+        canvas.setStrokeColor(TEAL); canvas.setFillColor(TEAL)
+        canvas.setStrokeAlpha(0.2); canvas.setFillAlpha(0.2)
+        canvas.setLineWidth(2.5)
+        tw = 2.0 * inch
+        canvas.roundRect(-tw / 2, -16, tw, 44, 10, stroke=1, fill=0)
+        canvas.setFont(SERIF_I, 26)
+        canvas.drawCentredString(0, -2, "EXECUTED")
+        canvas.restoreState()
+
+
+def _sig_cell(role, name, signed_at):
+    signed = bool(signed_at)
+    sig = Paragraph(_esc(name), s_c_sig) if signed else Paragraph("Awaiting signature", s_c_sig_pending)
+    date_txt = ("Signed " + signed_at.strftime("%b %d, %Y")) if signed else "Pending"
+    rows = [
+        [sig],
+        [HRFlowable(width=2.5 * inch, thickness=0.75, color=INK, spaceBefore=2, spaceAfter=4)],
+        [Paragraph(role.upper(), s_c_section)],
+        [Paragraph(_esc(name) if signed else "—", s_c_sigmeta)],
+        [Paragraph(date_txt, s_c_sigdate)],
+    ]
+    return Table(rows, colWidths=[2.7 * inch], style=TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (0, 0), 6), ("BOTTOMPADDING", (0, 0), (0, 0), 0),
+        ("TOPPADDING", (0, 1), (-1, -1), 0), ("BOTTOMPADDING", (0, 1), (-1, -1), 1),
+        ("VALIGN", (0, 0), (0, 0), "BOTTOM"),
+    ]))
+
+
+def render_contract_pdf(contract, contact=None) -> bytes:
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=letter,
+        leftMargin=0.95 * inch, rightMargin=0.95 * inch,
+        topMargin=0.9 * inch, bottomMargin=0.8 * inch,
+        title=contract.title,
+    )
+    cur = contract.currency
+    client = (contact.company_name or contact.name) if contact else "the Client"
+    story = []
+
+    # Header
+    story.append(Paragraph("CONSULTING AGREEMENT", s_c_kicker))
+    story.append(Paragraph(_esc(contract.title), s_c_title))
+    story.append(Spacer(1, 14))
+    story.append(HRFlowable(width="100%", thickness=0.75, color=MIST, spaceAfter=16))
+
+    # Parties
+    parties = (f'This Consulting Agreement is entered into between '
+               f'<b><font color="#2d3342">{CONSULTANT_NAME}</font></b> ("Consultant") and '
+               f'<b><font color="#2d3342">{_esc(client)}</font></b> ("Client").')
+    story.append(Paragraph(parties, s_c_body))
+    story.append(Spacer(1, 14))
+
+    # Key terms grid (effective / term / compensation)
+    def term_cell(label, value):
+        return Table([[Paragraph(label.upper(), s_c_section)], [Paragraph(value, s_c_body_ink)]],
+                     colWidths=[1.9 * inch],
+                     style=TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                       ("BOTTOMPADDING", (0, 0), (0, 0), 2), ("BOTTOMPADDING", (0, 1), (0, 1), 0)]))
+
+    eff = contract.start_date.strftime("%b %d, %Y") if contract.start_date else "On signing"
+    term = (f'{contract.start_date.strftime("%b %d, %Y")} – {contract.end_date.strftime("%b %d, %Y")}'
+            if (contract.start_date and contract.end_date) else "Until completion")
+    comp = _money(contract.total_value_cents, cur) if contract.total_value_cents else "As agreed"
+    grid = Table([[term_cell("Effective", eff), term_cell("Term", term), term_cell("Compensation", comp)]],
+                 colWidths=[2.1 * inch, 2.1 * inch, 2.1 * inch])
+    grid.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    story.append(grid)
+    story.append(Spacer(1, 20))
+
+    # Scope
+    if contract.scope_md:
+        story.append(Paragraph("SCOPE OF WORK", s_c_section))
+        story.append(Paragraph(_esc(contract.scope_md), s_c_body))
+        story.append(Spacer(1, 16))
+
+    # Terms
+    if contract.terms_md:
+        story.append(Paragraph("TERMS & CONDITIONS", s_c_section))
+        story.append(Paragraph(_esc(contract.terms_md), s_c_body))
+        story.append(Spacer(1, 16))
+
+    # Agreement line
+    story.append(HRFlowable(width="100%", thickness=0.75, color=MIST, spaceBefore=4, spaceAfter=14))
+    story.append(Paragraph(
+        "By signing below, both parties acknowledge they have read, understood, and agree to be "
+        "bound by the terms set forth in this Agreement.",
+        ParagraphStyle("agree", parent=s_c_body, fontName=SANS, textColor=INK)))
+    story.append(Spacer(1, 22))
+
+    # Signature block
+    sigs = Table(
+        [[_sig_cell("Consultant", contract.consultant_signed_name or CONSULTANT_NAME, contract.consultant_signed_at),
+          _sig_cell("Client", contract.accepted_name or client, contract.accepted_at)]],
+        colWidths=[3.0 * inch, 3.0 * inch],
+    )
+    sigs.setStyle(TableStyle([("LEFTPADDING", (0, 0), (0, 0), 0), ("LEFTPADDING", (1, 0), (1, 0), 24),
+                              ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    story.append(sigs)
+
+    executed = bool(contract.accepted_at and contract.consultant_signed_at)
+    deco = partial(_contract_decorate, executed=executed)
     doc.build(story, onFirstPage=deco, onLaterPages=deco)
     return buf.getvalue()

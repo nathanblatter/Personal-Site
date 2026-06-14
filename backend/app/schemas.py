@@ -1332,6 +1332,8 @@ class ContractResponse(BaseModel):
     file_url: Optional[str] = None
     public_token: Optional[str] = None
     sent_at: Optional[datetime] = None
+    consultant_signed_name: Optional[str] = None
+    consultant_signed_at: Optional[datetime] = None
     accepted_at: Optional[datetime] = None
     accepted_name: Optional[str] = None
     created_at: datetime
@@ -1352,6 +1354,9 @@ class ContractPublic(BaseModel):
     accepted_at: Optional[datetime] = None
     accepted_name: Optional[str] = None
     consultant_name: str = "Nathan Blatter"
+    consultant_signed_name: Optional[str] = None
+    consultant_signed_at: Optional[datetime] = None
+    client_name: Optional[str] = None
     model_config = {"from_attributes": True}
 
 

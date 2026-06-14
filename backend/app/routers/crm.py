@@ -395,21 +395,43 @@ async def update_contract(contract_id: str, payload: schemas.ContractUpdate, db:
     return contract
 
 
+CONSULTANT_NAME = "Nathan Blatter"
+
+
 @router.post("/contracts/{contract_id}/send", response_model=schemas.ContractResponse)
 async def send_contract(contract_id: str, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
-    """Mint a public token and mark the contract as sent. Returns the contract
-    (the frontend builds the shareable /contract/{token} link)."""
+    """Mint a public token and mark the contract as sent. Sending counts as the
+    consultant's own signature (you wouldn't send it if you didn't agree), so we
+    auto-counter-sign here. Returns the contract (the frontend builds the
+    shareable /contract/{token} link)."""
     contract = await db.get(models.Contract, contract_id)
     if not contract:
         raise HTTPException(404, "Contract not found")
+    now = _now()
     if not contract.public_token:
         contract.public_token = crm_utils.make_public_token()
     contract.status = models.ContractStatus.sent
-    contract.sent_at = _now()
-    contract.updated_at = _now()
+    contract.sent_at = now
+    if not contract.consultant_signed_at:
+        contract.consultant_signed_name = CONSULTANT_NAME
+        contract.consultant_signed_at = now
+    contract.updated_at = now
     await db.commit()
     await db.refresh(contract)
     return contract
+
+
+@router.get("/contracts/{contract_id}/pdf")
+async def contract_pdf(contract_id: str, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    from app.crm_pdf import render_contract_pdf
+    contract = await db.get(models.Contract, contract_id)
+    if not contract:
+        raise HTTPException(404, "Contract not found")
+    contact = await _contract_contact(db, contract)
+    pdf = render_contract_pdf(contract, contact)
+    return Response(content=pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'inline; filename="{_slug(contract.title)}.pdf"'
+    })
 
 
 @router.delete("/contracts/{contract_id}", status_code=204)
@@ -419,6 +441,18 @@ async def delete_contract(contract_id: str, db: AsyncSession = Depends(get_db), 
         raise HTTPException(404, "Contract not found")
     await db.delete(contract)
     await db.commit()
+
+
+async def _contract_contact(db: AsyncSession, contract: models.Contract):
+    """Resolve the client contact for a contract via its engagement."""
+    eng = await db.get(models.Engagement, contract.engagement_id)
+    if eng and eng.contact_id:
+        return await db.get(models.Contact, eng.contact_id)
+    return None
+
+
+def _slug(text: str) -> str:
+    return "".join(c if c.isalnum() else "-" for c in (text or "contract")).strip("-").lower() or "contract"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -803,13 +837,34 @@ async def public_invoice(token: str, db: AsyncSession = Depends(get_db)):
     )
 
 
+async def _contract_public(db: AsyncSession, contract: models.Contract) -> schemas.ContractPublic:
+    pub = schemas.ContractPublic.model_validate(contract)
+    contact = await _contract_contact(db, contract)
+    pub.client_name = (contact.company_name or contact.name) if contact else None
+    return pub
+
+
 @router.get("/public/contracts/{token}", response_model=schemas.ContractPublic)
 async def public_contract(token: str, db: AsyncSession = Depends(get_db)):
     res = await db.execute(select(models.Contract).where(models.Contract.public_token == token))
     contract = res.scalars().first()
     if not contract:
         raise HTTPException(404, "Contract not found")
-    return schemas.ContractPublic.model_validate(contract)
+    return await _contract_public(db, contract)
+
+
+@router.get("/public/contracts/{token}/pdf")
+async def public_contract_pdf(token: str, db: AsyncSession = Depends(get_db)):
+    from app.crm_pdf import render_contract_pdf
+    res = await db.execute(select(models.Contract).where(models.Contract.public_token == token))
+    contract = res.scalars().first()
+    if not contract:
+        raise HTTPException(404, "Contract not found")
+    contact = await _contract_contact(db, contract)
+    pdf = render_contract_pdf(contract, contact)
+    return Response(content=pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'inline; filename="{_slug(contract.title)}.pdf"'
+    })
 
 
 @router.post("/public/contracts/{token}/accept", response_model=schemas.ContractPublic)
@@ -822,7 +877,7 @@ async def accept_contract(token: str, payload: schemas.ContractAccept, request: 
     if not contract:
         raise HTTPException(404, "Contract not found")
     if contract.status == models.ContractStatus.accepted:
-        return schemas.ContractPublic.model_validate(contract)
+        return await _contract_public(db, contract)
     if contract.status not in (models.ContractStatus.sent,):
         raise HTTPException(400, "This contract is not open for acceptance")
     now = _now()
@@ -830,13 +885,17 @@ async def accept_contract(token: str, payload: schemas.ContractAccept, request: 
     contract.accepted_at = now
     contract.accepted_name = payload.accepted_name
     contract.accepted_ip = get_client_ip(request)
+    # Ensure the consultant counter-signature exists (defensive; normally set at send).
+    if not contract.consultant_signed_at:
+        contract.consultant_signed_name = CONSULTANT_NAME
+        contract.consultant_signed_at = now
     contract.updated_at = now
     if contract.engagement:
         await crm_utils.log_activity(
             db, contact_id=contract.engagement.contact_id, type=models.ActivityType.status_change,
             engagement_id=contract.engagement_id,
-            body_md=f"Contract **{contract.title}** accepted by {payload.accepted_name}",
+            body_md=f"Contract **{contract.title}** signed by {payload.accepted_name}",
         )
     await db.commit()
     await db.refresh(contract)
-    return schemas.ContractPublic.model_validate(contract)
+    return await _contract_public(db, contract)

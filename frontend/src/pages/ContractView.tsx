@@ -1,17 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { Loader2, CheckCircle2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'motion/react'
+import { Loader2, CheckCircle2, Download, PenLine, ShieldCheck, ArrowDown } from 'lucide-react'
 import { api, type ContractPublic } from '../lib/api'
-
-function money(cents?: number | null, currency = 'USD') {
-  if (cents == null) return null
-  const sym = currency === 'USD' ? '$' : `${currency} `
-  return `${sym}${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-function fmtDate(d?: string | null) {
-  if (!d) return '—'
-  return new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
-}
 
 export default function ContractView() {
   const { token } = useParams<{ token: string }>()
@@ -19,82 +10,163 @@ export default function ContractView() {
   const [error, setError] = useState(false)
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [docKey, setDocKey] = useState(0)          // bump to reload the embedded PDF
+  const docRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!token) return
-    api.crm.public.getContract(token).then(setC).catch(() => setError(true))
+    api.crm.public.getContract(token).then(c => { setC(c); setName(c.accepted_name || '') }).catch(() => setError(true))
   }, [token])
 
   useEffect(() => { if (c) document.title = c.title }, [c])
 
-  const accept = async () => {
+  const sign = async () => {
     if (!token || !name.trim()) return
     setSubmitting(true)
-    try { setC(await api.crm.public.acceptContract(token, { accepted_name: name.trim() })) }
-    catch { setError(true) }
+    try {
+      const updated = await api.crm.public.acceptContract(token, { accepted_name: name.trim() })
+      setC(updated)
+      setDocKey(k => k + 1)                          // re-render PDF with both signatures
+      docRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch { setError(true) }
     finally { setSubmitting(false) }
   }
 
-  if (error) return <Centered>Contract not found.</Centered>
-  if (!c) return <Centered><Loader2 className="animate-spin text-blue-500" /></Centered>
+  if (error) return <Shell><span className="font-mono text-sm text-steel tracking-wide">Contract not found or no longer available.</span></Shell>
+  if (!c) return <Shell><Loader2 className="animate-spin text-blue" /></Shell>
 
-  const total = money(c.total_value_cents, c.currency)
+  const pdfUrl = `${api.crm.public.contractPdfUrl(token!)}?v=${docKey}`
+  const signed = c.status === 'accepted'
+  const open = c.status === 'sent'
 
   return (
-    <div className="min-h-screen bg-slate-100 py-10 px-4">
-      <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-10">
-        <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-1">Agreement from {c.consultant_name}</div>
-        <h1 className="text-2xl font-bold text-slate-900 mb-6">{c.title}</h1>
-
-        <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm mb-6 pb-6 border-b border-slate-100">
-          {total && <Meta label="Value" value={total} />}
-          {c.start_date && <Meta label="Start" value={fmtDate(c.start_date)} />}
-          {c.end_date && <Meta label="End" value={fmtDate(c.end_date)} />}
-        </div>
-
-        {c.scope_md && <Block title="Scope" body={c.scope_md} />}
-        {c.terms_md && <Block title="Terms" body={c.terms_md} />}
-
-        {c.status === 'accepted' ? (
-          <div className="mt-8 p-5 bg-emerald-50 rounded-xl flex items-center gap-3 text-emerald-800">
-            <CheckCircle2 size={20} />
-            <div>
-              <div className="font-medium">Accepted{c.accepted_name ? ` by ${c.accepted_name}` : ''}</div>
-              {c.accepted_at && <div className="text-sm text-emerald-600">{new Date(c.accepted_at).toLocaleString()}</div>}
+    <div className="h-screen flex flex-col bg-mist/50 overflow-hidden">
+      {/* ── Top bar ── */}
+      <header className="shrink-0 bg-white border-b border-mist z-20">
+        <div className="max-w-[900px] mx-auto px-5 h-16 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-blue flex items-center justify-center shrink-0">
+            <span className="font-mono text-white text-xs font-bold">NB</span>
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-ink truncate leading-tight">{c.title}</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-steel">
+              {signed ? 'Executed agreement' : 'Consulting agreement'} · from {c.consultant_name}
             </div>
           </div>
-        ) : c.status === 'sent' ? (
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-2">Accept this agreement</div>
-            <p className="text-sm text-slate-500 mb-3">Type your full name to accept. This records your name, the date, and your IP as your electronic signature.</p>
-            <div className="flex gap-2">
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="Your full name"
-                className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
-              <button onClick={accept} disabled={!name.trim() || submitting}
-                className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                {submitting ? <Loader2 size={15} className="animate-spin" /> : 'Accept'}
+          <div className="ml-auto flex items-center gap-2">
+            <StatusChip status={c.status} />
+            {(signed) && (
+              <a href={pdfUrl} download={`${c.title}.pdf`}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-ink text-white text-sm font-medium hover:bg-blue transition-colors">
+                <Download size={14} /> Download
+              </a>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* ── Document canvas ── */}
+      <main ref={docRef} className="flex-1 overflow-auto">
+        <div className="max-w-[820px] mx-auto px-4 py-8">
+          <motion.div
+            initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="rounded-xl overflow-hidden shadow-[0_24px_70px_-24px_rgba(45,51,66,0.45)] ring-1 ring-mist bg-white">
+            <iframe key={docKey} src={pdfUrl} title="Contract document"
+              className="w-full block" style={{ height: 'calc(820px * 11 / 8.5)' }} />
+          </motion.div>
+
+          {open && (
+            <div className="flex flex-col items-center gap-1 text-steel py-6 print:hidden">
+              <ArrowDown size={16} className="animate-bounce text-blue" />
+              <span className="font-mono text-[10px] uppercase tracking-[0.2em]">Review, then sign below</span>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* ── Signing bar ── */}
+      <AnimatePresence mode="wait">
+        {open && (
+          <motion.footer key="sign"
+            initial={{ y: 90 }} animate={{ y: 0 }} exit={{ y: 90 }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="shrink-0 bg-white border-t-2 border-blue/20 shadow-[0_-12px_40px_-20px_rgba(45,51,66,0.3)] z-20">
+            <div className="max-w-[900px] mx-auto px-5 py-4 flex flex-col sm:flex-row sm:items-end gap-4">
+              <div className="flex-1">
+                <label className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-steel mb-2">
+                  <PenLine size={12} className="text-blue" /> Sign here — type your full legal name
+                </label>
+                <div className="relative">
+                  <input
+                    value={name} onChange={e => setName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && sign()}
+                    placeholder="Your full name" autoFocus
+                    className="w-full bg-cloud/70 border border-mist rounded-lg pl-4 pr-4 py-3 text-ink placeholder-silver focus:outline-none focus:border-blue/50 focus:ring-2 focus:ring-blue/10 transition-all"
+                    style={{ fontFamily: 'Caveat, cursive', fontSize: '26px', lineHeight: 1.1 }}
+                  />
+                  {!name && <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 font-mono text-[10px] uppercase tracking-wider text-silver">Signature</span>}
+                </div>
+              </div>
+              <button
+                onClick={sign} disabled={!name.trim() || submitting}
+                className="shrink-0 inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-lg bg-blue text-white font-medium shadow-lg shadow-blue/25 hover:bg-blue-dim disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : <><ShieldCheck size={16} /> Adopt &amp; Sign</>}
               </button>
             </div>
-          </div>
-        ) : (
-          <div className="mt-8 text-sm text-slate-400">This contract is not currently open for acceptance.</div>
+            <p className="max-w-[900px] mx-auto px-5 pb-3 text-[11px] text-steel">
+              By signing, you agree to the terms above. Your name, the date, and your IP address are recorded as your electronic signature. {c.consultant_name} has already signed.
+            </p>
+          </motion.footer>
         )}
-      </div>
+
+        {signed && (
+          <motion.footer key="done"
+            initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="shrink-0 bg-teal/8 border-t border-teal/25 z-20">
+            <div className="max-w-[900px] mx-auto px-5 py-4 flex items-center gap-3">
+              <CheckCircle2 size={22} className="text-teal shrink-0" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-ink">
+                  Signed by {c.accepted_name} and {c.consultant_signed_name || c.consultant_name}
+                </div>
+                <div className="font-mono text-[10px] text-steel tracking-wide">
+                  {c.accepted_at && `Executed ${new Date(c.accepted_at).toLocaleString()}`}
+                </div>
+              </div>
+              <a href={pdfUrl} download={`${c.title}.pdf`}
+                className="ml-auto inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-ink text-white text-sm font-medium hover:bg-blue transition-colors shrink-0">
+                <Download size={15} /> Download PDF
+              </a>
+            </div>
+          </motion.footer>
+        )}
+
+        {!open && !signed && (
+          <motion.footer key="closed" initial={{ y: 60 }} animate={{ y: 0 }}
+            className="shrink-0 bg-white border-t border-mist z-20">
+            <div className="max-w-[900px] mx-auto px-5 py-4 text-sm text-steel">This contract is not currently open for signing.</div>
+          </motion.footer>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
-  return <div><div className="text-[11px] font-mono uppercase tracking-wider text-slate-400">{label}</div><div className="text-slate-900 font-medium">{value}</div></div>
-}
-function Block({ title, body }: { title: string; body: string }) {
+function StatusChip({ status }: { status: string }) {
+  const map: Record<string, { label: string; cls: string; dot: string }> = {
+    sent: { label: 'Awaiting your signature', cls: 'text-blue bg-blue-wash', dot: 'bg-blue' },
+    accepted: { label: 'Executed', cls: 'text-teal bg-teal/10', dot: 'bg-teal' },
+    draft: { label: 'Draft', cls: 'text-steel bg-cloud', dot: 'bg-silver' },
+    declined: { label: 'Declined', cls: 'text-ember bg-ember/10', dot: 'bg-ember' },
+    void: { label: 'Void', cls: 'text-silver bg-cloud', dot: 'bg-silver' },
+  }
+  const s = map[status] ?? map.draft
   return (
-    <div className="mb-6">
-      <div className="text-[11px] font-mono uppercase tracking-wider text-slate-400 mb-2">{title}</div>
-      <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{body}</p>
-    </div>
+    <span className={`hidden sm:inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full ${s.cls}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} /> {s.label}
+    </span>
   )
 }
-function Centered({ children }: { children: React.ReactNode }) {
-  return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-500">{children}</div>
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return <div className="min-h-screen bg-cloud flex items-center justify-center">{children}</div>
 }

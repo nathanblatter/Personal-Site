@@ -590,6 +590,9 @@ export interface ContractPublic {
   accepted_at?: string | null
   accepted_name?: string | null
   consultant_name: string
+  consultant_signed_name?: string | null
+  consultant_signed_at?: string | null
+  client_name?: string | null
 }
 
 export interface TimeEntryResponse {
@@ -1011,6 +1014,7 @@ export const api = {
         request<ContractResponse>('PUT', `/crm/contracts/${id}`, data),
       send: (id: string) => request<ContractResponse>('POST', `/crm/contracts/${id}/send`),
       delete: (id: string) => request<void>('DELETE', `/crm/contracts/${id}`),
+      pdfUrl: (id: string) => `${API_BASE}/crm/contracts/${id}/pdf`,
     },
 
     timeEntries: {
@@ -1044,6 +1048,7 @@ export const api = {
       getContract: (token: string) => request<ContractPublic>('GET', `/crm/public/contracts/${token}`),
       acceptContract: (token: string, data: { accepted_name: string }) =>
         request<ContractPublic>('POST', `/crm/public/contracts/${token}/accept`, data),
+      contractPdfUrl: (token: string) => `${API_BASE}/crm/public/contracts/${token}/pdf`,
     },
   },
 }

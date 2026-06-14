@@ -194,6 +194,7 @@ function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: Eng
                 </button>
               )}
               {c.status === 'draft' && <button onClick={() => sendContract(c)} className="text-xs text-blue hover:underline">Send</button>}
+              <a href={api.crm.contracts.pdfUrl(c.id)} target="_blank" rel="noopener noreferrer" className="text-steel hover:text-blue" title="PDF"><FileText size={13} /></a>
               <button onClick={() => delContract(c.id)} className="text-silver hover:text-ember"><Trash2 size={13} /></button>
             </div>
           ))}

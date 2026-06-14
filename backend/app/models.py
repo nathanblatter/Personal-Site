@@ -668,6 +668,8 @@ class Contract(Base):
     file_url = Column(String, nullable=True)                    # uploaded signed PDF
     public_token = Column(String, nullable=True, unique=True)   # magic-link view/accept
     sent_at = Column(DateTime(timezone=True), nullable=True)
+    consultant_signed_name = Column(String, nullable=True)      # auto-signed by Nathan at send
+    consultant_signed_at = Column(DateTime(timezone=True), nullable=True)
     accepted_at = Column(DateTime(timezone=True), nullable=True)
     accepted_name = Column(String, nullable=True)
     accepted_ip = Column(String, nullable=True)
