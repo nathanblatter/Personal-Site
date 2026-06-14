@@ -5,6 +5,7 @@ All admin endpoints require auth. Client-facing magic-link endpoints live under
 /crm/public/* and are intentionally unauthenticated (guarded by an unguessable
 per-record token).
 """
+import os
 import secrets
 from datetime import datetime, timezone, date, timedelta
 from typing import List, Optional
@@ -18,9 +19,16 @@ from app.database import get_db
 from app import models, schemas, crm_utils
 from app.auth import require_auth
 from app.utils import get_client_ip, get_redis
-from app.email_service import send_contract_otp_email
+from app.email_service import send_contract_otp_email, send_contract_email, send_invoice_email
 
 router = APIRouter(prefix="/crm", tags=["crm"])
+
+SITE_URL = os.getenv("SITE_URL", "https://nathanblatter.com")
+
+
+def _money_str(cents, currency="USD"):
+    sym = "$" if currency == "USD" else f"{currency} "
+    return f"{sym}{(cents or 0) / 100:,.2f}"
 
 OTP_TTL = 600          # 10 minutes
 OTP_VERIFIED_TTL = 1800  # 30 minutes to complete signing after verifying
@@ -428,15 +436,49 @@ async def send_contract(contract_id: str, request: Request, db: AsyncSession = D
         contract.public_token = crm_utils.make_public_token()
     contract.status = models.ContractStatus.sent
     contract.sent_at = now
+    contract.declined_at = None          # re-sending revives a declined contract
+    contract.declined_reason = None
+    contract.reminder_sent_at = None
     if not contract.consultant_signed_at:
         contract.consultant_signed_name = CONSULTANT_NAME
         contract.consultant_signed_at = now
         await _log_contract(db, contract.id, "signed", request, actor_name=CONSULTANT_NAME,
                             meta={"party": "consultant"})
+
+    # Email the client the magic link.
+    contact = await _contract_contact(db, contract)
+    recipient = contact.email if contact else None
+    if recipient:
+        ok = await send_contract_email(recipient, contract.title, f"{SITE_URL}/contract/{contract.public_token}")
+        if ok:
+            await _log_contract(db, contract.id, "emailed", request, actor_email=recipient)
+        else:
+            recipient = None
     await _log_contract(db, contract.id, "sent", request, actor_name=CONSULTANT_NAME)
     contract.updated_at = now
     await db.commit()
     await db.refresh(contract)
+    contract.recipient_email = recipient
+    return contract
+
+
+@router.post("/contracts/{contract_id}/remind", response_model=schemas.ContractResponse)
+async def remind_contract(contract_id: str, request: Request, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    contract = await db.get(models.Contract, contract_id)
+    if not contract:
+        raise HTTPException(404, "Contract not found")
+    if contract.status != models.ContractStatus.sent or not contract.public_token:
+        raise HTTPException(400, "Only sent, unsigned contracts can be reminded")
+    contact = await _contract_contact(db, contract)
+    if not (contact and contact.email):
+        raise HTTPException(400, "No email on file for this client")
+    if not await send_contract_email(contact.email, contract.title, f"{SITE_URL}/contract/{contract.public_token}", reminder=True):
+        raise HTTPException(502, "Could not send the reminder email")
+    contract.reminder_sent_at = _now()
+    await _log_contract(db, contract.id, "reminder_sent", request, actor_email=contact.email)
+    await db.commit()
+    await db.refresh(contract)
+    contract.recipient_email = contact.email
     return contract
 
 
@@ -688,6 +730,17 @@ async def update_invoice(invoice_id: str, payload: schemas.InvoiceUpdate, db: As
     return await _invoice_response(db, inv.id)
 
 
+async def _email_invoice(db, inv, *, reminder: bool) -> Optional[str]:
+    """Email the client the invoice magic link. Returns the recipient, or None."""
+    contact = await db.get(models.Contact, inv.contact_id) if inv.contact_id else None
+    if not (contact and contact.email and inv.public_token):
+        return None
+    due = inv.due_date.strftime("%b %d, %Y") if inv.due_date else None
+    ok = await send_invoice_email(contact.email, inv.number, _money_str(inv.total_cents - inv.amount_paid_cents, inv.currency),
+                                  f"{SITE_URL}/invoice/{inv.public_token}", due=due, reminder=reminder)
+    return contact.email if ok else None
+
+
 @router.post("/invoices/{invoice_id}/send", response_model=schemas.InvoiceResponse)
 async def send_invoice(invoice_id: str, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
     inv = await _load_invoice(db, invoice_id)
@@ -697,8 +750,28 @@ async def send_invoice(invoice_id: str, db: AsyncSession = Depends(get_db), _: N
         inv.status = models.InvoiceStatus.sent
     inv.sent_at = _now()
     inv.updated_at = _now()
+    recipient = await _email_invoice(db, inv, reminder=False)
     await db.commit()
-    return await _invoice_response(db, inv.id)
+    resp = await _invoice_response(db, inv.id)
+    resp.recipient_email = recipient
+    return resp
+
+
+@router.post("/invoices/{invoice_id}/remind", response_model=schemas.InvoiceResponse)
+async def remind_invoice(invoice_id: str, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    inv = await _load_invoice(db, invoice_id)
+    if inv.status not in (models.InvoiceStatus.sent, models.InvoiceStatus.partial, models.InvoiceStatus.overdue):
+        raise HTTPException(400, "Only unpaid, sent invoices can be reminded")
+    if not inv.public_token:
+        raise HTTPException(400, "Send the invoice before reminding")
+    recipient = await _email_invoice(db, inv, reminder=True)
+    if not recipient:
+        raise HTTPException(400, "No email on file for this client")
+    inv.reminder_sent_at = _now()
+    await db.commit()
+    resp = await _invoice_response(db, inv.id)
+    resp.recipient_email = recipient
+    return resp
 
 
 @router.post("/invoices/{invoice_id}/payments", response_model=schemas.InvoiceResponse)
@@ -1053,3 +1126,139 @@ async def accept_contract(token: str, payload: schemas.ContractAccept, request: 
     await db.refresh(contract)
     await get_redis().delete(ok_key)
     return await _contract_public(db, contract)
+
+
+@router.post("/public/contracts/{token}/decline", response_model=schemas.ContractPublic)
+async def decline_contract(token: str, payload: schemas.ContractDecline, request: Request, db: AsyncSession = Depends(get_db)):
+    res = await db.execute(
+        select(models.Contract).where(models.Contract.public_token == token)
+        .options(selectinload(models.Contract.engagement))
+    )
+    contract = res.scalars().first()
+    if not contract:
+        raise HTTPException(404, "Contract not found")
+    if contract.status == models.ContractStatus.accepted:
+        raise HTTPException(400, "This contract has already been signed")
+    now = _now()
+    contract.status = models.ContractStatus.declined
+    contract.declined_at = now
+    contract.declined_reason = (payload.reason or "").strip() or None
+    contract.updated_at = now
+    reason_note = f" — “{contract.declined_reason}”" if contract.declined_reason else ""
+    await _log_contract(db, contract.id, "declined", request, meta={"reason": contract.declined_reason})
+    if contract.engagement:
+        await crm_utils.log_activity(
+            db, contact_id=contract.engagement.contact_id, type=models.ActivityType.status_change,
+            engagement_id=contract.engagement_id,
+            body_md=f"Contract **{contract.title}** — changes requested / declined by client{reason_note}",
+        )
+    await db.commit()
+    await db.refresh(contract)
+    return await _contract_public(db, contract)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Templates (reusable contract scope/terms & invoice line items)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/templates", response_model=List[schemas.TemplateResponse])
+async def list_templates(kind: Optional[str] = None, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    stmt = select(models.Template).order_by(models.Template.name)
+    if kind:
+        stmt = stmt.where(models.Template.kind == kind)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
+@router.post("/templates", response_model=schemas.TemplateResponse, status_code=201)
+async def create_template(payload: schemas.TemplateCreate, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    now = _now()
+    data = payload.model_dump()
+    data["kind"] = data["kind"].value if hasattr(data["kind"], "value") else data["kind"]
+    if data.get("line_items") is not None:
+        data["line_items"] = [li for li in data["line_items"]]
+    tmpl = models.Template(**data, created_at=now, updated_at=now)
+    db.add(tmpl)
+    await db.commit()
+    await db.refresh(tmpl)
+    return tmpl
+
+
+@router.put("/templates/{template_id}", response_model=schemas.TemplateResponse)
+async def update_template(template_id: str, payload: schemas.TemplateUpdate, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    tmpl = await db.get(models.Template, template_id)
+    if not tmpl:
+        raise HTTPException(404, "Template not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(tmpl, k, v)
+    tmpl.updated_at = _now()
+    await db.commit()
+    await db.refresh(tmpl)
+    return tmpl
+
+
+@router.delete("/templates/{template_id}", status_code=204)
+async def delete_template(template_id: str, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    tmpl = await db.get(models.Template, template_id)
+    if not tmpl:
+        raise HTTPException(404, "Template not found")
+    await db.delete(tmpl)
+    await db.commit()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Scheduled reminders (invoked from main.py lifespan)
+# ══════════════════════════════════════════════════════════════════════════════
+
+REMINDER_COOLDOWN = timedelta(days=3)            # don't re-remind more often than this
+CONTRACT_REMIND_AFTER = timedelta(days=3)        # nudge unsigned contracts after this long
+
+
+async def send_crm_reminders() -> str:
+    """Email reminders for overdue/unpaid invoices and stale unsigned contracts.
+    Idempotent via reminder_sent_at + cooldown."""
+    from app.database import AsyncSessionLocal
+    sent = 0
+    async with AsyncSessionLocal() as db:
+        now = _now()
+        cutoff = now - REMINDER_COOLDOWN
+
+        # Overdue, unpaid invoices
+        inv_res = await db.execute(
+            select(models.Invoice).where(
+                models.Invoice.status.in_([models.InvoiceStatus.sent, models.InvoiceStatus.partial, models.InvoiceStatus.overdue]),
+                models.Invoice.public_token.is_not(None),
+                models.Invoice.due_date.is_not(None),
+                models.Invoice.due_date < now.date(),
+                (models.Invoice.reminder_sent_at.is_(None)) | (models.Invoice.reminder_sent_at < cutoff),
+            )
+        )
+        for inv in inv_res.scalars().all():
+            recipient = await _email_invoice(db, inv, reminder=True)
+            if recipient:
+                inv.reminder_sent_at = now
+                sent += 1
+
+        # Sent-but-unsigned contracts older than the grace period
+        c_res = await db.execute(
+            select(models.Contract).where(
+                models.Contract.status == models.ContractStatus.sent,
+                models.Contract.public_token.is_not(None),
+                models.Contract.sent_at.is_not(None),
+                models.Contract.sent_at < now - CONTRACT_REMIND_AFTER,
+                (models.Contract.reminder_sent_at.is_(None)) | (models.Contract.reminder_sent_at < cutoff),
+            )
+        )
+        for contract in c_res.scalars().all():
+            contact = await _contract_contact(db, contract)
+            if contact and contact.email:
+                try:
+                    await send_contract_email(contact.email, contract.title, f"{SITE_URL}/contract/{contract.public_token}", reminder=True)
+                    contract.reminder_sent_at = now
+                    await _log_contract(db, contract.id, "reminder_sent", actor_email=contact.email)
+                    sent += 1
+                except Exception:
+                    pass
+
+        await db.commit()
+    return f"{sent} CRM reminders sent"

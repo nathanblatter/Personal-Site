@@ -1339,6 +1339,10 @@ class ContractResponse(BaseModel):
     signer_email: Optional[str] = None
     email_verified_at: Optional[datetime] = None
     document_sha256: Optional[str] = None
+    declined_at: Optional[datetime] = None
+    declined_reason: Optional[str] = None
+    reminder_sent_at: Optional[datetime] = None
+    recipient_email: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     model_config = {"from_attributes": True}
@@ -1402,6 +1406,10 @@ class ContractCertificate(BaseModel):
     signer_email: Optional[str] = None
     status: ContractStatus
     events: List[ContractEventPublic] = []
+
+
+class ContractDecline(BaseModel):
+    reason: Optional[str] = None
 
 
 # ── Time entries ──────────────────────────────────────────────────────────────
@@ -1523,6 +1531,8 @@ class InvoiceResponse(BaseModel):
     public_token: Optional[str] = None
     sent_at: Optional[datetime] = None
     paid_at: Optional[datetime] = None
+    reminder_sent_at: Optional[datetime] = None
+    recipient_email: Optional[str] = None
     contact_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -1570,6 +1580,47 @@ class CrmDashboard(BaseModel):
     contacts_count: int
     active_engagements: int
     overdue_invoices: List[InvoiceResponse] = []
+
+
+# ── Templates (reusable contract scope/terms & invoice line items) ───────────
+
+class TemplateKind(str, Enum):
+    contract = "contract"
+    invoice = "invoice"
+
+
+class TemplateBase(BaseModel):
+    kind: TemplateKind
+    name: str
+    title: Optional[str] = None
+    scope_md: Optional[str] = None
+    terms_md: Optional[str] = None
+    total_value_cents: Optional[int] = None
+    line_items: Optional[List[InvoiceLineItemBase]] = None
+    notes: Optional[str] = None
+    currency: str = "USD"
+
+
+class TemplateCreate(TemplateBase):
+    pass
+
+
+class TemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    title: Optional[str] = None
+    scope_md: Optional[str] = None
+    terms_md: Optional[str] = None
+    total_value_cents: Optional[int] = None
+    line_items: Optional[List[InvoiceLineItemBase]] = None
+    notes: Optional[str] = None
+    currency: Optional[str] = None
+
+
+class TemplateResponse(TemplateBase):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}
 
 
 ContactDetail.model_rebuild()

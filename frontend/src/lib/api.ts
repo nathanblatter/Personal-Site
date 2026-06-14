@@ -574,6 +574,10 @@ export interface ContractResponse {
   sent_at?: string | null
   accepted_at?: string | null
   accepted_name?: string | null
+  declined_at?: string | null
+  declined_reason?: string | null
+  reminder_sent_at?: string | null
+  recipient_email?: string | null
   created_at: string
   updated_at: string
 }
@@ -599,6 +603,8 @@ export interface ContractPublic {
   email_verified_at?: string | null
   document_sha256?: string | null
   requires_email_verification?: boolean
+  declined_at?: string | null
+  declined_reason?: string | null
 }
 
 export interface ContractEventPublic {
@@ -672,11 +678,29 @@ export interface InvoiceResponse {
   public_token?: string | null
   sent_at?: string | null
   paid_at?: string | null
+  reminder_sent_at?: string | null
+  recipient_email?: string | null
   contact_name?: string | null
   created_at: string
   updated_at: string
   line_items: InvoiceLineItem[]
   payments: PaymentResponse[]
+}
+
+export type TemplateKind = 'contract' | 'invoice'
+export interface Template {
+  id: string
+  kind: TemplateKind
+  name: string
+  title?: string | null
+  scope_md?: string | null
+  terms_md?: string | null
+  total_value_cents?: number | null
+  line_items?: InvoiceLineItem[] | null
+  notes?: string | null
+  currency: string
+  created_at: string
+  updated_at: string
 }
 
 export interface InvoicePublic {
@@ -1039,6 +1063,7 @@ export const api = {
       update: (id: string, data: Partial<ContractResponse>) =>
         request<ContractResponse>('PUT', `/crm/contracts/${id}`, data),
       send: (id: string) => request<ContractResponse>('POST', `/crm/contracts/${id}/send`),
+      remind: (id: string) => request<ContractResponse>('POST', `/crm/contracts/${id}/remind`),
       delete: (id: string) => request<void>('DELETE', `/crm/contracts/${id}`),
       pdfUrl: (id: string) => `${API_BASE}/crm/contracts/${id}/pdf`,
     },
@@ -1063,10 +1088,18 @@ export const api = {
       update: (id: string, data: { status?: InvoiceStatus; issue_date?: string; due_date?: string; tax_cents?: number; notes?: string; line_items?: InvoiceLineItem[] }) =>
         request<InvoiceResponse>('PUT', `/crm/invoices/${id}`, data),
       send: (id: string) => request<InvoiceResponse>('POST', `/crm/invoices/${id}/send`),
+      remind: (id: string) => request<InvoiceResponse>('POST', `/crm/invoices/${id}/remind`),
       recordPayment: (id: string, data: { amount_cents: number; method?: PaymentMethod; reference?: string; note?: string }) =>
         request<InvoiceResponse>('POST', `/crm/invoices/${id}/payments`, data),
       delete: (id: string) => request<void>('DELETE', `/crm/invoices/${id}`),
       pdfUrl: (id: string) => `${API_BASE}/crm/invoices/${id}/pdf`,
+    },
+
+    templates: {
+      list: (kind?: TemplateKind) => request<Template[]>('GET', kind ? `/crm/templates?kind=${kind}` : '/crm/templates'),
+      create: (data: Partial<Template>) => request<Template>('POST', '/crm/templates', data),
+      update: (id: string, data: Partial<Template>) => request<Template>('PUT', `/crm/templates/${id}`, data),
+      delete: (id: string) => request<void>('DELETE', `/crm/templates/${id}`),
     },
 
     public: {
@@ -1074,6 +1107,8 @@ export const api = {
       getContract: (token: string) => request<ContractPublic>('GET', `/crm/public/contracts/${token}`),
       acceptContract: (token: string, data: { accepted_name: string; email: string }) =>
         request<ContractPublic>('POST', `/crm/public/contracts/${token}/accept`, data),
+      declineContract: (token: string, reason: string) =>
+        request<ContractPublic>('POST', `/crm/public/contracts/${token}/decline`, { reason }),
       verifyStart: (token: string, email: string) =>
         request<{ ok: boolean }>('POST', `/crm/public/contracts/${token}/verify/start`, { email }),
       verifyConfirm: (token: string, email: string, code: string) =>

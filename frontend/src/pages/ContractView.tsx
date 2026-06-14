@@ -5,8 +5,9 @@ import { Loader2, CheckCircle2, Download, PenLine, ShieldCheck, ArrowDown, Mail,
 import { api, type ContractPublic, type ContractCertificate } from '../lib/api'
 
 const EVENT_LABELS: Record<string, string> = {
-  created: 'Document created', sent: 'Sent for signature', viewed: 'Document viewed',
-  otp_sent: 'Verification code sent', email_verified: 'Email verified', signed: 'Signed',
+  created: 'Document created', sent: 'Sent for signature', emailed: 'Emailed to client',
+  reminder_sent: 'Reminder sent', viewed: 'Document viewed', otp_sent: 'Verification code sent',
+  email_verified: 'Email verified', signed: 'Signed', declined: 'Changes requested',
 }
 const fmtTs = (s?: string | null) => s ? new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
 const normName = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase()
@@ -23,6 +24,8 @@ export default function ContractView() {
   const [msg, setMsg] = useState('')
   const [cert, setCert] = useState<ContractCertificate | null>(null)
   const [showAudit, setShowAudit] = useState(false)
+  const [declining, setDeclining] = useState(false)
+  const [declineReason, setDeclineReason] = useState('')
   const [docKey, setDocKey] = useState(0)
   const docRef = useRef<HTMLDivElement>(null)
 
@@ -59,6 +62,13 @@ export default function ContractView() {
       api.crm.public.getCertificate(token!).then(setCert).catch(() => {})
       docRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
     } catch { setMsg('Could not complete signing. Please re-verify and try again.'); setStep('email') }
+    finally { setBusy(false) }
+  }
+
+  const doDecline = async () => {
+    setBusy(true); setMsg('')
+    try { const u = await api.crm.public.declineContract(token!, declineReason.trim()); setC(u); setDeclining(false) }
+    catch { setMsg('Could not submit your request. Please try again.') }
     finally { setBusy(false) }
   }
 
@@ -128,6 +138,23 @@ export default function ContractView() {
             initial={{ y: 110 }} animate={{ y: 0 }} exit={{ y: 110 }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             className="shrink-0 bg-white border-t-2 border-blue/20 shadow-[0_-12px_40px_-20px_rgba(45,51,66,0.3)] z-20">
             <div className="max-w-[900px] mx-auto px-5 py-4">
+              {declining ? (
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-steel mb-2">Request changes</div>
+                  <textarea value={declineReason} onChange={e => setDeclineReason(e.target.value)} rows={3} autoFocus
+                    placeholder="What would you like changed? (optional)"
+                    className="w-full bg-cloud/70 border border-mist rounded-lg px-4 py-3 text-sm text-ink placeholder-silver focus:outline-none focus:border-blue/50 focus:ring-2 focus:ring-blue/10" />
+                  <div className="flex items-center gap-2 mt-3">
+                    <button onClick={doDecline} disabled={busy} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-ink text-white text-sm font-medium hover:bg-ember disabled:opacity-40 transition-colors">
+                      {busy ? <Loader2 size={15} className="animate-spin" /> : 'Send request'}
+                    </button>
+                    <button onClick={() => { setDeclining(false); setMsg('') }} className="text-sm text-steel hover:text-ink">Back to signing</button>
+                    {msg && <span className="text-[11px] text-ember">{msg}</span>}
+                  </div>
+                  <p className="mt-2 text-[11px] text-steel">{c.consultant_name} will be notified and can send a revised version. The contract won't be signed.</p>
+                </div>
+              ) : (
+              <>
               {/* step indicator */}
               <div className="flex items-center gap-2 mb-3 font-mono text-[10px] uppercase tracking-[0.18em]">
                 <Stepi icon={Mail} label="Verify email" active={step === 'email'} done={step !== 'email'} />
@@ -216,6 +243,24 @@ export default function ContractView() {
               <p className={`mt-2.5 text-[11px] ${msg ? 'text-blue' : 'text-steel'}`}>
                 {msg || (<><Lock size={11} className="inline -mt-0.5 mr-1" />Your email, name, IP address, and timestamps are recorded as your electronic signature. {c.consultant_name} has already signed.</>)}
               </p>
+              <button onClick={() => { setDeclining(true); setMsg('') }} className="mt-2 text-[11px] text-steel hover:text-ember underline">
+                Something off? Request changes instead
+              </button>
+              </>
+              )}
+            </div>
+          </motion.footer>
+        )}
+
+        {c.status === 'declined' && (
+          <motion.footer key="declined" initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="shrink-0 bg-violet/8 border-t border-violet/25 z-20">
+            <div className="max-w-[900px] mx-auto px-5 py-4 flex items-start gap-3">
+              <Info size={20} className="text-violet shrink-0 mt-0.5" />
+              <div>
+                <div className="text-sm font-medium text-ink">Changes requested</div>
+                <div className="text-[12px] text-steel">{c.consultant_name} has been notified and can send you a revised version to sign.{c.declined_reason ? ` Your note: “${c.declined_reason}”` : ''}</div>
+              </div>
             </div>
           </motion.footer>
         )}

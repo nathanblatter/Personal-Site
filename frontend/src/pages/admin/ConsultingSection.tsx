@@ -15,6 +15,7 @@ import PipelineTab from './consulting/PipelineTab'
 import ContactsTab from './consulting/ContactsTab'
 import EngagementsTab from './consulting/EngagementsTab'
 import InvoicesTab from './consulting/InvoicesTab'
+import TemplatesTab from './consulting/TemplatesTab'
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -22,6 +23,7 @@ const TABS = [
   { id: 'contacts', label: 'Contacts' },
   { id: 'engagements', label: 'Engagements' },
   { id: 'invoices', label: 'Invoices' },
+  { id: 'templates', label: 'Templates' },
 ]
 
 export interface CrmShared extends AdminCallbacks {
@@ -83,6 +85,7 @@ export default function ConsultingSection({ showToast, showError }: AdminCallbac
           {tab === 'contacts' && <ContactsTab shared={shared} />}
           {tab === 'engagements' && <EngagementsTab shared={shared} />}
           {tab === 'invoices' && <InvoicesTab shared={shared} />}
+          {tab === 'templates' && <TemplatesTab showToast={showToast} showError={showError} />}
         </>
       )}
     </div>

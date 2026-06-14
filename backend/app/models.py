@@ -677,6 +677,9 @@ class Contract(Base):
     email_verified_at = Column(DateTime(timezone=True), nullable=True)
     document_sha256 = Column(String, nullable=True)             # content fingerprint at execution
     executed_pdf = Column(LargeBinary, nullable=True)           # frozen, immutable executed document
+    declined_at = Column(DateTime(timezone=True), nullable=True)
+    declined_reason = Column(Text, nullable=True)
+    reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
 
@@ -699,6 +702,26 @@ class ContractEvent(Base):
     occurred_at = Column(DateTime(timezone=True), nullable=False)
 
     contract = relationship("Contract", back_populates="events")
+
+
+class Template(Base):
+    """Reusable contract or invoice template to avoid retyping scope/terms/line items."""
+    __tablename__ = "crm_template"
+
+    id = Column(PgUUID(as_uuid=False), primary_key=True, server_default="uuid_generate_v4()")
+    kind = Column(String, nullable=False)                       # "contract" | "invoice"
+    name = Column(String, nullable=False)                       # internal label
+    # contract fields
+    title = Column(String, nullable=True)
+    scope_md = Column(Text, nullable=True)
+    terms_md = Column(Text, nullable=True)
+    total_value_cents = Column(BigInteger, nullable=True)
+    # invoice fields
+    line_items = Column(JSON, nullable=True)                    # [{description, quantity, unit_price_cents}]
+    notes = Column(Text, nullable=True)
+    currency = Column(String(3), nullable=False, server_default="USD")
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    updated_at = Column(DateTime(timezone=True), nullable=False)
 
 
 class TimeEntry(Base):
@@ -740,6 +763,7 @@ class Invoice(Base):
     public_token = Column(String, nullable=True, unique=True)
     sent_at = Column(DateTime(timezone=True), nullable=True)
     paid_at = Column(DateTime(timezone=True), nullable=True)
+    reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
 

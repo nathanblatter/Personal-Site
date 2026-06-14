@@ -326,10 +326,13 @@ s_cert_td_mono = ParagraphStyle("certtdm", fontName=MONO, fontSize=7.5, textColo
 _EVENT_LABELS = {
     "created": "Document created",
     "sent": "Sent for signature",
+    "emailed": "Emailed to client",
+    "reminder_sent": "Reminder sent",
     "viewed": "Document viewed",
     "otp_sent": "Verification code sent",
     "email_verified": "Email verified",
     "signed": "Signed",
+    "declined": "Changes requested",
 }
 
 

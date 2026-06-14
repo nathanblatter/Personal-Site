@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { Plus, Trash2, FileText, Clock, Receipt, Link as LinkIcon, Check, Pencil, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, Trash2, FileText, Clock, Receipt, Link as LinkIcon, Check, Pencil, X, Bell, Info } from 'lucide-react'
 import {
-  api, type EngagementDetail, type EngagementResponse, type BillingType, type ContractResponse,
+  api, type EngagementDetail, type EngagementResponse, type BillingType, type ContractResponse, type Template,
 } from '../../../lib/api'
 import { AdminInput, AdminSelect, AdminTextarea } from '../AdminShared'
 import { fmtCents, dollarsToCents, centsToDollars, fmtMinutes, fmtDate, Pill } from './crmShared'
@@ -123,7 +123,15 @@ function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: Eng
       const sent = await api.crm.contracts.send(c.id)
       await refresh()
       if (sent.public_token) copyLink(`${window.location.origin}/contract/${sent.public_token}`, c.id)
-      showToast('Contract sent — link copied')
+      showToast(sent.recipient_email ? `Emailed to ${sent.recipient_email} · link copied` : 'Link copied — no email on file')
+    } catch (e) { showError((e as Error).message) }
+  }
+
+  const remindContract = async (c: ContractResponse) => {
+    try {
+      const r = await api.crm.contracts.remind(c.id)
+      await refresh()
+      showToast(r.recipient_email ? `Reminder emailed to ${r.recipient_email}` : 'Reminder sent')
     } catch (e) { showError((e as Error).message) }
   }
 
@@ -213,7 +221,8 @@ function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: Eng
                     {copied === c.id ? <Check size={13} className="text-teal" /> : <LinkIcon size={13} />}
                   </button>
                 )}
-                {c.status === 'draft' && <button onClick={() => sendContract(c)} className="text-xs text-blue hover:underline">Send</button>}
+                {(c.status === 'draft' || c.status === 'declined') && <button onClick={() => sendContract(c)} className="text-xs text-blue hover:underline">{c.status === 'declined' ? 'Re-send' : 'Send'}</button>}
+                {c.status === 'sent' && <button onClick={() => remindContract(c)} className="inline-flex items-center gap-1 text-xs text-blue hover:underline" title="Email a reminder"><Bell size={12} /> Remind</button>}
                 {c.status !== 'accepted' && (
                   <button onClick={() => { setEditingContractId(c.id); setCreatingContract(false) }} className="text-steel hover:text-blue" title="Edit"><Pencil size={13} /></button>
                 )}
@@ -224,7 +233,13 @@ function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: Eng
                 <span>EFFECTIVE {c.start_date ? fmtDate(c.start_date) : 'On signing'}</span>
                 <span>TERM {c.start_date && c.end_date ? `${fmtDate(c.start_date)} – ${fmtDate(c.end_date)}` : 'Until completion'}</span>
                 <span>VALUE {c.total_value_cents ? fmtCents(c.total_value_cents) : 'As agreed'}</span>
+                {c.reminder_sent_at && <span>REMINDED {fmtDate(c.reminder_sent_at)}</span>}
               </div>
+              {c.status === 'declined' && c.declined_reason && (
+                <div className="mt-2 flex items-start gap-1.5 text-[11px] text-ember bg-ember/5 border border-ember/15 rounded-md px-2.5 py-1.5">
+                  <Info size={12} className="shrink-0 mt-0.5" /> <span>Client requested changes: “{c.declined_reason}”</span>
+                </div>
+              )}
             </div>
           ))}
           {detail.contracts.length === 0 && !creatingContract && <div className="text-xs text-silver">No contracts</div>}
@@ -273,6 +288,17 @@ function ContractForm({ initial, submitLabel, onSubmit, onCancel }: {
   const [end, setEnd] = useState(initial?.end_date ?? '')
   const [scope, setScope] = useState(initial?.scope_md ?? '')
   const [terms, setTerms] = useState(initial?.terms_md ?? '')
+  const [templates, setTemplates] = useState<Template[]>([])
+
+  useEffect(() => { if (!initial) api.crm.templates.list('contract').then(setTemplates).catch(() => {}) }, [initial])
+
+  const applyTemplate = (id: string) => {
+    const t = templates.find(x => x.id === id); if (!t) return
+    if (t.title) setTitle(t.title)
+    if (t.scope_md) setScope(t.scope_md)
+    if (t.terms_md) setTerms(t.terms_md)
+    if (t.total_value_cents != null) setValue(centsToDollars(t.total_value_cents))
+  }
 
   const submit = () => {
     if (!title.trim()) return
@@ -288,6 +314,10 @@ function ContractForm({ initial, submitLabel, onSubmit, onCancel }: {
 
   return (
     <div className="border border-blue/20 bg-blue-wash/30 rounded-lg p-4 space-y-3">
+      {templates.length > 0 && (
+        <AdminSelect label="Start from template" value="" onChange={applyTemplate}
+          options={[{ value: '', label: 'Blank — or pick a template…' }, ...templates.map(t => ({ value: t.id, label: t.name }))]} />
+      )}
       <AdminInput label="Title" value={title} onChange={setTitle} placeholder="Statement of Work" />
       <div className="grid grid-cols-3 gap-3">
         <AdminInput label="Compensation ($)" value={value} onChange={setValue} placeholder="As agreed" />

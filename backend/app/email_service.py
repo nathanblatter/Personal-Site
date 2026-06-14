@@ -143,6 +143,52 @@ async def _send_mime(to: str, subject: str, text_body: str, html_body: str,
         return False
 
 
+def _btn(href: str, label: str) -> str:
+    return (f'<a href="{href}" style="display:inline-block;background:#3b6cf5;color:#fff;text-decoration:none;'
+            f'font-weight:600;font-size:14px;padding:12px 22px;border-radius:10px">{label}</a>')
+
+
+def _wrap(inner: str) -> str:
+    return (f'<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;'
+            f'padding:8px;color:#2d3342">{inner}'
+            f'<p style="font-size:12px;color:#8c95a6;margin-top:24px">Nathan Blatter · '
+            f'<a href="{SITE_URL}" style="color:#8c95a6">nathanblatter.com</a></p></div>')
+
+
+async def send_contract_email(to: str, contract_title: str, link: str, reminder: bool = False) -> bool:
+    verb = "A reminder to sign" if reminder else "You've been sent a contract to sign"
+    subject = (f"Reminder: please sign “{contract_title}”" if reminder
+               else f"Nathan Blatter sent you a contract to sign — {contract_title}")
+    text = f"{verb}: {contract_title}\n\nReview and sign here:\n{link}\n\nNathan has already signed."
+    html = _wrap(
+        f'<p style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#8c95a6;margin:0 0 6px">'
+        f'{"Signature reminder" if reminder else "Contract for signature"}</p>'
+        f'<p style="font-size:15px;margin:0 0 18px">{verb}: <strong>{contract_title}</strong>. '
+        f'Review the document and add your signature — Nathan has already signed.</p>'
+        f'<div style="margin:0 0 18px">{_btn(link, "Review &amp; sign")}</div>'
+        f'<p style="font-size:12px;color:#8c95a6;margin:0">Or paste this link: <br>{link}</p>')
+    return await _send_mime(to, subject, text, html)
+
+
+async def send_invoice_email(to: str, number: str, amount: str, link: str,
+                             due: str | None = None, reminder: bool = False) -> bool:
+    due_line = f" · due {due}" if due else ""
+    subject = (f"Reminder: invoice {number} ({amount}){' is overdue' if reminder else ''}"
+               if reminder else f"Invoice {number} from Nathan Blatter — {amount}")
+    lead = ("This is a friendly reminder about an unpaid invoice"
+            if reminder else "You have a new invoice")
+    text = f"{lead}: {number} for {amount}{due_line}.\n\nView it here:\n{link}"
+    html = _wrap(
+        f'<p style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#8c95a6;margin:0 0 6px">'
+        f'{"Payment reminder" if reminder else "New invoice"}</p>'
+        f'<p style="font-size:15px;margin:0 0 6px">{lead}:</p>'
+        f'<p style="font-size:22px;font-weight:700;margin:0 0 4px">{number} — {amount}</p>'
+        f'<p style="font-size:13px;color:#8c95a6;margin:0 0 18px">{("Due " + due) if due else ""}</p>'
+        f'<div style="margin:0 0 18px">{_btn(link, "View invoice")}</div>'
+        f'<p style="font-size:12px;color:#8c95a6;margin:0">Or paste this link: <br>{link}</p>')
+    return await _send_mime(to, subject, text, html)
+
+
 async def send_contract_otp_email(to: str, code: str, contract_title: str) -> bool:
     """Send a 6-digit verification code for signing a contract."""
     subject = f"Your code to sign “{contract_title}”: {code}"

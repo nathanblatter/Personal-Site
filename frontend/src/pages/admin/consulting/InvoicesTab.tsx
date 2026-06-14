@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FileText, Link as LinkIcon, Check, Trash2, DollarSign, Loader2 } from 'lucide-react'
+import { FileText, Link as LinkIcon, Check, Trash2, DollarSign, Loader2, Bell } from 'lucide-react'
 import { api, type InvoiceResponse, type PaymentMethod } from '../../../lib/api'
 import { AdminInput, AdminSelect } from '../AdminShared'
 import type { CrmShared } from '../ConsultingSection'
@@ -26,7 +26,15 @@ export default function InvoicesTab({ shared }: { shared: CrmShared }) {
       const sent = await api.crm.invoices.send(inv.id)
       await reload()
       if (sent.public_token) { navigator.clipboard.writeText(`${window.location.origin}/invoice/${sent.public_token}`); setCopied(inv.id); setTimeout(() => setCopied(''), 1500) }
-      showToast('Invoice sent — link copied')
+      showToast(sent.recipient_email ? `Emailed to ${sent.recipient_email} · link copied` : 'Link copied — no email on file')
+    } catch (e) { showError((e as Error).message) }
+  }
+
+  const remind = async (inv: InvoiceResponse) => {
+    try {
+      const r = await api.crm.invoices.remind(inv.id)
+      await reload()
+      showToast(r.recipient_email ? `Reminder emailed to ${r.recipient_email}` : 'Reminder sent')
     } catch (e) { showError((e as Error).message) }
   }
 
@@ -78,6 +86,11 @@ export default function InvoicesTab({ shared }: { shared: CrmShared }) {
 
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-mist">
               {inv.status === 'draft' && <button onClick={() => send(inv)} className="text-xs px-2.5 py-1.5 bg-blue text-white rounded-lg hover:bg-blue/90">Send</button>}
+              {(inv.status === 'sent' || inv.status === 'partial' || inv.status === 'overdue') && (
+                <button onClick={() => remind(inv)} className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 bg-cloud text-steel rounded-lg hover:bg-blue-wash hover:text-blue" title="Email a payment reminder">
+                  <Bell size={12} /> Remind
+                </button>
+              )}
               {inv.public_token && (
                 <button onClick={() => copyLink(inv)} className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 bg-cloud text-steel rounded-lg hover:bg-blue-wash hover:text-blue">
                   {copied === inv.id ? <Check size={12} className="text-teal" /> : <LinkIcon size={12} />} Link
