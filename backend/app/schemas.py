@@ -1352,6 +1352,7 @@ class ContractPublic(BaseModel):
     accepted_at: Optional[datetime] = None
     accepted_name: Optional[str] = None
     consultant_name: str = "Nathan Blatter"
+    model_config = {"from_attributes": True}
 
 
 class ContractAccept(BaseModel):
