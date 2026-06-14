@@ -590,9 +590,11 @@ export interface ContractPublic {
   accepted_at?: string | null
   accepted_name?: string | null
   consultant_name: string
+  consultant_email?: string
   consultant_signed_name?: string | null
   consultant_signed_at?: string | null
   client_name?: string | null
+  expected_signer_name?: string | null
   signer_email?: string | null
   email_verified_at?: string | null
   document_sha256?: string | null

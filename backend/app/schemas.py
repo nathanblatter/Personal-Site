@@ -1357,9 +1357,11 @@ class ContractPublic(BaseModel):
     accepted_at: Optional[datetime] = None
     accepted_name: Optional[str] = None
     consultant_name: str = "Nathan Blatter"
+    consultant_email: str = "nzb22@byu.edu"
     consultant_signed_name: Optional[str] = None
     consultant_signed_at: Optional[datetime] = None
     client_name: Optional[str] = None
+    expected_signer_name: Optional[str] = None   # name on file the client must sign with
     signer_email: Optional[str] = None
     email_verified_at: Optional[datetime] = None
     document_sha256: Optional[str] = None

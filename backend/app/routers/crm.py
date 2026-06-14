@@ -864,10 +864,16 @@ async def public_invoice(token: str, db: AsyncSession = Depends(get_db)):
     )
 
 
+def _norm_name(s: Optional[str]) -> str:
+    """Normalize a name for matching: trim, collapse inner whitespace, casefold."""
+    return " ".join((s or "").split()).casefold()
+
+
 async def _contract_public(db: AsyncSession, contract: models.Contract) -> schemas.ContractPublic:
     pub = schemas.ContractPublic.model_validate(contract)
     contact = await _contract_contact(db, contract)
     pub.client_name = (contact.company_name or contact.name) if contact else None
+    pub.expected_signer_name = contact.name if contact else None
     return pub
 
 
@@ -1003,10 +1009,17 @@ async def accept_contract(token: str, payload: schemas.ContractAccept, request: 
     if not await get_redis().get(ok_key):
         raise HTTPException(403, "Please verify your email before signing")
 
+    # Require the typed name to match the name on file (case/space-insensitive).
+    contact = await _contract_contact(db, contract)
+    expected = contact.name if contact else None
+    signer_name = " ".join(payload.accepted_name.split())  # trim + collapse whitespace
+    if expected and _norm_name(signer_name) != _norm_name(expected):
+        raise HTTPException(422, "The name you entered must match the name on file for this agreement.")
+
     now = _now()
     contract.status = models.ContractStatus.accepted
     contract.accepted_at = now
-    contract.accepted_name = payload.accepted_name
+    contract.accepted_name = signer_name
     contract.accepted_ip = get_client_ip(request)
     contract.signer_email = e
     contract.email_verified_at = now
@@ -1015,19 +1028,18 @@ async def accept_contract(token: str, payload: schemas.ContractAccept, request: 
         contract.consultant_signed_at = now
     contract.updated_at = now
 
-    await _log_contract(db, contract.id, "signed", request, actor_name=payload.accepted_name,
+    await _log_contract(db, contract.id, "signed", request, actor_name=signer_name,
                         actor_email=e, meta={"party": "client"})
     if contract.engagement:
         await crm_utils.log_activity(
             db, contact_id=contract.engagement.contact_id, type=models.ActivityType.status_change,
             engagement_id=contract.engagement_id,
-            body_md=f"Contract **{contract.title}** signed by {payload.accepted_name} ({e})",
+            body_md=f"Contract **{contract.title}** signed by {signer_name} ({e})",
         )
 
     # Tamper-evidence: fingerprint the content, then freeze the executed PDF
     # (with its certificate of completion) so it can never be silently re-generated.
     await db.flush()
-    contact = await _contract_contact(db, contract)
     contract.document_sha256 = crm_utils.contract_fingerprint(contract, contact)
     ev_res = await db.execute(
         select(models.ContractEvent).where(models.ContractEvent.contract_id == contract.id)

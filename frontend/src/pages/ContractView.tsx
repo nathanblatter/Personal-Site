@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
-import { Loader2, CheckCircle2, Download, PenLine, ShieldCheck, ArrowDown, Mail, KeyRound, Lock, FileCheck2, ChevronDown } from 'lucide-react'
+import { Loader2, CheckCircle2, Download, PenLine, ShieldCheck, ArrowDown, Mail, KeyRound, Lock, FileCheck2, ChevronDown, Info } from 'lucide-react'
 import { api, type ContractPublic, type ContractCertificate } from '../lib/api'
 
 const EVENT_LABELS: Record<string, string> = {
@@ -9,6 +9,7 @@ const EVENT_LABELS: Record<string, string> = {
   otp_sent: 'Verification code sent', email_verified: 'Email verified', signed: 'Signed',
 }
 const fmtTs = (s?: string | null) => s ? new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
+const normName = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase()
 
 export default function ContractView() {
   const { token } = useParams<{ token: string }>()
@@ -49,6 +50,8 @@ export default function ContractView() {
   }
   const sign = async () => {
     if (!name.trim()) return
+    const exp = c?.expected_signer_name || ''
+    if (exp && normName(name) !== normName(exp)) { setMsg(`Your name must match the name on file: ${exp}`); return }
     setBusy(true); setMsg('')
     try {
       const updated = await api.crm.public.acceptContract(token!, { accepted_name: name.trim(), email: email.trim() })
@@ -65,6 +68,9 @@ export default function ContractView() {
   const pdfUrl = `${api.crm.public.contractPdfUrl(token!)}?v=${docKey}`
   const signed = c.status === 'accepted'
   const open = c.status === 'sent'
+  const expected = c.expected_signer_name || ''
+  const nameTouched = name.trim().length > 0
+  const nameMatches = !expected || normName(name) === normName(expected)
 
   return (
     <div className="h-screen flex flex-col bg-mist/50 overflow-hidden">
@@ -167,14 +173,40 @@ export default function ContractView() {
                   <>
                     <div className="flex-1">
                       <label className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-steel mb-1.5">
-                        <CheckCircle2 size={12} className="text-teal" /> Email verified — type your full legal name to sign
+                        <CheckCircle2 size={12} className="text-teal" /> Email verified — sign your full legal name
+                        {expected && <span className="text-ink normal-case tracking-normal font-sans">— exactly as: <b>{expected}</b></span>}
                       </label>
-                      <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && sign()}
-                        placeholder="Your full name" autoFocus
-                        className="w-full bg-cloud/70 border border-mist rounded-lg px-4 py-3 text-ink placeholder-silver focus:outline-none focus:border-blue/50 focus:ring-2 focus:ring-blue/10"
-                        style={{ fontFamily: 'Caveat, cursive', fontSize: '26px', lineHeight: 1.1 }} />
+                      <div className="relative">
+                        <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && sign()}
+                          placeholder={expected || 'Your full name'} autoFocus aria-invalid={nameTouched && !nameMatches}
+                          className={`w-full bg-cloud/70 border rounded-lg px-4 py-3 pr-11 text-ink placeholder-silver focus:outline-none focus:ring-2 transition-colors ${
+                            nameTouched && !nameMatches ? 'border-ember/60 focus:border-ember/60 focus:ring-ember/10'
+                            : nameTouched && nameMatches ? 'border-teal/60 focus:border-teal/60 focus:ring-teal/10'
+                            : 'border-mist focus:border-blue/50 focus:ring-blue/10'}`}
+                          style={{ fontFamily: 'Caveat, cursive', fontSize: '26px', lineHeight: 1.1 }} />
+                        {nameTouched && (
+                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                            {nameMatches ? <CheckCircle2 size={18} className="text-teal" /> : <span className="block w-[18px] h-[18px] rounded-full border-2 border-ember/50" />}
+                          </span>
+                        )}
+                      </div>
+                      {expected && (
+                        <p className={`mt-1.5 text-[11px] ${nameTouched && !nameMatches ? 'text-ember' : nameTouched ? 'text-teal' : 'text-steel'}`}>
+                          {nameTouched && !nameMatches ? `Must match the name on file: ${expected}` : nameTouched ? 'Matches the name on file' : `Type your name exactly as: ${expected}`}
+                        </p>
+                      )}
+                      {expected && nameTouched && !nameMatches && (
+                        <div className="mt-2 flex items-start gap-2 text-[11px] text-slate bg-cloud/70 border border-mist rounded-lg px-3 py-2">
+                          <Info size={13} className="text-blue shrink-0 mt-0.5" />
+                          <span>
+                            We have your name on file as <b className="text-ink">{expected}</b>. If that isn’t your correct legal name, please{' '}
+                            <a href={`mailto:${c.consultant_email || ''}?subject=${encodeURIComponent(`Name correction — ${c.title}`)}&body=${encodeURIComponent(`Hi ${c.consultant_name}, the name on file for "${c.title}" should be: `)}`}
+                              className="text-blue underline font-medium">email {c.consultant_name}</a>{' '}to fix it before signing — don’t sign with a name that doesn’t match.
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <button onClick={sign} disabled={!name.trim() || busy} className="shrink-0 inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-lg bg-blue text-white font-medium shadow-lg shadow-blue/25 hover:bg-blue-dim disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                    <button onClick={sign} disabled={!nameTouched || !nameMatches || busy} className="shrink-0 inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-lg bg-blue text-white font-medium shadow-lg shadow-blue/25 hover:bg-blue-dim disabled:opacity-40 disabled:cursor-not-allowed transition-all">
                       {busy ? <Loader2 size={16} className="animate-spin" /> : <><ShieldCheck size={16} /> Adopt &amp; Sign</>}
                     </button>
                   </>
