@@ -144,6 +144,10 @@ async def _periodic_crm_reminders():
     return await crm.send_crm_reminders()
 
 
+async def _periodic_church_reminder():
+    return await kpi.send_church_reminder()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await kpi.init_kpi_db()
@@ -154,6 +158,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_supervised("booking_cleanup", _periodic_booking_cleanup, 3600)),
         asyncio.create_task(_supervised("booking_reminders", _periodic_booking_reminders, 600)),
         asyncio.create_task(_supervised("crm_reminders", _periodic_crm_reminders, 21600)),
+        asyncio.create_task(_supervised("church_reminder", _periodic_church_reminder, 600)),
     ]
     _read_index_html()
     yield
@@ -284,6 +289,7 @@ app.include_router(links.router)
 app.include_router(seo.router)
 app.include_router(kpi.router, prefix=API_PREFIX)
 app.include_router(kpi.health_ingest_router, prefix="/api")
+app.include_router(kpi.church_link_router)
 app.include_router(claude_usage.router, prefix=API_PREFIX)
 app.include_router(home.router, prefix=API_PREFIX)
 app.include_router(about_page.router, prefix=API_PREFIX)

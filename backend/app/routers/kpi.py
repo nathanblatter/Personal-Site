@@ -1,5 +1,8 @@
 """KPI router — exposes site analytics metrics for external dashboards."""
 
+import base64
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -12,7 +15,10 @@ from urllib.parse import urlparse, urlunparse
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+
+from app import imessage_service
 
 log = logging.getLogger("kpi")
 
@@ -291,6 +297,158 @@ async def temple_visit(_: None = Depends(_verify_health_ingest_key)):
             "SELECT temple FROM kpi_daily_log WHERE date = $1", today
         )
     return {"status": "ok", "date": today.isoformat(), "temple": count}
+
+
+# ---------------------------------------------------------------------------
+# Church check-in — magic link (no API key; auth is the signed token itself)
+# ---------------------------------------------------------------------------
+#
+# Flow: a weekly background task (Sunday ~5pm) texts Nathan a one-tap link via
+# the iMessage gateway. Tapping it hits GET /c/{token}, which verifies an HMAC
+# over the date and marks church=true for that day. natebot stays out of it —
+# this is the single writer of the church KPI (besides the manual /kpi church
+# fallback). Idempotent: tapping twice just re-sets true.
+
+CHURCH_LINK_SECRET = os.getenv("CHURCH_LINK_SECRET", "")
+SITE_BASE_URL = os.getenv("SITE_BASE_URL", "https://nathanblatter.com")
+# Hour (local time) to send the Sunday reminder; 17 = 5pm.
+CHURCH_REMINDER_HOUR = int(os.getenv("CHURCH_REMINDER_HOUR", "17"))
+
+# In-memory guard so the supervised loop texts at most once per day.
+_last_church_reminder: Optional[date_type] = None
+
+church_link_router = APIRouter(tags=["kpi"])
+
+
+def _b64url_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _b64url_decode(s: str) -> bytes:
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+def _church_signature(date_str: str) -> str:
+    sig = hmac.new(CHURCH_LINK_SECRET.encode(), date_str.encode(), hashlib.sha256).digest()
+    return _b64url_encode(sig)
+
+
+def sign_church_token(date_str: str) -> str:
+    return f"{_b64url_encode(date_str.encode())}.{_church_signature(date_str)}"
+
+
+def verify_church_token(token: str) -> Optional[date_type]:
+    """Return the signed date if the token is valid, else None."""
+    if not CHURCH_LINK_SECRET:
+        return None
+    try:
+        payload_b64, sig = token.split(".", 1)
+        date_str = _b64url_decode(payload_b64).decode()
+        if not hmac.compare_digest(_church_signature(date_str), sig):
+            return None
+        return date_type.fromisoformat(date_str)
+    except Exception:
+        return None
+
+
+def _church_page(heading: str, message: str, ok: bool) -> str:
+    accent = "#16a34a" if ok else "#dc2626"
+    glyph = "✅" if ok else "⚠️"
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{heading}</title>
+<style>
+  html,body{{height:100%;margin:0}}
+  body{{display:flex;align-items:center;justify-content:center;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    background:#0b0b0f;color:#f5f5f7;text-align:center;padding:24px}}
+  .card{{max-width:380px}}
+  .glyph{{font-size:56px;line-height:1}}
+  h1{{font-size:22px;margin:18px 0 8px;color:{accent}}}
+  p{{font-size:16px;color:#a1a1aa;margin:0}}
+</style></head>
+<body><div class="card">
+  <div class="glyph">{glyph}</div>
+  <h1>{heading}</h1>
+  <p>{message}</p>
+</div></body></html>"""
+
+
+_NO_STORE = {"Cache-Control": "no-store"}
+
+
+@church_link_router.get("/c/{token}", response_class=HTMLResponse, include_in_schema=False)
+async def church_checkin(token: str):
+    signed_date = verify_church_token(token)
+    if signed_date is None:
+        return HTMLResponse(
+            _church_page("Invalid link", "This check-in link isn't valid.", ok=False),
+            status_code=400,
+            headers=_NO_STORE,
+        )
+
+    # Only honor links for the last few days, so an old text can't be replayed later.
+    today = datetime.now(LOCAL_TZ).date()
+    if abs((today - signed_date).days) > 2:
+        return HTMLResponse(
+            _church_page("Link expired", "This check-in link is no longer valid.", ok=False),
+            status_code=410,
+            headers=_NO_STORE,
+        )
+
+    async with _KPI_POOL.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO kpi_daily_log (date, church)
+            VALUES ($1, TRUE)
+            ON CONFLICT (date) DO UPDATE SET church = TRUE
+            """,
+            signed_date,
+        )
+
+    pretty = signed_date.strftime("%A, %B ") + str(signed_date.day)
+    return HTMLResponse(
+        _church_page("Logged", f"Church recorded for {pretty}. 🙏", ok=True),
+        headers=_NO_STORE,
+    )
+
+
+async def send_church_reminder() -> str:
+    """Text the Sunday church magic link, at most once per Sunday in the target hour.
+
+    Designed to run on a short supervised interval (<1h); the hour-gate plus the
+    in-memory day-guard ensure exactly one send per Sunday unless the process
+    restarts inside the window.
+    """
+    global _last_church_reminder
+    now = datetime.now(LOCAL_TZ)
+    if now.weekday() != 6:          # 6 = Sunday
+        return "skip: not sunday"
+    if now.hour != CHURCH_REMINDER_HOUR:
+        return "skip: outside send window"
+    today = now.date()
+    if _last_church_reminder == today:
+        return "skip: already sent today"
+    if not CHURCH_LINK_SECRET:
+        log.warning("CHURCH_LINK_SECRET not set — cannot send church reminder")
+        return "skip: no secret configured"
+
+    async with _KPI_POOL.acquire() as conn:
+        already = await conn.fetchval(
+            "SELECT church FROM kpi_daily_log WHERE date = $1", today
+        )
+    if already:
+        _last_church_reminder = today
+        return "skip: church already logged"
+
+    url = f"{SITE_BASE_URL}/c/{sign_church_token(today.isoformat())}"
+    await imessage_service.send_alert(
+        f"Did you make it to church today? Tap to log it 🙏\n{url}"
+    )
+    _last_church_reminder = today
+    return f"sent church reminder for {today.isoformat()}"
 
 
 class LocationIngestRequest(BaseModel):
