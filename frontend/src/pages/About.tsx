@@ -18,6 +18,13 @@ const CERTIFICATIONS = [
     image: 'https://nathanblatter.com/api/v1/storage/download/certs/psm1.png',
     verify_url: 'https://www.credly.com/badges/32fb3752-e53f-4f0f-8699-0e4ac8c24897/public_url',
   },
+  {
+    id: 'd2c9c8b1-5a0e-4c3b-9cbd-8f0a4e5e7a6f',
+    name: 'Claude 101',
+    issuer: 'Anthropic',
+    image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
+    verify_url: 'https://verify.skilljar.com/c/73tzbqpcbe5p',
+  }
 ]
 
 export default function About() {
