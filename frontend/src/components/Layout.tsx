@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { Menu, X, Sun, Moon } from 'lucide-react'
 import { useTheme } from '../lib/useTheme'
 import CookieBanner from './CookieBanner'
+import BugReport from './BugReport'
 
 const navLinks = [
   { to: '/', label: 'Home', code: '00' },
@@ -191,6 +192,7 @@ export default function Layout() {
       </footer>
 
       <CookieBanner />
+      <BugReport />
     </div>
   )
 }

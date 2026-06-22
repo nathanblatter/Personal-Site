@@ -15,7 +15,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import select
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
 from app.database import AsyncSessionLocal
 from app import models
@@ -288,6 +288,7 @@ app.include_router(analytics.router)
 app.include_router(links.router)
 app.include_router(seo.router)
 app.include_router(kpi.router, prefix=API_PREFIX)
+app.include_router(bug_report.router, prefix=API_PREFIX)
 app.include_router(kpi.health_ingest_router, prefix="/api")
 app.include_router(kpi.church_link_router)
 app.include_router(claude_usage.router, prefix=API_PREFIX)
