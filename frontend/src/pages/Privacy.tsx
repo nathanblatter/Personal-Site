@@ -7,7 +7,7 @@ export default function Privacy() {
         <div className="mb-12">
           <span className="font-mono text-xs text-blue tracking-[0.2em] uppercase">// LEGAL</span>
           <h1 className="font-serif text-4xl md:text-5xl italic text-ink mt-3 mb-4">Privacy Policy</h1>
-          <p className="font-mono text-xs text-steel">Last updated: May 2026</p>
+          <p className="font-mono text-xs text-steel">Last updated: June 2026</p>
         </div>
 
         <div className="prose-custom space-y-10 text-steel leading-relaxed">
@@ -84,8 +84,33 @@ export default function Privacy() {
             <h2 className="font-sans font-semibold text-ink text-xl">Contact Form</h2>
             <p>
               If you submit a message via the contact form, your name, email address, and message
-              are sent to Nathan Blatter by email. This data is used only to respond to your
-              inquiry and is not stored in a database, sold, or shared with anyone.
+              are sent to Nathan Blatter by email and stored privately so that he can keep track of
+              and respond to your inquiry. This data is used only to correspond with you. It is never
+              sold or shared with anyone, and you can request its deletion at any time (see below).
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="font-sans font-semibold text-ink text-xl">Scheduling a Call</h2>
+            <p>
+              If you request a call through the booking page, the name, email address, and topic
+              you provide are stored so the meeting can be scheduled and managed. Confirmation,
+              reminder, and update emails are sent to that address. To host the call, a meeting
+              link is created through <span className="text-ink font-medium">Zoom</span>; the
+              details you submit are shared with Zoom only as needed to set up that meeting. This
+              data is never sold or shared with anyone else, and you can request its deletion at
+              any time (see below).
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="font-sans font-semibold text-ink text-xl">Bug Reports &amp; Feedback</h2>
+            <p>
+              If you use the feedback widget to report a problem, the message you write — along
+              with the page you were on and basic technical details (such as browser and screen
+              size) — is forwarded to a private issue tracker so the problem can be fixed. Only
+              include personal information if you choose to. This data is used solely to diagnose
+              and resolve issues and is never sold or shared with third parties.
             </p>
           </section>
 
@@ -125,6 +150,22 @@ export default function Privacy() {
                   .
                 </p>
               </div>
+              <div>
+                <p className="text-ink font-medium text-sm mb-1">Zoom</p>
+                <p className="text-sm">
+                  If you book a call, a meeting is created through Zoom. The name, email, and topic
+                  you provide are shared with Zoom solely to set up and host that meeting. See{' '}
+                  <a
+                    href="https://www.zoom.com/en/trust/privacy/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue hover:underline"
+                  >
+                    Zoom's Privacy Statement
+                  </a>
+                  .
+                </p>
+              </div>
             </div>
           </section>
 
@@ -132,10 +173,10 @@ export default function Privacy() {
             <h2 className="font-sans font-semibold text-ink text-xl">Your Rights (GDPR)</h2>
             <p>
               If you are located in the European Economic Area, you have the right to access,
-              correct, or request deletion of any personal data held about you. As this site
-              collects no persistent personal data from visitors, there is typically nothing
-              to provide or delete. For contact form submissions, you may request deletion
-              by emailing the address below.
+              correct, or request deletion of any personal data held about you. Browsing the site
+              creates no persistent personal record. If you have contacted Nathan, booked a call,
+              or submitted feedback, you can request a copy or deletion of that information at any
+              time by getting in touch (see below).
             </p>
           </section>
 
