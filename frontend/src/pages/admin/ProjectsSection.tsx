@@ -4,6 +4,7 @@ import { Plus, Trash2, GripVertical, Save, X, Pencil, ExternalLink } from 'lucid
 import { api, type ProjectResponse } from '../../lib/api'
 import { AdminInput, AdminTextarea, AdminSelect, TagEditor, StatusBadge, SectionCard, FileUploadButton, type AdminCallbacks } from './AdminShared'
 import { useUnsavedWarning } from './useUnsavedWarning'
+import { useDragReorder } from './useDragReorder'
 
 interface ProjectsSectionProps extends AdminCallbacks {
   projects: ProjectResponse[]
@@ -17,6 +18,17 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
   const updateProjectLocal = (id: number, field: string, value: unknown) => {
     setProjects(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
   }
+
+  const { dragHandleProps, dropTargetProps, overId } = useDragReorder(projects, async (next) => {
+    const reindexed = next.map((p, i) => ({ ...p, sort_order: i }))
+    const changed = reindexed.filter(p => projects.find(o => o.id === p.id)?.sort_order !== p.sort_order)
+    setProjects(reindexed)
+    try {
+      await Promise.all(changed.map(p => api.projects.update(p.id, { sort_order: p.sort_order })))
+    } catch (err) {
+      showError((err as Error).message)
+    }
+  })
 
   const saveProject = async (project: ProjectResponse) => {
     try {
@@ -52,15 +64,24 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
     }
   }
 
-  const deleteProject = async (id: number) => {
-    try {
-      await api.projects.delete(id)
-      setProjects(prev => prev.filter(p => p.id !== id))
-      if (editingProject === id) setEditingProject(null)
-      showToast('Project deleted')
-    } catch (err) {
-      showError((err as Error).message)
-    }
+  const deleteProject = (id: number) => {
+    const idx = projects.findIndex(p => p.id === id)
+    const removed = projects[idx]
+    if (!removed) return
+    setProjects(prev => prev.filter(p => p.id !== id))
+    if (editingProject === id) setEditingProject(null)
+    let undone = false
+    const timer = setTimeout(async () => {
+      if (undone) return
+      try { await api.projects.delete(id) } catch (err) {
+        setProjects(prev => [...prev.slice(0, idx), removed, ...prev.slice(idx)])
+        showError((err as Error).message)
+      }
+    }, 5000)
+    showToast('Project deleted', {
+      label: 'Undo',
+      onClick: () => { undone = true; clearTimeout(timer); setProjects(prev => [...prev.slice(0, idx), removed, ...prev.slice(idx)]) },
+    })
   }
 
   return (
@@ -77,12 +98,19 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
 
       <div className="space-y-3">
         {projects.map(project => (
-          <SectionCard key={project.id} className="!p-0 overflow-hidden">
+          <SectionCard key={project.id} {...dropTargetProps(project.id)} className={`!p-0 overflow-hidden ${overId === project.id ? 'ring-2 ring-blue/30' : ''}`}>
             <div
               className="flex items-center gap-4 p-5 cursor-pointer hover:bg-cloud/50 transition-colors"
               onClick={() => setEditingProject(editingProject === project.id ? null : project.id)}
             >
-              <GripVertical size={14} className="text-silver" />
+              <span
+                {...dragHandleProps(project.id)}
+                onClick={e => e.stopPropagation()}
+                className="cursor-grab active:cursor-grabbing text-silver hover:text-steel"
+                title="Drag to reorder"
+              >
+                <GripVertical size={14} />
+              </span>
               <div className="w-4 h-4 rounded-md border border-mist" style={{ background: project.color }} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3">

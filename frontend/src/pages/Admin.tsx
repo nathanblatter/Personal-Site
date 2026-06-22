@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import {
@@ -19,6 +19,10 @@ import {
   Calendar,
   Handshake,
   FileStack,
+  ChevronsLeft,
+  ChevronsRight,
+  Rows3,
+  Rows2,
 } from 'lucide-react'
 import {
   api,
@@ -33,8 +37,9 @@ import {
   type BlogPostResponse,
   type TestimonialResponse,
 } from '../lib/api'
-import { Toast } from './admin/AdminShared'
+import { Toast, type ToastAction } from './admin/AdminShared'
 import AdminThemePicker from './admin/AdminThemePicker'
+import AdminCommandPalette from './admin/AdminCommandPalette'
 import { useAdminTheme } from '../lib/adminThemes'
 import OverviewSection from './admin/OverviewSection'
 import ProjectsSection from './admin/ProjectsSection'
@@ -81,8 +86,24 @@ const sections = [
 export default function Admin() {
   const navigate = useNavigate()
   const { themeId, theme, setTheme } = useAdminTheme()
-  const [activeSection, setActiveSection] = useState('overview')
+  const [activeSection, setActiveSection] = useState(() => {
+    try {
+      const stored = localStorage.getItem('admin-section')
+      return stored && sections.some(s => s.id === stored) ? stored : 'overview'
+    } catch { return 'overview' }
+  })
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('admin-sidebar-collapsed') === '1' } catch { return false }
+  })
+  const [compact, setCompact] = useState(() => {
+    try { return localStorage.getItem('admin-density') === 'compact' } catch { return false }
+  })
   const [isLoading, setIsLoading] = useState(true)
+
+  // Persist UI preferences.
+  useEffect(() => { try { localStorage.setItem('admin-section', activeSection) } catch { /* ignore */ } }, [activeSection])
+  useEffect(() => { try { localStorage.setItem('admin-sidebar-collapsed', collapsed ? '1' : '0') } catch { /* ignore */ } }, [collapsed])
+  useEffect(() => { try { localStorage.setItem('admin-density', compact ? 'compact' : 'comfortable') } catch { /* ignore */ } }, [compact])
 
   // ── Shared data state (loaded once, used across sections) ───────────────
   const [projects, setProjects] = useState<ProjectResponse[]>([])
@@ -96,9 +117,16 @@ export default function Admin() {
   const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
   const [blogs, setBlogs] = useState<BlogPostResponse[]>([])
 
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ message: string; action?: ToastAction } | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  const showToast = useCallback((msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000) }, [])
+  const showToast = useCallback((msg: string, action?: ToastAction) => {
+    clearTimeout(toastTimer.current)
+    setToast({ message: msg, action })
+    // Keep action toasts (e.g. Undo) up long enough to act, but dismiss before
+    // the underlying delete commits at 5s.
+    toastTimer.current = setTimeout(() => setToast(null), action ? 4500 : 3000)
+  }, [])
   const showError = useCallback((msg: string) => showToast(`Error: ${msg}`), [showToast])
 
   // ── Initial data load ────────────────────────────────────────────────────
@@ -184,63 +212,96 @@ export default function Admin() {
     internships: () => <InternshipsSection showToast={showToast} showError={showError} />,
   }
 
+  const logout = () => api.auth.logout().then(() => navigate('/admin/login'))
+
   return (
     <div className="min-h-screen bg-cloud flex" style={theme.vars as React.CSSProperties}>
       {/* ── Sidebar ── */}
-      <aside className="w-64 bg-white border-r border-mist flex flex-col fixed top-0 left-0 bottom-0 z-40">
-        <div className="p-6 border-b border-mist">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue rounded-lg flex items-center justify-center">
+      <aside className={`${collapsed ? 'w-20' : 'w-64'} bg-white border-r border-mist flex flex-col fixed top-0 left-0 bottom-0 z-40 transition-[width] duration-200`}>
+        <div className={`border-b border-mist ${collapsed ? 'p-3 flex flex-col items-center gap-3' : 'p-4 flex items-center justify-between gap-2'}`}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 bg-blue rounded-lg flex items-center justify-center shrink-0">
               <span className="font-mono text-white text-sm font-bold">NB</span>
             </div>
-            <div>
-              <span className="text-sm font-medium text-ink block leading-tight">Admin Panel</span>
-              <span className="font-mono text-[10px] text-steel tracking-wider">PORTFOLIO CMS</span>
-            </div>
+            {!collapsed && (
+              <div>
+                <span className="text-sm font-medium text-ink block leading-tight">Admin Panel</span>
+                <span className="font-mono text-[10px] text-steel tracking-wider">PORTFOLIO CMS</span>
+              </div>
+            )}
           </div>
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="p-1.5 rounded-lg text-steel hover:text-ink hover:bg-cloud transition-colors shrink-0"
+          >
+            {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+          </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {sections.map(section => {
             const isActive = activeSection === section.id
             return (
               <button
                 key={section.id}
                 onClick={() => setActiveSection(section.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all ${
-                  isActive
-                    ? 'bg-blue-wash text-blue font-medium'
-                    : 'text-steel hover:text-ink hover:bg-cloud'
+                title={collapsed ? section.label : undefined}
+                className={`w-full flex items-center gap-3 rounded-lg text-sm transition-all ${collapsed ? 'justify-center px-0' : 'px-4'} ${compact ? 'py-2' : 'py-2.5'} ${
+                  isActive ? 'bg-blue-wash text-blue font-medium' : 'text-steel hover:text-ink hover:bg-cloud'
                 }`}
               >
-                <section.icon size={16} />
-                {section.label}
+                <section.icon size={16} className="shrink-0" />
+                {!collapsed && section.label}
               </button>
             )
           })}
         </nav>
 
-        <div className="p-4 border-t border-mist space-y-2">
-          <AdminThemePicker themeId={themeId} setTheme={setTheme} />
-          <a
-            href="/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-mist text-sm text-steel hover:text-blue hover:border-blue/30 transition-all"
-          >
-            <Eye size={14} /> View Live Site
-          </a>
-          <button
-            onClick={() => api.auth.logout().then(() => navigate('/admin/login'))}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm text-steel hover:text-ember hover:bg-ember/5 transition-all"
-          >
-            <LogOut size={14} /> Logout
-          </button>
+        <div className="p-3 border-t border-mist space-y-2">
+          {collapsed ? (
+            <>
+              <button onClick={() => setCompact(c => !c)} title={compact ? 'Comfortable density' : 'Compact density'} className="w-full flex justify-center py-2 rounded-lg text-steel hover:text-blue hover:bg-cloud transition-all">
+                {compact ? <Rows3 size={16} /> : <Rows2 size={16} />}
+              </button>
+              <a href="/" target="_blank" rel="noopener noreferrer" title="View live site" className="w-full flex justify-center py-2 rounded-lg text-steel hover:text-blue hover:bg-cloud transition-all">
+                <Eye size={16} />
+              </a>
+              <button onClick={logout} title="Logout" className="w-full flex justify-center py-2 rounded-lg text-steel hover:text-ember hover:bg-ember/5 transition-all">
+                <LogOut size={16} />
+              </button>
+            </>
+          ) : (
+            <>
+              <AdminThemePicker themeId={themeId} setTheme={setTheme} />
+              <button
+                onClick={() => setCompact(c => !c)}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg border border-mist text-sm text-steel hover:text-blue hover:border-blue/30 transition-all"
+              >
+                {compact ? <Rows3 size={14} /> : <Rows2 size={14} />}
+                <span className="flex-1 text-left">{compact ? 'Comfortable' : 'Compact'}</span>
+              </button>
+              <a
+                href="/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-mist text-sm text-steel hover:text-blue hover:border-blue/30 transition-all"
+              >
+                <Eye size={14} /> View Live Site
+              </a>
+              <button
+                onClick={logout}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm text-steel hover:text-ember hover:bg-ember/5 transition-all"
+              >
+                <LogOut size={14} /> Logout
+              </button>
+            </>
+          )}
         </div>
       </aside>
 
       {/* ── Main content ── */}
-      <main className="flex-1 ml-64 p-10">
+      <main className={`flex-1 ${collapsed ? 'ml-20' : 'ml-64'} ${compact ? 'p-6' : 'p-10'} transition-[margin] duration-200`}>
         <div className="max-w-[960px]">
           <AnimatePresence mode="wait">
             <motion.div key={activeSection}>
@@ -250,9 +311,17 @@ export default function Admin() {
         </div>
       </main>
 
+      {/* ── Command palette (⌘K) ── */}
+      <AdminCommandPalette
+        sections={sections}
+        onNavigate={setActiveSection}
+        onSetTheme={setTheme}
+        onLogout={logout}
+      />
+
       {/* ── Toast ── */}
       <AnimatePresence>
-        {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+        {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}
       </AnimatePresence>
     </div>
   )

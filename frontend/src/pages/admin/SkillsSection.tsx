@@ -1,7 +1,8 @@
 import { motion } from 'motion/react'
-import { Plus, Trash2, Save } from 'lucide-react'
+import { Plus, Trash2, Save, GripVertical } from 'lucide-react'
 import { api, type SkillResponse } from '../../lib/api'
 import { SectionCard, type AdminCallbacks } from './AdminShared'
+import { useDragReorder } from './useDragReorder'
 
 interface SkillsSectionProps extends AdminCallbacks {
   skills: SkillResponse[]
@@ -12,6 +13,17 @@ export default function SkillsSection({ showToast, showError, skills, setSkills 
   const updateSkillLocal = (id: number, field: string, value: unknown) => {
     setSkills(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s))
   }
+
+  const { dragHandleProps, dropTargetProps, overId } = useDragReorder(skills, async (next) => {
+    const reindexed = next.map((s, i) => ({ ...s, sort_order: i }))
+    const changed = reindexed.filter(s => skills.find(o => o.id === s.id)?.sort_order !== s.sort_order)
+    setSkills(reindexed)
+    try {
+      await Promise.all(changed.map(s => api.skills.update(s.id, { sort_order: s.sort_order })))
+    } catch (err) {
+      showError((err as Error).message)
+    }
+  })
 
   const saveAllSkills = async () => {
     try {
@@ -32,14 +44,23 @@ export default function SkillsSection({ showToast, showError, skills, setSkills 
     }
   }
 
-  const deleteSkill = async (id: number) => {
-    try {
-      await api.skills.delete(id)
-      setSkills(prev => prev.filter(s => s.id !== id))
-      showToast('Skill removed')
-    } catch (err) {
-      showError((err as Error).message)
-    }
+  const deleteSkill = (id: number) => {
+    const idx = skills.findIndex(s => s.id === id)
+    const removed = skills[idx]
+    if (!removed) return
+    setSkills(prev => prev.filter(s => s.id !== id))
+    let undone = false
+    const timer = setTimeout(async () => {
+      if (undone) return
+      try { await api.skills.delete(id) } catch (err) {
+        setSkills(prev => [...prev.slice(0, idx), removed, ...prev.slice(idx)])
+        showError((err as Error).message)
+      }
+    }, 5000)
+    showToast('Skill removed', {
+      label: 'Undo',
+      onClick: () => { undone = true; clearTimeout(timer); setSkills(prev => [...prev.slice(0, idx), removed, ...prev.slice(idx)]) },
+    })
   }
 
   return (
@@ -55,14 +76,22 @@ export default function SkillsSection({ showToast, showError, skills, setSkills 
       </div>
 
       <SectionCard className="!p-0 overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-0 text-[11px] font-mono text-steel tracking-wider uppercase px-6 py-3 border-b border-mist bg-cloud/50">
+        <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-0 text-[11px] font-mono text-steel tracking-wider uppercase px-6 py-3 border-b border-mist bg-cloud/50">
+          <span className="w-6"></span>
           <span>Skill</span>
           <span className="w-20 text-center">Category</span>
           <span className="w-28 text-center">Level</span>
           <span className="w-16"></span>
         </div>
         {skills.map(skill => (
-          <div key={skill.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-0 items-center px-6 py-3.5 border-b border-mist last:border-b-0 hover:bg-cloud/30 transition-colors">
+          <div
+            key={skill.id}
+            {...dropTargetProps(skill.id)}
+            className={`grid grid-cols-[auto_1fr_auto_auto_auto] gap-0 items-center px-6 py-3.5 border-b border-mist last:border-b-0 hover:bg-cloud/30 transition-colors ${overId === skill.id ? 'bg-blue-wash/60' : ''}`}
+          >
+            <span {...dragHandleProps(skill.id)} className="w-6 -ml-1 cursor-grab active:cursor-grabbing text-silver hover:text-steel" title="Drag to reorder">
+              <GripVertical size={14} />
+            </span>
             <input
               value={skill.name}
               onChange={e => updateSkillLocal(skill.id, 'name', e.target.value)}

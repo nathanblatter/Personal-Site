@@ -3,8 +3,13 @@ import { motion } from 'motion/react'
 import { X, Check, Upload, Loader2, ChevronDown } from 'lucide-react'
 import { api } from '../../lib/api'
 
+export interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 export interface AdminCallbacks {
-  showToast: (msg: string) => void
+  showToast: (msg: string, action?: ToastAction) => void
   showError: (msg: string) => void
 }
 
@@ -131,15 +136,15 @@ export function VisibilityToggle({ value = 'show', onChange }: { value?: string;
   )
 }
 
-export function SectionCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+export function SectionCard({ children, className = '', ...rest }: { children: React.ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={`bg-snow border border-mist rounded-xl p-6 ${className}`}>
+    <div className={`bg-snow border border-mist rounded-xl p-6 ${className}`} {...rest}>
       {children}
     </div>
   )
 }
 
-export function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+export function Toast({ message, onClose, action }: { message: string; onClose: () => void; action?: ToastAction }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -149,7 +154,15 @@ export function Toast({ message, onClose }: { message: string; onClose: () => vo
     >
       <Check size={16} className="text-teal" />
       <span className="text-sm font-medium">{message}</span>
-      <button onClick={onClose} className="text-steel hover:text-white transition-colors ml-2"><X size={14} /></button>
+      {action && (
+        <button
+          onClick={() => { action.onClick(); onClose() }}
+          className="ml-1 px-2.5 py-1 rounded-md bg-white/15 hover:bg-white/25 text-white font-mono text-xs transition-colors"
+        >
+          {action.label}
+        </button>
+      )}
+      <button onClick={onClose} className="text-steel hover:text-white transition-colors ml-1"><X size={14} /></button>
     </motion.div>
   )
 }

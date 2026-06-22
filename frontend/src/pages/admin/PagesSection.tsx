@@ -3,6 +3,7 @@ import { Plus, Trash2, Loader2, Save } from 'lucide-react'
 import { api, type NowContent, type UsesContent } from '../../lib/api'
 import { CONTENT_ICON_OPTIONS } from '../../lib/contentIcons'
 import { AdminInput, AdminTextarea, AdminSelect, SectionCard, type AdminCallbacks } from './AdminShared'
+import { useUnsavedWarning } from './useUnsavedWarning'
 
 const EMPTY_NOW: NowContent = { last_updated: '', sections: [] }
 const EMPTY_USES: UsesContent = { categories: [] }
@@ -11,6 +12,9 @@ export default function PagesSection({ showToast, showError }: AdminCallbacks) {
   const [tab, setTab] = useState<'now' | 'uses'>('now')
   const [now, setNow] = useState<NowContent>(EMPTY_NOW)
   const [uses, setUses] = useState<UsesContent>(EMPTY_USES)
+  // Last-saved snapshots, for dirty detection.
+  const [savedNow, setSavedNow] = useState<NowContent>(EMPTY_NOW)
+  const [savedUses, setSavedUses] = useState<UsesContent>(EMPTY_USES)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -19,10 +23,18 @@ export default function PagesSection({ showToast, showError }: AdminCallbacks) {
       api.siteContent.get<NowContent>('now').then(r => r.data).catch(() => EMPTY_NOW),
       api.siteContent.get<UsesContent>('uses').then(r => r.data).catch(() => EMPTY_USES),
     ]).then(([n, u]) => {
-      setNow({ last_updated: n.last_updated ?? '', sections: n.sections ?? [] })
-      setUses({ categories: u.categories ?? [] })
+      const loadedNow = { last_updated: n.last_updated ?? '', sections: n.sections ?? [] }
+      const loadedUses = { categories: u.categories ?? [] }
+      setNow(loadedNow); setSavedNow(loadedNow)
+      setUses(loadedUses); setSavedUses(loadedUses)
     }).finally(() => setLoading(false))
   }, [])
+
+  const dirtyNow = JSON.stringify(now) !== JSON.stringify(savedNow)
+  const dirtyUses = JSON.stringify(uses) !== JSON.stringify(savedUses)
+  const dirty = dirtyNow || dirtyUses
+  const activeDirty = tab === 'now' ? dirtyNow : dirtyUses
+  useUnsavedWarning(dirty)
 
   const save = useCallback(async () => {
     setSaving(true)
@@ -37,8 +49,10 @@ export default function PagesSection({ showToast, showError }: AdminCallbacks) {
           })),
         }
         await api.siteContent.update('now', cleaned)
+        setNow(cleaned); setSavedNow(cleaned)
       } else {
         await api.siteContent.update('uses', uses)
+        setSavedUses(uses)
       }
       showToast(`Saved /${tab}`)
     } catch (err) {
@@ -64,14 +78,21 @@ export default function PagesSection({ showToast, showError }: AdminCallbacks) {
           <h1 className="text-2xl font-semibold text-ink">Pages</h1>
           <p className="text-sm text-steel mt-1">Edit the content shown on /now and /uses.</p>
         </div>
-        <button
-          onClick={save}
-          disabled={saving}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue text-white text-sm font-medium hover:bg-blue-dim transition-colors disabled:opacity-60"
-        >
-          {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-          Save /{tab}
-        </button>
+        <div className="flex items-center gap-3">
+          {activeDirty && (
+            <span className="flex items-center gap-1.5 font-mono text-xs text-ember">
+              <span className="w-1.5 h-1.5 rounded-full bg-ember" /> Unsaved
+            </span>
+          )}
+          <button
+            onClick={save}
+            disabled={saving || !activeDirty}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue text-white text-sm font-medium hover:bg-blue-dim transition-colors disabled:opacity-60"
+          >
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            Save /{tab}
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
