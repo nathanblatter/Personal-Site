@@ -31,6 +31,13 @@ const CERTIFICATIONS = [
     issuer: 'Anthropic',
     image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
     verify_url: 'https://verify.skilljar.com/c/b7vmfwh6b5od',
+  },
+  {
+    id: 'b2f6g7d4-0c9e-5h2i-6j8k-7l9m0n1o2p3q',
+    name: 'Claude Platform 101',
+    issuer: 'Anthropic',
+    image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
+    verify_url: 'https://verify.skilljar.com/c/54yaiiv7tg97',
   }
 ]
 
