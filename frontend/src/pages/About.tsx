@@ -38,6 +38,13 @@ const CERTIFICATIONS = [
     issuer: 'Anthropic',
     image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
     verify_url: 'https://verify.skilljar.com/c/54yaiiv7tg97',
+  },
+  {
+    id: 'c3g7h8e5-1d0f-6i3j-7k9l-8m0n1o2p3q4r',
+    name: 'Al Fluency: Framework & Foundations',
+    issuer: 'Anthropic',
+    image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
+    verify_url: 'https://verify.skilljar.com/c/rh7mnwth9jt5',
   }
 ]
 
