@@ -24,6 +24,13 @@ const CERTIFICATIONS = [
     issuer: 'Anthropic',
     image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
     verify_url: 'https://verify.skilljar.com/c/73tzbqpcbe5p',
+  },
+  {
+    id: 'a1e5f6c3-9b8d-4e2f-8c7a-1d2b3c4d5e6f',
+    name: 'Claude Code 101',
+    issuer: 'Anthropic',
+    image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
+    verify_url: 'https://verify.skilljar.com/c/b7vmfwh6b5od',
   }
 ]
 
