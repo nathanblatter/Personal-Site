@@ -28,7 +28,15 @@ export default function PagesSection({ showToast, showError }: AdminCallbacks) {
     setSaving(true)
     try {
       if (tab === 'now') {
-        await api.siteContent.update('now', now)
+        // Trim/filter list items only at save time, so editing stays unrestricted.
+        const cleaned: NowContent = {
+          ...now,
+          sections: now.sections.map(s => ({
+            ...s,
+            items: s.items.map(i => i.trim()).filter(Boolean),
+          })),
+        }
+        await api.siteContent.update('now', cleaned)
       } else {
         await api.siteContent.update('uses', uses)
       }
@@ -126,7 +134,7 @@ function NowEditor({ now, setNow }: { now: NowContent; setNow: (n: NowContent) =
           <AdminTextarea
             label="Items (one per line)"
             value={section.items.join('\n')}
-            onChange={v => updateSection(i, { items: v.split('\n').map(s => s.trim()).filter(Boolean) })}
+            onChange={v => updateSection(i, { items: v.split('\n') })}
             rows={4}
           />
         </SectionCard>

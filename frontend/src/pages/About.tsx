@@ -343,7 +343,7 @@ export default function About() {
                 <img
                   src={cert.image}
                   alt={cert.name}
-                  className="w-16 h-16 object-contain shrink-0"
+                  className="w-16 h-16 object-contain shrink-0 bg-[#ffffff] rounded-lg p-1.5"
                 />
                 <div className="min-w-0">
                   <p className="font-sans font-semibold text-ink leading-snug mb-1">{cert.name}</p>
