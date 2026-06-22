@@ -11,13 +11,17 @@ const navLinks = [
   { to: '/about', label: 'About', code: '01' },
   { to: '/projects', label: 'Projects', code: '02' },
   { to: '/blog', label: 'Blog', code: '03' },
-  { to: '/contact', label: 'Contact', code: '04' },
+  { to: '/now', label: 'Now', code: '04' },
+  { to: '/uses', label: 'Uses', code: '05' },
+  { to: '/contact', label: 'Contact', code: '06' },
 ]
 
 const chunkMap: Record<string, () => Promise<unknown>> = {
   '/about': () => import('../pages/About'),
   '/projects': () => import('../pages/Projects'),
   '/blog': () => import('../pages/Blog'),
+  '/now': () => import('../pages/Now'),
+  '/uses': () => import('../pages/Uses'),
   '/contact': () => import('../pages/Contact'),
   '/resume': () => import('../pages/Resume'),
 }
@@ -58,7 +62,7 @@ export default function Layout() {
                   to={link.to}
                   onMouseEnter={() => prefetch(link.to)}
                   onFocus={() => prefetch(link.to)}
-                  className={`relative px-5 py-2.5 font-mono text-xs tracking-wider transition-colors rounded-lg ${
+                  className={`relative px-4 py-2.5 font-mono text-xs tracking-wider transition-colors rounded-lg ${
                     isActive ? 'text-blue bg-blue-wash' : 'text-steel hover:text-ink hover:bg-cloud'
                   }`}
                 >
@@ -181,18 +185,6 @@ export default function Layout() {
                 {link.label}
               </Link>
             ))}
-            <Link
-              to="/now"
-              className="font-mono text-xs text-steel hover:text-blue transition-colors"
-            >
-              Now
-            </Link>
-            <Link
-              to="/uses"
-              className="font-mono text-xs text-steel hover:text-blue transition-colors"
-            >
-              Uses
-            </Link>
             <Link
               to="/privacy"
               className="font-mono text-xs text-steel hover:text-blue transition-colors"
