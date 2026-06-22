@@ -148,6 +148,17 @@ export interface SiteContentResponse<T = unknown> {
   updated_at?: string
 }
 
+export type ServiceStatus = 'operational' | 'degraded' | 'down'
+export interface ServiceHealth {
+  name: string
+  status: ServiceStatus
+  latency_ms: number
+}
+export interface ServiceHealthResponse {
+  overall: ServiceStatus
+  services: ServiceHealth[]
+}
+
 // ── Internship Tracker Types ──────────────────────────────────────────────
 
 export interface CompanyResponse {
@@ -855,6 +866,10 @@ export const api = {
       request<SiteContentResponse<T>>('GET', `/site-content/${key}`),
     update: <T = unknown>(key: string, data: T) =>
       request<SiteContentResponse<T>>('PUT', `/site-content/${key}`, { data }),
+  },
+
+  health: {
+    services: () => request<ServiceHealthResponse>('GET', '/health/services'),
   },
 
   auth: {

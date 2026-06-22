@@ -10,6 +10,7 @@ const Projects = lazy(() => import('./pages/Projects'))
 const CaseStudy = lazy(() => import('./pages/CaseStudy'))
 const Now = lazy(() => import('./pages/Now'))
 const Uses = lazy(() => import('./pages/Uses'))
+const Status = lazy(() => import('./pages/Status'))
 const About = lazy(() => import('./pages/About'))
 const Contact = lazy(() => import('./pages/Contact'))
 const Blog = lazy(() => import('./pages/Blog'))
@@ -48,6 +49,7 @@ function App() {
           <Route path="/projects/:projectId" element={<Suspense fallback={null}><CaseStudy /></Suspense>} />
           <Route path="/now" element={<Suspense fallback={null}><Now /></Suspense>} />
           <Route path="/uses" element={<Suspense fallback={null}><Uses /></Suspense>} />
+          <Route path="/status" element={<Suspense fallback={null}><Status /></Suspense>} />
           <Route path="/about" element={<Suspense fallback={null}><About /></Suspense>} />
           <Route path="/contact" element={<Suspense fallback={null}><Contact /></Suspense>} />
           <Route path="/resume" element={<Suspense fallback={null}><Resume /></Suspense>} />

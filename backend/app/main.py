@@ -15,7 +15,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import select
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report, newsletter, site_content
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report, newsletter, site_content, health
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
 from app.database import AsyncSessionLocal
 from app import models
@@ -91,7 +91,7 @@ _STATIC_OG: dict[str, dict[str, str]] = {
     },
 }
 
-_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude", "/status", "/solar", "/testimonial", "/bookings", "/bio", "/newsletter", "/site-content"})
+_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude", "/status", "/solar", "/testimonial", "/bookings", "/bio", "/newsletter", "/site-content", "/health"})
 
 # Known bot user-agent patterns for OG tag injection
 BOT_PATTERN = re.compile(
@@ -315,6 +315,36 @@ app.include_router(bio.router, prefix=API_PREFIX)
 app.include_router(crm.router, prefix=API_PREFIX)
 app.include_router(newsletter.router, prefix=API_PREFIX)
 app.include_router(site_content.router, prefix=API_PREFIX)
+app.include_router(health.router, prefix=API_PREFIX)
+
+
+_SECURITY_TXT = """\
+Contact: mailto:nzb22@byu.edu
+Preferred-Languages: en
+Canonical: https://nathanblatter.com/.well-known/security.txt
+"""
+
+_HUMANS_TXT = """\
+/* TEAM */
+  Developer: Nathan Blatter
+  Site: https://nathanblatter.com
+  Contact: nzb22@byu.edu
+
+/* SITE */
+  Standards: HTML5, CSS3, TypeScript
+  Components: React, Vite, Tailwind CSS, FastAPI, PostgreSQL
+"""
+
+
+@app.get("/.well-known/security.txt", include_in_schema=False)
+@app.get("/security.txt", include_in_schema=False)
+async def security_txt():
+    return Response(content=_SECURITY_TXT, media_type="text/plain")
+
+
+@app.get("/humans.txt", include_in_schema=False)
+async def humans_txt():
+    return Response(content=_HUMANS_TXT, media_type="text/plain")
 
 
 @app.get("/api/v1/suggest", include_in_schema=False)

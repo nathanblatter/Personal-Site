@@ -15,24 +15,52 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _substring_search(base, q: str):
+    """Fallback: case-insensitive substring match, newest first."""
+    return base.where(
+        func.lower(models.BlogPost.title).contains(q.lower())
+        | func.lower(models.BlogPost.content).contains(q.lower())
+        | func.lower(models.BlogPost.excerpt).contains(q.lower())
+    ).order_by(models.BlogPost.published_at.desc())
+
+
 @router.get("", response_model=List[schemas.BlogPostResponse])
 async def list_published_posts(
     q: str = Query(None, min_length=1, max_length=200),
     db: AsyncSession = Depends(get_db),
 ):
-    query = (
-        select(models.BlogPost)
-        .where(models.BlogPost.published == True)  # noqa: E712
-    )
-    if q:
-        pattern = f"%{q}%"
-        query = query.where(
-            func.lower(models.BlogPost.title).contains(q.lower())
-            | func.lower(models.BlogPost.content).contains(q.lower())
-            | func.lower(models.BlogPost.excerpt).contains(q.lower())
+    base = select(models.BlogPost).where(models.BlogPost.published == True)  # noqa: E712
+
+    if not q:
+        result = await db.execute(base.order_by(models.BlogPost.published_at.desc()))
+        return result.scalars().all()
+
+    # Full-text search with relevance ranking (Postgres). Falls back to a
+    # substring match if FTS finds nothing (e.g. partial/prefix terms) or errors.
+    try:
+        doc = func.to_tsvector(
+            "english",
+            func.concat_ws(
+                " ",
+                models.BlogPost.title,
+                models.BlogPost.subtitle,
+                models.BlogPost.excerpt,
+                models.BlogPost.content,
+            ),
         )
-    query = query.order_by(models.BlogPost.published_at.desc())
-    result = await db.execute(query)
+        ts_query = func.plainto_tsquery("english", q)
+        ranked = (
+            base.where(doc.op("@@")(ts_query))
+            .order_by(func.ts_rank(doc, ts_query).desc(), models.BlogPost.published_at.desc())
+        )
+        result = await db.execute(ranked)
+        rows = result.scalars().all()
+        if rows:
+            return rows
+    except Exception:
+        pass
+
+    result = await db.execute(_substring_search(base, q))
     return result.scalars().all()
 
 

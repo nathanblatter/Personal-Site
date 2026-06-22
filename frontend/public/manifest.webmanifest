@@ -1,0 +1,23 @@
+{
+  "name": "Nathan Blatter",
+  "short_name": "Nathan Blatter",
+  "description": "Portfolio of Nathan Blatter — full-stack engineer, AI developer, and consultant.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

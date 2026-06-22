@@ -59,6 +59,27 @@ html.dark {
   color: white;
 }
 
+/* Visible keyboard focus across interactive elements */
+:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Respect users who prefer reduced motion: neutralize CSS animations/transitions.
+   motion/react animations are handled via <MotionConfig reducedMotion="user">. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }

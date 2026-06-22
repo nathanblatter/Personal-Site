@@ -40,6 +40,13 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Skip to content — visible only when focused via keyboard */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-blue focus:text-white focus:font-mono focus:text-xs"
+      >
+        Skip to content
+      </a>
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-white/80 border-b border-mist">
         <div className="max-w-[1100px] w-full mx-auto px-6 h-18 flex items-center justify-between">
@@ -150,7 +157,7 @@ export default function Layout() {
       </AnimatePresence>
 
       {/* Page content */}
-      <main className="flex-1 pt-24">
+      <main id="main-content" className="flex-1 pt-24">
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
@@ -185,6 +192,12 @@ export default function Layout() {
                 {link.label}
               </Link>
             ))}
+            <Link
+              to="/status"
+              className="font-mono text-xs text-steel hover:text-blue transition-colors"
+            >
+              Status
+            </Link>
             <Link
               to="/privacy"
               className="font-mono text-xs text-steel hover:text-blue transition-colors"
