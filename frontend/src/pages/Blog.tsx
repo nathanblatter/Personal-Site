@@ -4,12 +4,14 @@ import { motion } from 'motion/react'
 import { Calendar, Clock, Eye, ArrowRight, Search, X } from 'lucide-react'
 import { api, type BlogPostResponse } from '../lib/api'
 import { readTime, formatDate } from '../lib/blogUtils'
+import NewsletterSignup from '../components/NewsletterSignup'
 
 export default function Blog() {
   const [posts, setPosts] = useState<BlogPostResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [query, setQuery] = useState('')
+  const [activeTag, setActiveTag] = useState<string | null>(null)
   const [retryKey, setRetryKey] = useState(0)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
@@ -27,6 +29,14 @@ export default function Blog() {
     debounceRef.current = setTimeout(doFetch, 300)
     return () => clearTimeout(debounceRef.current)
   }, [query, retryKey])
+
+  // Drop a tag filter that no longer exists in the current result set.
+  useEffect(() => {
+    if (activeTag && !posts.some(p => p.tags.includes(activeTag))) setActiveTag(null)
+  }, [posts, activeTag])
+
+  const allTags = Array.from(new Set(posts.flatMap(p => p.tags))).sort((a, b) => a.localeCompare(b))
+  const displayedPosts = activeTag ? posts.filter(p => p.tags.includes(activeTag)) : posts
 
   return (
     <div className="max-w-[1100px] w-full mx-auto px-6 py-20">
@@ -59,6 +69,35 @@ export default function Blog() {
             </button>
           )}
         </div>
+
+        {/* Tag filter */}
+        {allTags.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-5">
+            <button
+              onClick={() => setActiveTag(null)}
+              className={`font-mono text-[11px] px-3 py-1 rounded-full border transition-colors ${
+                activeTag === null
+                  ? 'border-blue text-blue bg-blue-wash'
+                  : 'border-mist text-steel hover:border-silver hover:text-ink'
+              }`}
+            >
+              All
+            </button>
+            {allTags.map(tag => (
+              <button
+                key={tag}
+                onClick={() => setActiveTag(t => (t === tag ? null : tag))}
+                className={`font-mono text-[11px] px-3 py-1 rounded-full border uppercase tracking-wider transition-colors ${
+                  activeTag === tag
+                    ? 'border-blue text-blue bg-blue-wash'
+                    : 'border-mist text-steel hover:border-silver hover:text-ink'
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
       </motion.div>
 
       {/* Content */}
@@ -103,7 +142,7 @@ export default function Blog() {
         </motion.div>
       ) : (
         <div className="grid md:grid-cols-2 gap-6">
-          {posts.map((post, i) => (
+          {displayedPosts.map((post, i) => (
             <motion.div
               key={post.id}
               initial={{ opacity: 0, y: 20 }}
@@ -178,6 +217,11 @@ export default function Blog() {
           ))}
         </div>
       )}
+
+      {/* Newsletter */}
+      <div className="mt-20">
+        <NewsletterSignup />
+      </div>
     </div>
   )
 }

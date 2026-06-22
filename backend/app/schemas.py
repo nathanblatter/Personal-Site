@@ -448,6 +448,38 @@ class BlogPostResponse(BlogPostBase):
     model_config = {"from_attributes": True}
 
 
+# ── Site Content (editable JSON blocks) ──────────────────────────────────────
+
+class SiteContentResponse(BaseModel):
+    key: str
+    data: Dict[str, Any]
+    updated_at: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class SiteContentUpdate(BaseModel):
+    data: Dict[str, Any]
+
+
+# ── Newsletter ────────────────────────────────────────────────────────────────
+
+class SubscribeRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    honeypot: Optional[str] = None
+
+
+class SubscriberResponse(BaseModel):
+    id: int
+    email: str
+    confirmed: bool
+    unsubscribed: bool
+    source: Optional[str] = None
+    created_at: str
+
+    model_config = {"from_attributes": True}
+
+
 # ── Internship Tracker Enums ─────────────────────────────────────────────────
 
 class RoleType(str, Enum):

@@ -168,6 +168,26 @@ class BlogPost(Base):
     view_count = Column(Integer, nullable=False, default=0, server_default="0")
 
 
+class SiteContent(Base):
+    """Editable JSON content blocks keyed by name (e.g. "now", "uses")."""
+    __tablename__ = "site_content"
+
+    key = Column(String, primary_key=True)
+    data = Column(JSON, nullable=False, default=dict)
+    updated_at = Column(String, nullable=True)
+
+
+class Subscriber(Base):
+    __tablename__ = "subscribers"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    confirmed = Column(Boolean, nullable=False, default=True)
+    unsubscribed = Column(Boolean, nullable=False, default=False)
+    source = Column(String, nullable=True)  # e.g. "blog"
+    created_at = Column(String, nullable=False)
+
+
 # ── Internship Tracker Enums ─────────────────────────────────────────────────
 
 class RoleType(str, enum.Enum):

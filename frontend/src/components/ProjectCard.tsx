@@ -3,6 +3,7 @@ import { ArrowUpRight } from 'lucide-react'
 
 export interface Project {
   id: string | number
+  project_id?: string
   title: string
   description: string
   tags: string[]

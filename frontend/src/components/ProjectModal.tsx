@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
-import { X, ArrowUpRight, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, ArrowUpRight, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Project } from './ProjectCard'
 
 interface Props {
@@ -188,18 +189,30 @@ export default function ProjectModal({ project, onClose }: Props) {
                   ))}
                 </div>
 
-                {/* Live link */}
-                {project.link && (
-                  <a
-                    href={project.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 font-mono text-xs text-blue hover:text-blue-dim transition-colors"
-                  >
-                    View Live
-                    <ArrowUpRight size={12} />
-                  </a>
-                )}
+                {/* Links */}
+                <div className="flex items-center gap-5">
+                  {project.project_id && (
+                    <Link
+                      to={`/projects/${project.project_id}`}
+                      onClick={onClose}
+                      className="inline-flex items-center gap-2 font-mono text-xs text-blue hover:text-blue-dim transition-colors"
+                    >
+                      Read the case study
+                      <ArrowRight size={12} />
+                    </Link>
+                  )}
+                  {project.link && (
+                    <a
+                      href={project.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 font-mono text-xs text-steel hover:text-ink transition-colors"
+                    >
+                      View Live
+                      <ArrowUpRight size={12} />
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>

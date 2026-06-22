@@ -319,7 +319,116 @@ CONTACT_META = {
 }
 
 
+# ── Editable site content (/now, /uses) ──────────────────────────────────────
+
+NOW_CONTENT = {
+    "last_updated": "June 2026",
+    "sections": [
+        {
+            "icon": "Hammer",
+            "title": "Building",
+            "items": [
+                "Growing this site into a consulting CRM — contracts, invoicing, and client scheduling.",
+                "A handful of full-stack side projects with FastAPI, React, and Postgres.",
+            ],
+        },
+        {
+            "icon": "BookOpen",
+            "title": "Learning",
+            "items": [
+                "Going deeper on agentic AI systems and how to build with them well.",
+                "Sharpening distributed systems and database internals.",
+            ],
+        },
+        {
+            "icon": "Compass",
+            "title": "Focused on",
+            "items": [
+                "Coursework at BYU and shipping things that real people use.",
+                "Taking on a few select consulting engagements.",
+            ],
+        },
+        {
+            "icon": "Coffee",
+            "title": "Outside of work",
+            "items": [
+                "Reading, time with family, and staying involved at church.",
+            ],
+        },
+    ],
+}
+
+USES_CONTENT = {
+    "categories": [
+        {
+            "icon": "Laptop",
+            "title": "Hardware",
+            "items": [
+                {"name": "Mac Mini (M-series)", "note": "Home server — runs this site, Docker, and the CI runner"},
+                {"name": "MacBook", "note": "Daily driver for development"},
+                {"name": "External monitor + mechanical keyboard", "note": "Desk setup"},
+            ],
+        },
+        {
+            "icon": "Code2",
+            "title": "Editor & Dev",
+            "items": [
+                {"name": "VS Code", "note": "Primary editor"},
+                {"name": "Claude Code", "note": "AI pair-programming in the terminal"},
+                {"name": "iTerm2 + zsh", "note": "Shell"},
+                {"name": "Git + GitHub", "note": "Version control & CI/CD"},
+            ],
+        },
+        {
+            "icon": "Server",
+            "title": "Stack",
+            "items": [
+                {"name": "React + TypeScript + Vite", "note": "Frontend"},
+                {"name": "Tailwind CSS", "note": "Styling"},
+                {"name": "FastAPI (Python)", "note": "Backend APIs"},
+                {"name": "PostgreSQL", "note": "Database"},
+                {"name": "Docker Compose", "note": "Local + prod orchestration"},
+            ],
+        },
+        {
+            "icon": "Wrench",
+            "title": "Services & Tools",
+            "items": [
+                {"name": "Cloudflare", "note": "DNS, CDN, and tunnels"},
+                {"name": "Umami", "note": "Privacy-friendly, self-hosted analytics"},
+                {"name": "Zoom", "note": "Client calls"},
+                {"name": "Figma", "note": "Design & mockups"},
+            ],
+        },
+    ],
+}
+
+SITE_CONTENT = {"now": NOW_CONTENT, "uses": USES_CONTENT}
+
+
 # ── Seed logic ────────────────────────────────────────────────────────────────
+
+async def ensure_site_content(db) -> None:
+    """Backfill default /now and /uses content for any key that's missing.
+
+    Idempotent and independent of the main seed guard, so it runs on every
+    deploy and never overwrites content edited through the admin panel.
+    """
+    from datetime import datetime, timezone
+    added = False
+    for key, data in SITE_CONTENT.items():
+        existing = await db.execute(
+            select(models.SiteContent).where(models.SiteContent.key == key)
+        )
+        if existing.scalar_one_or_none() is None:
+            db.add(models.SiteContent(
+                key=key, data=data, updated_at=datetime.now(timezone.utc).isoformat()
+            ))
+            added = True
+    if added:
+        await db.commit()
+        print("Seeded missing site content.")
+
 
 async def seed() -> None:
     # Ensure tables exist (safe to call even after alembic migrations)
@@ -327,6 +436,9 @@ async def seed() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
     async with AsyncSessionLocal() as db:
+        # Backfill editable content blocks regardless of the seed guard below.
+        await ensure_site_content(db)
+
         # Skip if already seeded
         result = await db.execute(select(models.Project))
         if result.scalars().first():

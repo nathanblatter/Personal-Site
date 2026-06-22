@@ -182,6 +182,18 @@ export default function Layout() {
               </Link>
             ))}
             <Link
+              to="/now"
+              className="font-mono text-xs text-steel hover:text-blue transition-colors"
+            >
+              Now
+            </Link>
+            <Link
+              to="/uses"
+              className="font-mono text-xs text-steel hover:text-blue transition-colors"
+            >
+              Uses
+            </Link>
+            <Link
               to="/privacy"
               className="font-mono text-xs text-steel hover:text-blue transition-colors"
             >

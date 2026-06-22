@@ -133,6 +133,21 @@ export interface ContactSubmitRequest {
   honeypot?: string
 }
 
+// ── Editable Site Content (/now, /uses) ──────────────────────────────────────
+
+export interface NowSection { icon: string; title: string; items: string[] }
+export interface NowContent { last_updated: string; sections: NowSection[] }
+
+export interface UsesItem { name: string; note: string }
+export interface UsesCategory { icon: string; title: string; items: UsesItem[] }
+export interface UsesContent { categories: UsesCategory[] }
+
+export interface SiteContentResponse<T = unknown> {
+  key: string
+  data: T
+  updated_at?: string
+}
+
 // ── Internship Tracker Types ──────────────────────────────────────────────
 
 export interface CompanyResponse {
@@ -828,6 +843,18 @@ export const api = {
     update: (id: number, data: Partial<Omit<BlogPostResponse, 'id' | 'created_at' | 'updated_at'>>) =>
       request<BlogPostResponse>('PUT', `/blog/${id}`, data),
     delete: (id: number) => request<void>('DELETE', `/blog/${id}`),
+  },
+
+  newsletter: {
+    subscribe: (email: string, honeypot?: string) =>
+      request<void>('POST', '/newsletter/subscribe', { email, honeypot }),
+  },
+
+  siteContent: {
+    get: <T = unknown>(key: string) =>
+      request<SiteContentResponse<T>>('GET', `/site-content/${key}`),
+    update: <T = unknown>(key: string, data: T) =>
+      request<SiteContentResponse<T>>('PUT', `/site-content/${key}`, { data }),
   },
 
   auth: {

@@ -15,7 +15,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import select
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report, newsletter, site_content
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
 from app.database import AsyncSessionLocal
 from app import models
@@ -79,9 +79,19 @@ _STATIC_OG: dict[str, dict[str, str]] = {
         "description": "Technical writing on software engineering, AI, and data systems.",
         "url": f"{DOMAIN}/blog",
     },
+    "now": {
+        "title": "Now — Nathan Blatter",
+        "description": "What Nathan Blatter is focused on, building, and learning right now.",
+        "url": f"{DOMAIN}/now",
+    },
+    "uses": {
+        "title": "Uses — Nathan Blatter",
+        "description": "The hardware, software, and services Nathan Blatter uses to build.",
+        "url": f"{DOMAIN}/uses",
+    },
 }
 
-_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude", "/status", "/solar", "/testimonial", "/bookings", "/bio"})
+_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude", "/status", "/solar", "/testimonial", "/bookings", "/bio", "/newsletter", "/site-content"})
 
 # Known bot user-agent patterns for OG tag injection
 BOT_PATTERN = re.compile(
@@ -303,6 +313,8 @@ app.include_router(resume.router, prefix=API_PREFIX)
 app.include_router(bookings.router, prefix=API_PREFIX)
 app.include_router(bio.router, prefix=API_PREFIX)
 app.include_router(crm.router, prefix=API_PREFIX)
+app.include_router(newsletter.router, prefix=API_PREFIX)
+app.include_router(site_content.router, prefix=API_PREFIX)
 
 
 @app.get("/api/v1/suggest", include_in_schema=False)
@@ -315,7 +327,7 @@ async def suggest_page(path: str = ""):
     candidates: list[str] = []
 
     # Static routes
-    for route in ("about", "projects", "blog", "contact", "resume"):
+    for route in ("about", "projects", "blog", "contact", "resume", "now", "uses"):
         candidates.append(route)
 
     # Blog slugs

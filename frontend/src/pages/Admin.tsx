@@ -18,6 +18,7 @@ import {
   HardDrive,
   Calendar,
   Handshake,
+  FileStack,
 } from 'lucide-react'
 import {
   api,
@@ -47,6 +48,7 @@ import BookingsSection from './admin/BookingsSection'
 import BioSection from './admin/BioSection'
 import InternshipsSection from './admin/InternshipsSection'
 import ConsultingSection from './admin/ConsultingSection'
+import PagesSection from './admin/PagesSection'
 
 /* ═══════════════════════════════════════════════
    SIDEBAR NAV CONFIG
@@ -61,6 +63,7 @@ const sections = [
   { id: 'coursework', label: 'Coursework', icon: BookOpen },
   { id: 'contact', label: 'Contact', icon: AtSign },
   { id: 'blog', label: 'Blog', icon: FileText },
+  { id: 'pages', label: 'Pages', icon: FileStack },
   { id: 'files', label: 'Files', icon: HardDrive },
   { id: 'links', label: 'Links', icon: Link2 },
   { id: 'bookings', label: 'Bookings', icon: Calendar },
@@ -158,6 +161,7 @@ export default function Admin() {
     coursework: () => <CourseworkSection showToast={showToast} showError={showError} coursework={coursework} setCoursework={setCoursework} />,
     contact: () => <ContactSection showToast={showToast} showError={showError} socials={socials} setSocials={setSocials} contactMeta={contactMeta} setContactMeta={setContactMeta} />,
     blog: () => <BlogSection showToast={showToast} showError={showError} blogs={blogs} setBlogs={setBlogs} />,
+    pages: () => <PagesSection showToast={showToast} showError={showError} />,
     files: () => <FilesSection showToast={showToast} showError={showError} />,
     links: () => (
       <LinksSection
