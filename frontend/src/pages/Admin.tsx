@@ -34,6 +34,8 @@ import {
   type TestimonialResponse,
 } from '../lib/api'
 import { Toast } from './admin/AdminShared'
+import AdminThemePicker from './admin/AdminThemePicker'
+import { useAdminTheme } from '../lib/adminThemes'
 import OverviewSection from './admin/OverviewSection'
 import ProjectsSection from './admin/ProjectsSection'
 import SkillsSection from './admin/SkillsSection'
@@ -78,6 +80,7 @@ const sections = [
 
 export default function Admin() {
   const navigate = useNavigate()
+  const { themeId, theme, setTheme } = useAdminTheme()
   const [activeSection, setActiveSection] = useState('overview')
   const [isLoading, setIsLoading] = useState(true)
 
@@ -132,7 +135,7 @@ export default function Admin() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-cloud flex items-center justify-center">
+      <div className="min-h-screen bg-cloud flex items-center justify-center" style={theme.vars as React.CSSProperties}>
         <div className="flex flex-col items-center gap-4 text-steel">
           <Loader2 size={32} className="animate-spin text-blue" />
           <span className="font-mono text-sm tracking-wider">Loading admin panel…</span>
@@ -182,7 +185,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-cloud flex">
+    <div className="min-h-screen bg-cloud flex" style={theme.vars as React.CSSProperties}>
       {/* ── Sidebar ── */}
       <aside className="w-64 bg-white border-r border-mist flex flex-col fixed top-0 left-0 bottom-0 z-40">
         <div className="p-6 border-b border-mist">
@@ -218,6 +221,7 @@ export default function Admin() {
         </nav>
 
         <div className="p-4 border-t border-mist space-y-2">
+          <AdminThemePicker themeId={themeId} setTheme={setTheme} />
           <a
             href="/"
             target="_blank"
