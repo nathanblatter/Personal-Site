@@ -40,7 +40,7 @@ export default function BioSection({ showToast, showError }: AdminCallbacks) {
       {/* ── Settings ── */}
       <SectionCard>
         <h3 className="font-mono text-[11px] text-steel tracking-wider uppercase mb-5">Page Settings</h3>
-        <div className="grid grid-cols-2 gap-5 mb-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
           <AdminInput label="Heading" value={bioSettings.heading} onChange={v => setBioSettings(s => ({ ...s, heading: v }))} />
           <AdminInput label="Subheading" value={bioSettings.subheading ?? ''} onChange={v => setBioSettings(s => ({ ...s, subheading: v }))} />
           <AdminInput label="Avatar URL" value={bioSettings.avatar_url ?? ''} onChange={v => setBioSettings(s => ({ ...s, avatar_url: v }))} mono />
@@ -119,7 +119,7 @@ export default function BioSection({ showToast, showError }: AdminCallbacks) {
           {bioShowNew && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
               <div className="border border-mist rounded-lg p-5 mb-5 bg-cloud/30 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <AdminInput label="Title" value={bioNewLink.title} onChange={v => setBioNewLink(p => ({ ...p, title: v }))} />
                   <AdminInput label="URL" value={bioNewLink.url} onChange={v => setBioNewLink(p => ({ ...p, url: v }))} mono />
                   <AdminInput label="Description" value={bioNewLink.description} onChange={v => setBioNewLink(p => ({ ...p, description: v }))} />
@@ -165,7 +165,7 @@ export default function BioSection({ showToast, showError }: AdminCallbacks) {
               {bioEditLink?.id === link.id ? (
                 /* Inline edit mode */
                 <div className="p-5 bg-cloud/30 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <AdminInput label="Title" value={bioEditLink.title} onChange={v => setBioEditLink(p => p ? { ...p, title: v } : p)} />
                     <AdminInput label="URL" value={bioEditLink.url} onChange={v => setBioEditLink(p => p ? { ...p, url: v } : p)} mono />
                     <AdminInput label="Description" value={bioEditLink.description ?? ''} onChange={v => setBioEditLink(p => p ? { ...p, description: v } : p)} />

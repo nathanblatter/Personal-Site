@@ -148,7 +148,7 @@ function NowEditor({ now, setNow }: { now: NowContent; setNow: (n: NowContent) =
               <Trash2 size={15} />
             </button>
           </div>
-          <div className="grid sm:grid-cols-2 gap-4 mb-4">
+          <div className="grid sm:grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <AdminSelect label="Icon" value={section.icon} onChange={v => updateSection(i, { icon: v })} options={CONTENT_ICON_OPTIONS} />
             <AdminInput label="Title" value={section.title} onChange={v => updateSection(i, { title: v })} />
           </div>
@@ -191,7 +191,7 @@ function UsesEditor({ uses, setUses }: { uses: UsesContent; setUses: (u: UsesCon
               <Trash2 size={15} />
             </button>
           </div>
-          <div className="grid sm:grid-cols-2 gap-4 mb-4">
+          <div className="grid sm:grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <AdminSelect label="Icon" value={cat.icon} onChange={v => updateCat(i, { icon: v })} options={CONTENT_ICON_OPTIONS} />
             <AdminInput label="Title" value={cat.title} onChange={v => updateCat(i, { title: v })} />
           </div>

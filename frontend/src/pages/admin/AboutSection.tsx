@@ -155,7 +155,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
         </div>
         <div className="space-y-3">
           {interests.map(item => (
-            <div key={item.id} className="grid grid-cols-[auto_1fr_1fr_auto] gap-4 items-start p-4 rounded-lg bg-white border border-mist">
+            <div key={item.id} className="grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr_auto] gap-3 sm:gap-4 items-start p-4 rounded-lg bg-white border border-mist">
               <input
                 value={item.icon}
                 onChange={e => updateInterestLocal(item.id, 'icon', e.target.value)}
@@ -200,7 +200,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
         </div>
         <div className="space-y-3">
           {(about?.looking_for || []).map((item, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 items-start p-4 rounded-lg bg-white border border-mist">
+            <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-start p-4 rounded-lg bg-white border border-mist">
               <input
                 value={item.role}
                 onChange={e => {
@@ -267,7 +267,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
         <div className="space-y-3">
           {testimonials.map(t => (
             <div key={t.id} className="p-4 rounded-lg bg-white border border-mist space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   value={t.name}
                   onChange={e => setTestimonials(prev => prev.map(x => x.id === t.id ? { ...x, name: e.target.value } : x))}
@@ -434,7 +434,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
         {showNewReqForm && (
           <div className="mb-5 p-4 rounded-xl bg-snow border border-mist space-y-3">
             <p className="font-mono text-xs text-blue uppercase tracking-wider">New testimonial request</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block font-mono text-[10px] text-silver uppercase tracking-wider mb-1">Slug (URL)</label>
                 <input

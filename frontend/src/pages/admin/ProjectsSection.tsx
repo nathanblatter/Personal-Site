@@ -145,11 +145,11 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
                   className="overflow-hidden"
                 >
                   <div className="border-t border-mist p-6 bg-white space-y-5">
-                    <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <AdminInput label="Title" value={project.title} onChange={v => updateProjectLocal(project.id, 'title', v)} />
                       <AdminInput label="Year" value={project.year} onChange={v => updateProjectLocal(project.id, 'year', v)} mono />
                     </div>
-                    <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <AdminInput label="Slug (project_id)" value={project.project_id} onChange={v => updateProjectLocal(project.id, 'project_id', v)} mono placeholder="my-project-slug" />
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
@@ -200,7 +200,7 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <AdminSelect
                         label="Status"
                         value={project.status}

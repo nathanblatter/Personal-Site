@@ -69,7 +69,7 @@ export default function ContactsTab({ shared }: { shared: CrmShared }) {
         </div>
 
         {adding && (
-          <div className="bg-snow border border-mist rounded-xl p-4 grid grid-cols-2 gap-3 items-end">
+          <div className="bg-snow border border-mist rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
             <AdminInput label="Name" value={form.name} onChange={v => setForm({ ...form, name: v })} />
             <AdminInput label="Email" value={form.email} onChange={v => setForm({ ...form, email: v })} />
             <AdminInput label="Phone" value={form.phone} onChange={v => setForm({ ...form, phone: v })} />

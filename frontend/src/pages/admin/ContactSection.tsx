@@ -119,11 +119,11 @@ export default function ContactSection({ showToast, showError, socials, setSocia
                     className="overflow-hidden"
                   >
                     <div className="border-t border-mist p-6 bg-white space-y-5">
-                      <div className="grid grid-cols-2 gap-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <AdminInput label="Label" value={social.label} onChange={v => updateSocialLocal(social.id, 'label', v)} />
                         <AdminInput label="Icon name" value={social.icon} onChange={v => updateSocialLocal(social.id, 'icon', v)} mono placeholder="Github, Linkedin, Mail…" />
                       </div>
-                      <div className="grid grid-cols-2 gap-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <AdminInput label="Handle / Display text" value={social.handle} onChange={v => updateSocialLocal(social.id, 'handle', v)} mono />
                         <AdminInput label="URL / href" value={social.href} onChange={v => updateSocialLocal(social.id, 'href', v)} mono placeholder="https://…" />
                       </div>
@@ -146,7 +146,7 @@ export default function ContactSection({ showToast, showError, socials, setSocia
         <SectionCard>
           <h3 className="font-sans font-semibold text-ink mb-5">Page Meta</h3>
           <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <AdminInput label="Heading" value={contactMeta.heading} onChange={v => setContactMeta(prev => prev ? { ...prev, heading: v } : prev)} />
               <AdminInput label="Subheading" value={contactMeta.subheading} onChange={v => setContactMeta(prev => prev ? { ...prev, subheading: v } : prev)} />
             </div>

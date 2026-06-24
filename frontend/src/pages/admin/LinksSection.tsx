@@ -74,6 +74,8 @@ export default function LinksSection({ showToast, showError, projects, skills, e
       </div>
 
       <SectionCard className="!p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+        <div className="min-w-[640px]">
         <div className="grid grid-cols-[1fr_1fr_auto_auto_auto_auto] gap-0 text-[11px] font-mono text-steel tracking-wider uppercase px-6 py-3 border-b border-mist bg-cloud/50">
           <span>Label / Slug</span>
           <span>Destination</span>
@@ -168,7 +170,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                   <div className="px-6 py-5 space-y-4">
                     {/* ── Hero ── */}
                     {ctxTab === 'hero' && (
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <AdminInput label="Company Name" value={link.portfolio_ctx?.company ?? ''} placeholder="Stripe"
                           onChange={v => patchCtx({ company: v || undefined })} />
                         <AdminInput label="Hero Tagline" value={link.portfolio_ctx?.tagline ?? ''} placeholder="Custom subtitle for this company…"
@@ -229,7 +231,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                                   onChange={v => patchCtx({ experience: { ...(link.portfolio_ctx?.experience ?? {}), [String(item.id)]: { ...(expCtx ?? {}), visibility: v as 'show' | 'highlight' | 'hide' } } })}
                                 />
                               </div>
-                              <div className="grid grid-cols-2 gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <AdminInput label="Title override" value={expCtx?.title ?? ''} placeholder={item.title}
                                   onChange={v => patchCtx({ experience: { ...(link.portfolio_ctx?.experience ?? {}), [String(item.id)]: { ...(expCtx ?? { visibility: 'show' as const }), title: v || undefined } } })} />
                                 <AdminInput label="Subtitle override" value={expCtx?.subtitle ?? ''} placeholder={item.subtitle}
@@ -263,7 +265,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                             />
                           ))}
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <AdminInput label="Status Text" value={link.portfolio_ctx?.about?.status_text ?? ''} placeholder="Open to opportunities"
                             onChange={v => patchAbout({ status_text: v || undefined })} />
                           <AdminInput label="GPA Override" value={link.portfolio_ctx?.about?.gpa ?? ''} placeholder="3.95"
@@ -288,7 +290,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                             <div className="space-y-2">
                               {link.portfolio_ctx.about.looking_for.map((item, i) => (
                                 <div key={i} className="border border-mist rounded-lg p-3 bg-white space-y-2">
-                                  <div className="grid grid-cols-2 gap-2">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <AdminInput label="Role" value={item.role ?? ''} onChange={v => {
                                       const arr = [...link.portfolio_ctx!.about!.looking_for!]
                                       arr[i] = { ...arr[i], role: v }
@@ -300,7 +302,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                                       patchAbout({ looking_for: arr })
                                     }} />
                                   </div>
-                                  <div className="grid grid-cols-2 gap-2">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <AdminInput label="Timeline" value={item.timeline ?? ''} onChange={v => {
                                       const arr = [...link.portfolio_ctx!.about!.looking_for!]
                                       arr[i] = { ...arr[i], timeline: v }
@@ -414,6 +416,8 @@ export default function LinksSection({ showToast, showError, projects, skills, e
             })()}
           </div>
         ))}
+        </div>
+        </div>
       </SectionCard>
     </motion.div>
   )

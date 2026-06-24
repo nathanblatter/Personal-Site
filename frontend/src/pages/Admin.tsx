@@ -23,6 +23,8 @@ import {
   ChevronsRight,
   Rows3,
   Rows2,
+  Menu,
+  X,
 } from 'lucide-react'
 import {
   api,
@@ -99,6 +101,26 @@ export default function Admin() {
     try { return localStorage.getItem('admin-density') === 'compact' } catch { return false }
   })
   const [isLoading, setIsLoading] = useState(true)
+
+  // Mobile: off-canvas drawer instead of a fixed sidebar.
+  const [isMobile, setIsMobile] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const update = () => setIsMobile(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+  // Lock body scroll while the drawer is open.
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden'
+      return () => { document.body.style.overflow = '' }
+    }
+  }, [mobileOpen])
+  // On mobile the drawer is always full-width with labels (ignore desktop collapse).
+  const effectiveCollapsed = isMobile ? false : collapsed
 
   // Persist UI preferences.
   useEffect(() => { try { localStorage.setItem('admin-section', activeSection) } catch { /* ignore */ } }, [activeSection])
@@ -213,29 +235,55 @@ export default function Admin() {
   }
 
   const logout = () => api.auth.logout().then(() => navigate('/admin/login'))
+  const selectSection = (id: string) => { setActiveSection(id); setMobileOpen(false) }
 
   return (
-    <div className="min-h-screen bg-cloud flex" style={theme.vars as React.CSSProperties}>
-      {/* ── Sidebar ── */}
-      <aside className={`${collapsed ? 'w-20' : 'w-64'} bg-white border-r border-mist flex flex-col fixed top-0 left-0 bottom-0 z-40 transition-[width] duration-200`}>
-        <div className={`border-b border-mist ${collapsed ? 'p-3 flex flex-col items-center gap-3' : 'p-4 flex items-center justify-between gap-2'}`}>
+    <div className="min-h-screen bg-cloud md:flex" style={theme.vars as React.CSSProperties}>
+      {/* ── Mobile top bar ── */}
+      <header className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 h-14 bg-white border-b border-mist">
+        <button
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+          className="p-2 -ml-2 rounded-lg text-steel hover:text-ink hover:bg-cloud transition-colors"
+        >
+          <Menu size={20} />
+        </button>
+        <div className="w-7 h-7 bg-blue rounded-md flex items-center justify-center shrink-0">
+          <span className="font-mono text-white text-xs font-bold">NB</span>
+        </div>
+        <span className="text-sm font-medium text-ink capitalize">{activeSection}</span>
+      </header>
+
+      {/* ── Mobile backdrop ── */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          className="md:hidden fixed inset-0 z-40 bg-ink/40 backdrop-blur-sm"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ── Sidebar (off-canvas drawer on mobile) ── */}
+      <aside className={`${effectiveCollapsed ? 'w-20' : 'w-64'} bg-white border-r border-mist flex flex-col fixed top-0 left-0 bottom-0 z-50 transition-transform md:transition-[width] duration-200 ${mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'} md:translate-x-0`}>
+        <div className={`border-b border-mist ${effectiveCollapsed ? 'p-3 flex flex-col items-center gap-3' : 'p-4 flex items-center justify-between gap-2'}`}>
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 bg-blue rounded-lg flex items-center justify-center shrink-0">
               <span className="font-mono text-white text-sm font-bold">NB</span>
             </div>
-            {!collapsed && (
+            {!effectiveCollapsed && (
               <div>
                 <span className="text-sm font-medium text-ink block leading-tight">Admin Panel</span>
                 <span className="font-mono text-[10px] text-steel tracking-wider">PORTFOLIO CMS</span>
               </div>
             )}
           </div>
+          {/* Collapse toggle (desktop) / close (mobile) */}
           <button
-            onClick={() => setCollapsed(c => !c)}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={() => isMobile ? setMobileOpen(false) : setCollapsed(c => !c)}
+            title={isMobile ? 'Close menu' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className="p-1.5 rounded-lg text-steel hover:text-ink hover:bg-cloud transition-colors shrink-0"
           >
-            {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+            {isMobile ? <X size={18} /> : collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
           </button>
         </div>
 
@@ -245,21 +293,21 @@ export default function Admin() {
             return (
               <button
                 key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                title={collapsed ? section.label : undefined}
-                className={`w-full flex items-center gap-3 rounded-lg text-sm transition-all ${collapsed ? 'justify-center px-0' : 'px-4'} ${compact ? 'py-2' : 'py-2.5'} ${
+                onClick={() => selectSection(section.id)}
+                title={effectiveCollapsed ? section.label : undefined}
+                className={`w-full flex items-center gap-3 rounded-lg text-sm transition-all ${effectiveCollapsed ? 'justify-center px-0' : 'px-4'} ${compact ? 'py-2' : 'py-2.5'} ${
                   isActive ? 'bg-blue-wash text-blue font-medium' : 'text-steel hover:text-ink hover:bg-cloud'
                 }`}
               >
                 <section.icon size={16} className="shrink-0" />
-                {!collapsed && section.label}
+                {!effectiveCollapsed && section.label}
               </button>
             )
           })}
         </nav>
 
         <div className="p-3 border-t border-mist space-y-2">
-          {collapsed ? (
+          {effectiveCollapsed ? (
             <>
               <button onClick={() => setCompact(c => !c)} title={compact ? 'Comfortable density' : 'Compact density'} className="w-full flex justify-center py-2 rounded-lg text-steel hover:text-blue hover:bg-cloud transition-all">
                 {compact ? <Rows3 size={16} /> : <Rows2 size={16} />}
@@ -301,7 +349,7 @@ export default function Admin() {
       </aside>
 
       {/* ── Main content ── */}
-      <main className={`flex-1 ${collapsed ? 'ml-20' : 'ml-64'} ${compact ? 'p-6' : 'p-10'} transition-[margin] duration-200`}>
+      <main className={`flex-1 min-w-0 ${collapsed ? 'md:ml-20' : 'md:ml-64'} p-4 sm:p-6 ${compact ? 'md:p-6' : 'md:p-10'} transition-[margin] duration-200`}>
         <div className="max-w-[960px]">
           <AnimatePresence mode="wait">
             <motion.div key={activeSection}>

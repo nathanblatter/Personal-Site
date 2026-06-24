@@ -121,7 +121,7 @@ function TemplateForm({ kind, initial, onSave, onCancel }: {
       <AdminInput label="Template name" value={name} onChange={setName} placeholder={kind === 'contract' ? 'Standard advisory SOW' : '50% deposit'} />
       {kind === 'contract' ? (
         <>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <AdminInput label="Default title" value={title} onChange={setTitle} placeholder="Consulting Agreement" />
             <AdminInput label="Default value ($)" value={value} onChange={setValue} placeholder="optional" />
           </div>
@@ -133,7 +133,7 @@ function TemplateForm({ kind, initial, onSave, onCancel }: {
           <div className="space-y-2">
             <label className="block font-mono text-[11px] text-steel tracking-wider uppercase">Line items</label>
             {items.map((it, i) => (
-              <div key={i} className="grid grid-cols-[1fr_70px_90px_auto] gap-2 items-center">
+              <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_70px_90px_auto] gap-2 items-center">
                 <input value={it.description} onChange={e => setItem(i, 'description', e.target.value)} placeholder="Description"
                   className="px-3 py-2 bg-white border border-mist rounded-lg text-sm focus:outline-none focus:border-blue/50" />
                 <input value={it.quantity} onChange={e => setItem(i, 'quantity', e.target.value)} placeholder="Qty"

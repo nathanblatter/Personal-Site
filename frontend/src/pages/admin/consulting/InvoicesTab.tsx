@@ -108,7 +108,7 @@ export default function InvoicesTab({ shared }: { shared: CrmShared }) {
             </div>
 
             {payFor === inv.id && (
-              <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end mt-3 pt-3 border-t border-mist">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end mt-3 pt-3 border-t border-mist">
                 <AdminInput label="Amount ($)" value={pay.amount} onChange={v => setPay({ ...pay, amount: v })} />
                 <AdminSelect label="Method" value={pay.method} onChange={v => setPay({ ...pay, method: v as PaymentMethod })} options={METHODS} />
                 <AdminInput label="Reference" value={pay.reference} onChange={v => setPay({ ...pay, reference: v })} placeholder="optional" />

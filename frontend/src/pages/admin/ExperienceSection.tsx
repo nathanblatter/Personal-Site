@@ -107,7 +107,7 @@ export default function ExperienceSection({ showToast, showError, experience, se
                   className="overflow-hidden"
                 >
                   <div className="border-t border-mist p-6 bg-white space-y-5">
-                    <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <AdminInput label="Title" value={exp.title} onChange={v => updateExpLocal(exp.id, 'title', v)} />
                       <AdminInput label="Date Range" value={exp.year} onChange={v => updateExpLocal(exp.id, 'year', v)} mono />
                     </div>

@@ -54,7 +54,7 @@ export default function PipelineTab({ shared }: { shared: CrmShared }) {
       </div>
 
       {adding && (
-        <div className="bg-snow border border-mist rounded-xl p-5 grid md:grid-cols-4 gap-3 items-end">
+        <div className="bg-snow border border-mist rounded-xl p-5 grid md:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
           <AdminInput label="Title" value={title} onChange={setTitle} placeholder="Website redesign" />
           <AdminSelect label="Contact" value={contactId} onChange={setContactId}
             options={[{ value: '', label: 'Select…' }, ...contacts.map(c => ({ value: c.id, label: c.name }))]} />

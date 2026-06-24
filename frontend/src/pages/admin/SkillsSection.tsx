@@ -76,6 +76,8 @@ export default function SkillsSection({ showToast, showError, skills, setSkills 
       </div>
 
       <SectionCard className="!p-0 overflow-hidden">
+        <div className="overflow-x-auto">
+        <div className="min-w-[480px]">
         <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-0 text-[11px] font-mono text-steel tracking-wider uppercase px-6 py-3 border-b border-mist bg-cloud/50">
           <span className="w-6"></span>
           <span>Skill</span>
@@ -126,6 +128,8 @@ export default function SkillsSection({ showToast, showError, skills, setSkills 
             </div>
           </div>
         ))}
+        </div>
+        </div>
       </SectionCard>
 
       <div className="flex justify-end">

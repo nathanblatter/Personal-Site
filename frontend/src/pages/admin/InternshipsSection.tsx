@@ -153,7 +153,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
 
   const renderIntDashboard = () => (
     <div className="space-y-8">
-      <div className="grid grid-cols-4 gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
         {[
           { label: 'Total Apps', value: dash?.total_applications ?? 0, sub: `${dash?.response_rate ? (dash.response_rate * 100).toFixed(0) : 0}% response rate`, color: 'blue' },
           { label: 'Active', value: intApps.filter(a => !['rejected', 'withdrawn', 'ghosted', 'accepted', 'declined'].includes(a.current_status)).length, sub: 'in pipeline', color: 'teal' },
@@ -203,7 +203,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
         </div>
       </SectionCard>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <SectionCard>
           <h3 className="font-sans font-semibold text-ink mb-4 flex items-center gap-2">
             <Globe size={16} className="text-blue" /> Application Sources
@@ -292,7 +292,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
               <div className="flex-1 h-px bg-mist" />
               <span className="font-mono text-[11px] text-silver">{group.apps.length}</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
               {group.apps.map(app => (
                 <motion.div
                   key={app.id}
@@ -342,7 +342,8 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
   }
 
   const renderList = () => (
-    <div className="space-y-2">
+    <div className="overflow-x-auto">
+    <div className="min-w-[760px] space-y-2">
       <div className="grid grid-cols-[1fr_1fr_100px_80px_90px_100px_40px] gap-3 px-4 py-2">
         {['Company', 'Position', 'Status', 'Priority', 'Source', 'Applied', ''].map(h => (
           <span key={h} className="font-mono text-[10px] text-steel tracking-wider uppercase">{h}</span>
@@ -406,7 +407,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                       {app.role_type && (
                         <div>
                           <span className="font-mono text-[10px] text-steel uppercase block mb-1">Role Type</span>
@@ -474,6 +475,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
         </div>
       )}
     </div>
+    </div>
   )
 
   const renderAddForm = () => {
@@ -483,7 +485,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
     return (
       <SectionCard>
         <h3 className="font-sans font-semibold text-ink mb-6">New Application</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <AdminInput label="Company" value={form.company_name} onChange={v => set('company_name', v)} placeholder="e.g. Google" />
           <AdminInput label="Job Title" value={form.job_title} onChange={v => set('job_title', v)} placeholder="e.g. Software Engineer Intern" />
           <AdminInput label="Team" value={form.team} onChange={v => set('team', v)} placeholder="e.g. Search Infra" />

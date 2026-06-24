@@ -18,7 +18,7 @@ export default function OverviewSection({ projects, skills, experience, coursewo
         <p className="text-steel text-sm">Manage your portfolio content. All changes persist to the database.</p>
       </div>
 
-      <div className="grid grid-cols-4 gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
         {[
           { label: 'Projects', count: projects.length, live: projects.filter(p => p.status === 'live').length, color: 'blue' },
           { label: 'Skills', count: skills.length, live: null, color: 'violet' },
@@ -38,7 +38,7 @@ export default function OverviewSection({ projects, skills, experience, coursewo
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <SectionCard>
           <h3 className="font-sans font-semibold text-ink mb-4 flex items-center gap-2">
             <FolderKanban size={16} className="text-blue" /> Recent Projects

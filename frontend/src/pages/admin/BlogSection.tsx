@@ -172,7 +172,7 @@ export default function BlogSection({ showToast, showError, blogs, setBlogs }: B
                 >
                   <div className="border-t border-mist p-6 bg-white space-y-5">
                     {/* Title + Subtitle */}
-                    <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <AdminInput
                         label="Title"
                         value={blogDraft.title ?? ''}
@@ -187,7 +187,7 @@ export default function BlogSection({ showToast, showError, blogs, setBlogs }: B
                     </div>
 
                     {/* Slug + Cover image */}
-                    <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <AdminInput
                         label="Slug"
                         value={blogDraft.slug ?? ''}

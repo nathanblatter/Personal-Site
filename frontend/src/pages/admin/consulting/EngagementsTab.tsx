@@ -49,7 +49,7 @@ export default function EngagementsTab({ shared }: { shared: CrmShared }) {
       </div>
 
       {adding && (
-        <div className="bg-snow border border-mist rounded-xl p-5 grid md:grid-cols-2 gap-3 items-end">
+        <div className="bg-snow border border-mist rounded-xl p-5 grid md:grid-cols-1 sm:grid-cols-2 gap-3 items-end">
           <AdminSelect label="Client" value={form.contact_id} onChange={v => setForm({ ...form, contact_id: v })}
             options={[{ value: '', label: 'Select…' }, ...contacts.map(c => ({ value: c.id, label: c.name }))]} />
           <AdminInput label="Title" value={form.title} onChange={v => setForm({ ...form, title: v })} placeholder="Q3 Advisory" />
@@ -176,7 +176,7 @@ function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: Eng
           <Clock size={15} /><span className="font-mono text-[10px] uppercase tracking-wider">Time</span>
           <span className="text-xs">· {fmtMinutes(unbilledMin)} unbilled</span>
         </div>
-        <div className="grid grid-cols-[120px_90px_1fr_auto] gap-2 items-end mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-[120px_90px_1fr_auto] gap-2 items-end mb-3">
           <AdminInput label="Date" value={te.entry_date} onChange={v => setTe({ ...te, entry_date: v })} type="date" />
           <AdminInput label="Hours" value={te.hours} onChange={v => setTe({ ...te, hours: v })} placeholder="1.5" />
           <AdminInput label="Description" value={te.description} onChange={v => setTe({ ...te, description: v })} />
@@ -319,7 +319,7 @@ function ContractForm({ initial, submitLabel, onSubmit, onCancel }: {
           options={[{ value: '', label: 'Blank — or pick a template…' }, ...templates.map(t => ({ value: t.id, label: t.name }))]} />
       )}
       <AdminInput label="Title" value={title} onChange={setTitle} placeholder="Statement of Work" />
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <AdminInput label="Compensation ($)" value={value} onChange={setValue} placeholder="As agreed" />
         <AdminInput label="Effective / Start" value={start} onChange={setStart} type="date" />
         <AdminInput label="End" value={end} onChange={setEnd} type="date" />
