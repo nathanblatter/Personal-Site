@@ -52,6 +52,13 @@ const CERTIFICATIONS = [
     issuer: 'Anthropic Education',
     image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
     verify_url: 'https://verify.skilljar.com/c/sgcvp2oqfhpj',
+  },
+  {
+    id: 'e5i9j0g7-3f2h-8k5l-9m1n-0o2p3q4r5s6t',
+    name: 'Claude Code in Action',
+    issuer: 'Anthropic Education',
+    image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
+    verify_url: 'https://verify.skilljar.com/c/7pi2rei6yo3m',
   }
 ]
 
