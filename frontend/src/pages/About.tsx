@@ -45,6 +45,13 @@ const CERTIFICATIONS = [
     issuer: 'Anthropic',
     image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
     verify_url: 'https://verify.skilljar.com/c/rh7mnwth9jt5',
+  },
+  {
+    id: 'd4h8i9f6-2e1g-7j4k-8l0m-9n1o2p3q4r5s',
+    name: 'Introduction to Claude Cowork',
+    issuer: 'Anthropic',
+    image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
+    verify_url: 'https://verify.skilljar.com/c/sgcvp2oqfhpj',
   }
 ]
 
