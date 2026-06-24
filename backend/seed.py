@@ -405,6 +405,53 @@ USES_CONTENT = {
 
 SITE_CONTENT = {"now": NOW_CONTENT, "uses": USES_CONTENT}
 
+# Logos already live in image storage; image_key is the storage path under
+# /api/v1/storage/download/.
+CERTIFICATIONS = [
+    {
+        "name": "Professional Scrum Master I",
+        "issuer": "Scrum.org",
+        "image_key": "certs/psm1.png",
+        "verify_url": "https://www.credly.com/badges/32fb3752-e53f-4f0f-8699-0e4ac8c24897/public_url",
+    },
+    {
+        "name": "Claude 101",
+        "issuer": "Anthropic Education",
+        "image_key": "uploads/5fcb8471941a4d959ccd449bceed55fe.png",
+        "verify_url": "https://verify.skilljar.com/c/73tzbqpcbe5p",
+    },
+    {
+        "name": "Claude Code 101",
+        "issuer": "Anthropic Education",
+        "image_key": "uploads/5fcb8471941a4d959ccd449bceed55fe.png",
+        "verify_url": "https://verify.skilljar.com/c/b7vmfwh6b5od",
+    },
+    {
+        "name": "Claude Platform 101",
+        "issuer": "Anthropic Education",
+        "image_key": "uploads/5fcb8471941a4d959ccd449bceed55fe.png",
+        "verify_url": "https://verify.skilljar.com/c/54yaiiv7tg97",
+    },
+    {
+        "name": "AI Fluency: Framework & Foundations",
+        "issuer": "Anthropic Education",
+        "image_key": "uploads/5fcb8471941a4d959ccd449bceed55fe.png",
+        "verify_url": "https://verify.skilljar.com/c/rh7mnwth9jt5",
+    },
+    {
+        "name": "Introduction to Claude Cowork",
+        "issuer": "Anthropic Education",
+        "image_key": "uploads/5fcb8471941a4d959ccd449bceed55fe.png",
+        "verify_url": "https://verify.skilljar.com/c/sgcvp2oqfhpj",
+    },
+    {
+        "name": "Claude Code in Action",
+        "issuer": "Anthropic Education",
+        "image_key": "uploads/5fcb8471941a4d959ccd449bceed55fe.png",
+        "verify_url": "https://verify.skilljar.com/c/7pi2rei6yo3m",
+    },
+]
+
 
 # ── Seed logic ────────────────────────────────────────────────────────────────
 
@@ -430,6 +477,47 @@ async def ensure_site_content(db) -> None:
         print("Seeded missing site content.")
 
 
+async def ensure_certifications(db) -> None:
+    """Backfill certifications + their auto-tracked verify links once.
+
+    Runs independent of the main seed guard (prod already has projects seeded).
+    Only seeds when the table is empty, so it never fights admin edits.
+    """
+    import re
+    existing = await db.execute(select(models.Certification))
+    if existing.scalars().first():
+        return
+
+    download_prefix = "/api/v1/storage/download/"
+    for i, data in enumerate(CERTIFICATIONS):
+        verify = (data.get("verify_url") or "").strip()
+        link_id = None
+        if verify:
+            base = "cert-" + re.sub(r"[^a-z0-9]+", "-", data["name"].lower()).strip("-")
+            base = base.rstrip("-") or "cert"
+            slug, n = base, 1
+            while (await db.execute(
+                select(models.TrackedLink).where(models.TrackedLink.slug == slug)
+            )).scalar_one_or_none() is not None:
+                n += 1
+                slug = f"{base}-{n}"
+            link = models.TrackedLink(slug=slug, destination_url=verify, label=data["name"])
+            db.add(link)
+            await db.flush()
+            link_id = link.id
+        db.add(models.Certification(
+            name=data["name"],
+            issuer=data["issuer"],
+            image_key=data.get("image_key"),
+            image_url=(download_prefix + data["image_key"]) if data.get("image_key") else None,
+            verify_url=verify or None,
+            tracked_link_id=link_id,
+            sort_order=i,
+        ))
+    await db.commit()
+    print("Seeded certifications.")
+
+
 async def seed() -> None:
     # Ensure tables exist (safe to call even after alembic migrations)
     async with engine.begin() as conn:
@@ -438,6 +526,7 @@ async def seed() -> None:
     async with AsyncSessionLocal() as db:
         # Backfill editable content blocks regardless of the seed guard below.
         await ensure_site_content(db)
+        await ensure_certifications(db)
 
         # Skip if already seeded
         result = await db.execute(select(models.Project))

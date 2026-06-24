@@ -93,6 +93,18 @@ export interface CourseworkResponse {
   sort_order: number
 }
 
+export interface CertificationResponse {
+  id: number
+  name: string
+  issuer: string
+  image_url?: string
+  image_key?: string
+  verify_url?: string
+  sort_order: number
+  tracked_link_id?: number
+  verify_slug?: string
+}
+
 export interface SocialResponse {
   id: number
   icon: string
@@ -353,6 +365,7 @@ export interface AboutPageResponse {
   coursework: CourseworkResponse[]
   experience: ExperienceResponse[]
   testimonials: TestimonialResponse[]
+  certifications: CertificationResponse[]
 }
 
 // ── Contact Page Types ───────────────────────────────────────────────────────
@@ -826,6 +839,15 @@ export const api = {
     update: (id: number, data: Partial<Omit<CourseworkResponse, 'id'>>) =>
       request<CourseworkResponse>('PUT', `/about/coursework/${id}`, data),
     delete: (id: number) => request<void>('DELETE', `/about/coursework/${id}`),
+  },
+
+  certifications: {
+    list: () => request<CertificationResponse[]>('GET', '/about/certifications'),
+    create: (data: Partial<Omit<CertificationResponse, 'id' | 'tracked_link_id' | 'verify_slug'>>) =>
+      request<CertificationResponse>('POST', '/about/certifications', data),
+    update: (id: number, data: Partial<Omit<CertificationResponse, 'id' | 'tracked_link_id' | 'verify_slug'>>) =>
+      request<CertificationResponse>('PUT', `/about/certifications/${id}`, data),
+    delete: (id: number) => request<void>('DELETE', `/about/certifications/${id}`),
   },
 
   contact: {

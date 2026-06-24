@@ -6,61 +6,9 @@ import GitHubSection from '../components/GitHubSection'
 import ClaudeSection from '../components/ClaudeSection'
 import Skeleton from '../components/Skeleton'
 import { Quote, ExternalLink } from 'lucide-react'
-import { api, type AboutResponse, type InterestResponse, type CourseworkResponse, type ExperienceResponse, type TestimonialResponse } from '../lib/api'
+import { api, type AboutResponse, type InterestResponse, type CourseworkResponse, type ExperienceResponse, type TestimonialResponse, type CertificationResponse } from '../lib/api'
 import { usePortfolioCtx } from '../lib/usePortfolioCtx'
 import { getIcon } from '../lib/iconMap'
-
-const CERTIFICATIONS = [
-  {
-    id: '32fb3752-e53f-4f0f-8699-0e4ac8c24897',
-    name: 'Professional Scrum Master I',
-    issuer: 'Scrum.org',
-    image: 'https://nathanblatter.com/api/v1/storage/download/certs/psm1.png',
-    verify_url: 'https://www.credly.com/badges/32fb3752-e53f-4f0f-8699-0e4ac8c24897/public_url',
-  },
-  {
-    id: 'd2c9c8b1-5a0e-4c3b-9cbd-8f0a4e5e7a6f',
-    name: 'Claude 101',
-    issuer: 'Anthropic Education',
-    image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
-    verify_url: 'https://verify.skilljar.com/c/73tzbqpcbe5p',
-  },
-  {
-    id: 'a1e5f6c3-9b8d-4e2f-8c7a-1d2b3c4d5e6f',
-    name: 'Claude Code 101',
-    issuer: 'Anthropic Education',
-    image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
-    verify_url: 'https://verify.skilljar.com/c/b7vmfwh6b5od',
-  },
-  {
-    id: 'b2f6g7d4-0c9e-5h2i-6j8k-7l9m0n1o2p3q',
-    name: 'Claude Platform 101',
-    issuer: 'Anthropic Education',
-    image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
-    verify_url: 'https://verify.skilljar.com/c/54yaiiv7tg97',
-  },
-  {
-    id: 'c3g7h8e5-1d0f-6i3j-7k9l-8m0n1o2p3q4r',
-    name: 'Al Fluency: Framework & Foundations',
-    issuer: 'Anthropic Education',
-    image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
-    verify_url: 'https://verify.skilljar.com/c/rh7mnwth9jt5',
-  },
-  {
-    id: 'd4h8i9f6-2e1g-7j4k-8l0m-9n1o2p3q4r5s',
-    name: 'Introduction to Claude Cowork',
-    issuer: 'Anthropic Education',
-    image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
-    verify_url: 'https://verify.skilljar.com/c/sgcvp2oqfhpj',
-  },
-  {
-    id: 'e5i9j0g7-3f2h-8k5l-9m1n-0o2p3q4r5s6t',
-    name: 'Claude Code in Action',
-    issuer: 'Anthropic Education',
-    image: 'https://nathanblatter.com/api/v1/storage/download/uploads/5fcb8471941a4d959ccd449bceed55fe.png',
-    verify_url: 'https://verify.skilljar.com/c/7pi2rei6yo3m',
-  }
-]
 
 export default function About() {
   const [about, setAbout] = useState<AboutResponse | null>(null)
@@ -68,16 +16,18 @@ export default function About() {
   const [coursework, setCoursework] = useState<CourseworkResponse[]>([])
   const [experience, setExperience] = useState<ExperienceResponse[]>([])
   const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
+  const [certifications, setCertifications] = useState<CertificationResponse[]>([])
   const [loading, setLoading] = useState(true)
   const portfolioCtx = usePortfolioCtx()
 
   useEffect(() => {
-    api.aboutPage.get().then(({ about: ab, interests: intr, coursework: cw, experience: ex, testimonials: test }) => {
+    api.aboutPage.get().then(({ about: ab, interests: intr, coursework: cw, experience: ex, testimonials: test, certifications: certs }) => {
       setAbout(ab)
       setInterests(intr)
       setCoursework(cw)
       setExperience(ex)
       setTestimonials(test)
+      setCertifications(certs ?? [])
     }).finally(() => setLoading(false))
   }, [])
 
@@ -342,32 +292,52 @@ export default function About() {
             subtitle="Verified credentials and professional certifications."
           />
           <div className="flex flex-wrap gap-5">
-            {CERTIFICATIONS.map((cert, i) => (
-              <motion.a
-                key={cert.id}
-                href={cert.verify_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.08 }}
-                className="group flex items-center gap-5 p-5 rounded-xl border border-mist bg-white hover:border-blue/30 hover:shadow-lg hover:shadow-blue/5 transition-all max-w-sm"
-              >
-                <img
-                  src={cert.image}
-                  alt={cert.name}
-                  className="w-16 h-16 object-contain shrink-0 bg-[#ffffff] rounded-lg p-1.5"
-                />
-                <div className="min-w-0">
-                  <p className="font-sans font-semibold text-ink leading-snug mb-1">{cert.name}</p>
-                  <p className="font-mono text-[11px] text-steel mb-3">{cert.issuer}</p>
-                  <span className="inline-flex items-center gap-1 font-mono text-[11px] text-blue group-hover:underline">
-                    Verify <ExternalLink size={10} />
-                  </span>
-                </div>
-              </motion.a>
-            ))}
+            {loading
+              ? Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-5 p-5 rounded-xl border border-mist bg-white max-w-sm w-[320px]">
+                    <Skeleton className="w-16 h-16 rounded-lg shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  </div>
+                ))
+              : null}
+            {certifications.map((cert, i) => {
+              const href = cert.verify_slug ? `/go/${cert.verify_slug}` : cert.verify_url
+              return (
+                <motion.a
+                  key={cert.id}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08 }}
+                  className="group flex items-center gap-5 p-5 rounded-xl border border-mist bg-white hover:border-blue/30 hover:shadow-lg hover:shadow-blue/5 transition-all max-w-sm"
+                >
+                  {cert.image_url && (
+                    <img
+                      src={cert.image_url}
+                      alt={cert.name}
+                      loading="lazy"
+                      className="w-16 h-16 object-contain shrink-0 bg-[#ffffff] rounded-lg p-1.5"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-sans font-semibold text-ink leading-snug mb-1">{cert.name}</p>
+                    <p className="font-mono text-[11px] text-steel mb-3">{cert.issuer}</p>
+                    {href && (
+                      <span className="inline-flex items-center gap-1 font-mono text-[11px] text-blue group-hover:underline">
+                        Verify <ExternalLink size={10} />
+                      </span>
+                    )}
+                  </div>
+                </motion.a>
+              )
+            })}
           </div>
         </div>
       </section>

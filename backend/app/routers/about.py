@@ -1,4 +1,5 @@
-from typing import List
+import re
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -10,6 +11,67 @@ from app.cache import cache
 router = APIRouter(prefix="/about", tags=["about"])
 
 SINGLETON_ID = 1
+
+
+# ── Certification helpers ─────────────────────────────────────────────────────
+
+async def _unique_link_slug(db: AsyncSession, name: str) -> str:
+    """Build a stable, unique tracked-link slug from a cert name (e.g. cert-psm-i)."""
+    base = "cert-" + re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")
+    base = base.rstrip("-") or "cert"
+    slug = base
+    n = 1
+    while True:
+        existing = await db.execute(
+            select(models.TrackedLink).where(models.TrackedLink.slug == slug)
+        )
+        if existing.scalar_one_or_none() is None:
+            return slug
+        n += 1
+        slug = f"{base}-{n}"
+
+
+def _cert_response(cert: models.Certification) -> schemas.CertificationResponse:
+    return schemas.CertificationResponse(
+        id=cert.id,
+        name=cert.name,
+        issuer=cert.issuer,
+        image_url=cert.image_url,
+        image_key=cert.image_key,
+        verify_url=cert.verify_url,
+        sort_order=cert.sort_order,
+        tracked_link_id=cert.tracked_link_id,
+        verify_slug=cert.tracked_link.slug if cert.tracked_link else None,
+    )
+
+
+async def _sync_tracked_link(db: AsyncSession, cert: models.Certification) -> None:
+    """Keep the cert's auto-created tracked link in step with its verify_url/name.
+
+    - verify_url set, no link  → create a /go/{slug} link
+    - verify_url set, has link → update destination + label
+    - verify_url cleared        → delete the link
+    """
+    link = cert.tracked_link
+    verify = (cert.verify_url or "").strip()
+
+    if not verify:
+        if link is not None:
+            await db.delete(link)
+            cert.tracked_link = None
+            cert.tracked_link_id = None
+        return
+
+    if link is None:
+        slug = await _unique_link_slug(db, cert.name)
+        link = models.TrackedLink(slug=slug, destination_url=verify, label=cert.name or slug)
+        db.add(link)
+        await db.flush()
+        cert.tracked_link = link
+        cert.tracked_link_id = link.id
+    else:
+        link.destination_url = verify
+        link.label = cert.name or link.label
 
 
 # ── About singleton ───────────────────────────────────────────────────────────
@@ -207,5 +269,55 @@ async def delete_testimonial(tid: int, db: AsyncSession = Depends(get_db), _: No
     if not t:
         raise HTTPException(status_code=404, detail="Testimonial not found")
     await db.delete(t)
+    await db.commit()
+    await cache.delete("page:about")
+
+
+# ── Certifications ────────────────────────────────────────────────────────────
+
+@router.get("/certifications", response_model=List[schemas.CertificationResponse])
+async def list_certifications(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(models.Certification).order_by(models.Certification.sort_order, models.Certification.id)
+    )
+    return [_cert_response(c) for c in result.scalars().unique().all()]
+
+
+@router.post("/certifications", response_model=schemas.CertificationResponse, status_code=status.HTTP_201_CREATED)
+async def create_certification(payload: schemas.CertificationCreate, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    cert = models.Certification(**payload.model_dump())
+    db.add(cert)
+    await db.flush()
+    await _sync_tracked_link(db, cert)
+    await db.commit()
+    await db.refresh(cert)
+    await cache.delete("page:about")
+    return _cert_response(cert)
+
+
+@router.put("/certifications/{cert_id}", response_model=schemas.CertificationResponse)
+async def update_certification(cert_id: int, payload: schemas.CertificationUpdate, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    result = await db.execute(select(models.Certification).where(models.Certification.id == cert_id))
+    cert = result.scalar_one_or_none()
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certification not found")
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(cert, key, value)
+    await _sync_tracked_link(db, cert)
+    await db.commit()
+    await db.refresh(cert)
+    await cache.delete("page:about")
+    return _cert_response(cert)
+
+
+@router.delete("/certifications/{cert_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_certification(cert_id: int, db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
+    result = await db.execute(select(models.Certification).where(models.Certification.id == cert_id))
+    cert = result.scalar_one_or_none()
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certification not found")
+    if cert.tracked_link is not None:
+        await db.delete(cert.tracked_link)
+    await db.delete(cert)
     await db.commit()
     await cache.delete("page:about")

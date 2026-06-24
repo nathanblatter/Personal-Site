@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
-import { Plus, Trash2, Save, Eye, X, Check, ExternalLink, Copy } from 'lucide-react'
+import { Plus, Trash2, Save, Eye, X, Check, ExternalLink, Copy, Award } from 'lucide-react'
 import {
   api,
   type AboutResponse,
   type InterestResponse,
   type TestimonialResponse,
   type TestimonialRequestResponse,
+  type CertificationResponse,
 } from '../../lib/api'
-import { AdminInput, AdminTextarea, SectionCard, type AdminCallbacks } from './AdminShared'
+import { AdminInput, AdminTextarea, SectionCard, FileUploadButton, type AdminCallbacks } from './AdminShared'
 
 interface AboutSectionProps extends AdminCallbacks {
   about: AboutResponse | null
@@ -30,11 +31,48 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
   const [showNewReqForm, setShowNewReqForm] = useState(false)
   const [expandedReq, setExpandedReq] = useState<number | null>(null)
 
+  const [certs, setCerts] = useState<CertificationResponse[]>([])
+  const [certsLoaded, setCertsLoaded] = useState(false)
+
   useEffect(() => {
     api.testimonialRequests.list()
       .then(r => { setTestimonialReqs(r); setTReqsLoaded(true) })
       .catch(err => showError((err as Error).message))
+    api.certifications.list()
+      .then(r => { setCerts(r); setCertsLoaded(true) })
+      .catch(err => showError((err as Error).message))
   }, [showError])
+
+  const updateCertLocal = (id: number, field: keyof CertificationResponse, value: string) => {
+    setCerts(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
+  }
+
+  const addCert = async () => {
+    try {
+      const created = await api.certifications.create({ name: 'New Certification', issuer: 'Issuer', sort_order: certs.length })
+      setCerts(prev => [...prev, created])
+      showToast('Certification added')
+    } catch (err) { showError((err as Error).message) }
+  }
+
+  const saveCert = async (cert: CertificationResponse) => {
+    try {
+      const updated = await api.certifications.update(cert.id, {
+        name: cert.name, issuer: cert.issuer, verify_url: cert.verify_url,
+        image_url: cert.image_url, image_key: cert.image_key, sort_order: cert.sort_order,
+      })
+      setCerts(prev => prev.map(c => c.id === updated.id ? updated : c))
+      showToast(updated.verify_slug ? `Saved · tracked at /go/${updated.verify_slug}` : 'Certification saved')
+    } catch (err) { showError((err as Error).message) }
+  }
+
+  const deleteCert = async (id: number) => {
+    try {
+      await api.certifications.delete(id)
+      setCerts(prev => prev.filter(c => c.id !== id))
+      showToast('Certification removed')
+    } catch (err) { showError((err as Error).message) }
+  }
 
   const saveAbout = async () => {
     if (!about) return
@@ -285,6 +323,94 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
           ))}
           {testimonials.length === 0 && (
             <p className="text-center text-steel text-sm py-4 font-mono">No testimonials yet.</p>
+          )}
+        </div>
+      </SectionCard>
+
+      {/* Certifications */}
+      <SectionCard>
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="font-sans font-semibold text-ink flex items-center gap-2"><Award size={16} className="text-blue" /> Certifications</h3>
+            <p className="text-xs text-steel font-mono mt-0.5">Each verify URL auto-creates a tracked /go/ link that counts clicks</p>
+          </div>
+          <button onClick={addCert} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-blue bg-blue-wash rounded-lg hover:bg-blue/10 transition-colors">
+            <Plus size={12} /> Add
+          </button>
+        </div>
+        <div className="space-y-3">
+          {certs.map(cert => (
+            <div key={cert.id} className="flex gap-4 p-4 rounded-lg bg-white border border-mist">
+              {/* Logo */}
+              <div className="shrink-0 flex flex-col items-center gap-2">
+                <div className="w-16 h-16 rounded-lg bg-[#ffffff] border border-mist overflow-hidden flex items-center justify-center">
+                  {cert.image_url
+                    ? <img src={cert.image_url} alt={cert.name} className="w-full h-full object-contain p-1.5" />
+                    : <Award size={20} className="text-silver" />}
+                </div>
+                <FileUploadButton
+                  prefix="certs"
+                  label="Logo"
+                  accept="image/*"
+                  onUploaded={(url, key) => setCerts(prev => prev.map(c => c.id === cert.id ? { ...c, image_url: url, image_key: key } : c))}
+                />
+              </div>
+              {/* Fields */}
+              <div className="flex-1 min-w-0 space-y-2">
+                <input
+                  value={cert.name}
+                  onChange={e => updateCertLocal(cert.id, 'name', e.target.value)}
+                  className="w-full text-sm text-ink font-medium bg-transparent focus:outline-none focus:bg-snow focus:ring-2 focus:ring-blue/10 rounded px-2 py-1.5 transition-all border border-mist"
+                  placeholder="Certification name"
+                />
+                <input
+                  value={cert.issuer}
+                  onChange={e => updateCertLocal(cert.id, 'issuer', e.target.value)}
+                  className="w-full text-sm text-steel bg-transparent focus:outline-none focus:bg-snow focus:ring-2 focus:ring-blue/10 rounded px-2 py-1.5 transition-all border border-mist"
+                  placeholder="Issuer"
+                />
+                <input
+                  value={cert.verify_url ?? ''}
+                  onChange={e => updateCertLocal(cert.id, 'verify_url', e.target.value)}
+                  className="w-full text-xs text-steel font-mono bg-transparent focus:outline-none focus:bg-snow focus:ring-2 focus:ring-blue/10 rounded px-2 py-1.5 transition-all border border-mist"
+                  placeholder="Verify URL (https://…)"
+                />
+                {cert.verify_slug && (
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(`https://nathanblatter.com/go/${cert.verify_slug}`); showToast('Tracked link copied') }}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-mono text-blue hover:underline"
+                    title="Copy tracked link"
+                  >
+                    <ExternalLink size={11} /> /go/{cert.verify_slug} <Copy size={10} />
+                  </button>
+                )}
+              </div>
+              {/* Actions */}
+              <div className="flex flex-col items-center gap-1 shrink-0">
+                <button onClick={() => saveCert(cert)} className="p-1.5 text-steel hover:text-blue transition-colors" title="Save">
+                  <Save size={13} />
+                </button>
+                <button onClick={() => deleteCert(cert.id)} className="p-1.5 text-silver hover:text-ember transition-colors" title="Delete">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {certs.length === 0 && certsLoaded && (
+            <p className="text-center text-steel text-sm py-4 font-mono">No certifications yet. Add one above.</p>
+          )}
+          {!certsLoaded && (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex gap-4 p-4 rounded-lg bg-white border border-mist animate-pulse">
+                  <div className="w-16 h-16 rounded-lg bg-mist shrink-0" />
+                  <div className="flex-1 space-y-2 py-1">
+                    <div className="h-8 bg-mist rounded" />
+                    <div className="h-8 bg-mist rounded w-2/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </SectionCard>

@@ -129,6 +129,22 @@ class Coursework(Base):
     sort_order = Column(Integer, nullable=False, default=0)
 
 
+class Certification(Base):
+    __tablename__ = "certifications"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False)
+    issuer = Column(String, nullable=False)
+    image_url = Column(String, nullable=True)            # logo download URL
+    image_key = Column(String, nullable=True)            # storage key in image storage
+    verify_url = Column(String, nullable=True)           # raw credential verification URL
+    # Auto-created tracked link so /go/{slug} redirects to verify_url and counts clicks.
+    tracked_link_id = Column(Integer, ForeignKey("tracked_links.id", ondelete="SET NULL"), nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+
+    tracked_link = relationship("TrackedLink", lazy="joined")
+
+
 class Social(Base):
     __tablename__ = "socials"
 

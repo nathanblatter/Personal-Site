@@ -351,6 +351,38 @@ class CourseworkResponse(CourseworkBase):
     model_config = {"from_attributes": True}
 
 
+# ── Certifications ────────────────────────────────────────────────────────────
+
+class CertificationBase(BaseModel):
+    name: str
+    issuer: str
+    image_url: Optional[str] = None
+    image_key: Optional[str] = None
+    verify_url: Optional[str] = None
+    sort_order: int = 0
+
+
+class CertificationCreate(CertificationBase):
+    pass
+
+
+class CertificationUpdate(BaseModel):
+    name: Optional[str] = None
+    issuer: Optional[str] = None
+    image_url: Optional[str] = None
+    image_key: Optional[str] = None
+    verify_url: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class CertificationResponse(CertificationBase):
+    id: int
+    tracked_link_id: Optional[int] = None
+    verify_slug: Optional[str] = None   # tracked-link slug → public links to /go/{slug}
+
+    model_config = {"from_attributes": True}
+
+
 # ── Socials ───────────────────────────────────────────────────────────────────
 
 class SocialBase(BaseModel):
