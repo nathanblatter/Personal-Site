@@ -415,40 +415,55 @@ async def church_checkin(token: str):
     )
 
 
-async def send_church_reminder() -> str:
-    """Text the Sunday church magic link, at most once per Sunday in the target hour.
+# How many hours after CHURCH_REMINDER_HOUR the reminder may still fire on Sunday.
+# A window (not an exact hour) so a deploy/restart inside the 5pm hour, or event-loop
+# lag, doesn't make the reminder miss the whole week.
+CHURCH_REMINDER_WINDOW_HOURS = int(os.getenv("CHURCH_REMINDER_WINDOW_HOURS", "4"))
 
-    Designed to run on a short supervised interval (<1h); the hour-gate plus the
-    in-memory day-guard ensure exactly one send per Sunday unless the process
-    restarts inside the window.
+
+async def send_church_reminder(force: bool = False) -> str:
+    """Text the Sunday church magic link, at most once per Sunday.
+
+    Runs on a short supervised interval. On Sunday it fires once any time within
+    [CHURCH_REMINDER_HOUR, +WINDOW); the DB check (already-logged) and the in-memory
+    day-guard keep it to a single send. `force=True` bypasses the day/window/guard
+    checks for manual end-to-end testing.
     """
     global _last_church_reminder
     now = datetime.now(LOCAL_TZ)
-    if now.weekday() != 6:          # 6 = Sunday
-        return "skip: not sunday"
-    if now.hour != CHURCH_REMINDER_HOUR:
-        return "skip: outside send window"
     today = now.date()
-    if _last_church_reminder == today:
-        return "skip: already sent today"
+
+    if not force:
+        if now.weekday() != 6:          # 6 = Sunday
+            return "skip: not sunday"
+        window_end = CHURCH_REMINDER_HOUR + CHURCH_REMINDER_WINDOW_HOURS
+        if not (CHURCH_REMINDER_HOUR <= now.hour < window_end):
+            return "skip: outside send window"
+        if _last_church_reminder == today:
+            return "skip: already sent today"
+
     if not CHURCH_LINK_SECRET:
         log.warning("CHURCH_LINK_SECRET not set — cannot send church reminder")
         return "skip: no secret configured"
 
-    async with _KPI_POOL.acquire() as conn:
-        already = await conn.fetchval(
-            "SELECT church FROM kpi_daily_log WHERE date = $1", today
-        )
-    if already:
-        _last_church_reminder = today
-        return "skip: church already logged"
+    if not force:
+        async with _KPI_POOL.acquire() as conn:
+            already = await conn.fetchval(
+                "SELECT church FROM kpi_daily_log WHERE date = $1", today
+            )
+        if already:
+            _last_church_reminder = today
+            return "skip: church already logged"
 
     url = f"{SITE_BASE_URL}/c/{sign_church_token(today.isoformat())}"
+    prefix = "[test] " if force else ""
     await imessage_service.send_alert(
-        f"Did you make it to church today? Tap to log it 🙏\n{url}"
+        f"{prefix}Did you make it to church today? Tap to log it 🙏\n{url}"
     )
-    _last_church_reminder = today
-    return f"sent church reminder for {today.isoformat()}"
+    if not force:
+        _last_church_reminder = today
+    result = f"sent church reminder for {today.isoformat()}"
+    return f"{result} (test)" if force else result
 
 
 class LocationIngestRequest(BaseModel):
@@ -553,6 +568,16 @@ async def scrape_github_kpi() -> dict[str, int]:
 def verify_kpi_key(x_kpi_api_key: Optional[str] = Header(None)):
     if x_kpi_api_key != os.getenv("KPI_API_KEY"):
         raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+@router.post("/church/test-reminder")
+async def church_test_reminder(_=Depends(verify_kpi_key)):
+    """Force-send the church check-in text now, bypassing the Sunday/hour gate.
+
+    Use to verify the token + iMessage path end-to-end without waiting for Sunday.
+    """
+    result = await send_church_reminder(force=True)
+    return {"result": result}
 
 
 @router.get("")
