@@ -1,10 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
+import { QRCodeCanvas } from 'qrcode.react'
 import { Plus, Trash2, GripVertical, Save, Eye, EyeOff, Check, Pencil, ExternalLink, Download } from 'lucide-react'
 import { api, type BioLinkResponse, type BioPageSettingsResponse } from '../../lib/api'
 import { AdminInput, SectionCard, type AdminCallbacks } from './AdminShared'
 
+const BIO_URL = 'https://nathanblatter.com/linkinbio'
+
 export default function BioSection({ showToast, showError }: AdminCallbacks) {
+  const qrRef = useRef<HTMLCanvasElement>(null)
+
+  const downloadQR = () => {
+    const canvas = qrRef.current
+    if (!canvas) return
+    const link = document.createElement('a')
+    link.download = 'linkinbio-qr.png'
+    link.href = canvas.toDataURL('image/png')
+    link.click()
+  }
+
   const [bioLinks, setBioLinks] = useState<BioLinkResponse[]>([])
   const [bioSettings, setBioSettings] = useState<BioPageSettingsResponse>({ heading: 'Nathan Blatter', subheading: '', avatar_url: '', show_portfolio_link: true, show_booking_link: true })
   const [bioEditLink, setBioEditLink] = useState<BioLinkResponse | null>(null)
@@ -82,22 +96,24 @@ export default function BioSection({ showToast, showError }: AdminCallbacks) {
       {/* ── QR Code ── */}
       <SectionCard>
         <h3 className="font-mono text-[11px] text-steel tracking-wider uppercase mb-4">QR Code</h3>
-        <div className="flex items-start gap-6">
-          <img
-            src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://nathanblatter.com/linkinbio"
-            alt="QR Code for linkinbio"
-            className="w-[200px] h-[200px] border border-mist rounded-lg"
-          />
+        <div className="flex flex-col sm:flex-row items-start gap-6">
+          <div className="p-3 bg-[#ffffff] border border-mist rounded-lg shrink-0">
+            <QRCodeCanvas
+              ref={qrRef}
+              value={BIO_URL}
+              size={200}
+              level="M"
+              marginSize={0}
+            />
+          </div>
           <div className="space-y-3">
             <p className="text-sm text-steel">Scan to open <span className="font-mono text-ink">nathanblatter.com/linkinbio</span></p>
-            <a
-              href="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://nathanblatter.com/linkinbio"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={downloadQR}
               className="inline-flex items-center gap-2 px-3 py-2 border border-mist text-steel font-mono text-xs rounded-lg hover:text-blue hover:border-blue/30 transition-all"
             >
               <Download size={14} /> Download QR
-            </a>
+            </button>
           </div>
         </div>
       </SectionCard>
