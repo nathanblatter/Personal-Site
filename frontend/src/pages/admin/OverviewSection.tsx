@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { FolderKanban, BarChart3 } from 'lucide-react'
+import { FolderKanban, BarChart3, Code2, ExternalLink } from 'lucide-react'
 import type { ProjectResponse, SkillResponse, ExperienceResponse, CourseworkResponse } from '../../lib/api'
 import { StatusBadge, SectionCard } from './AdminShared'
 
@@ -37,6 +37,31 @@ export default function OverviewSection({ projects, skills, experience, coursewo
           </SectionCard>
         ))}
       </div>
+
+      <SectionCard>
+        <h3 className="font-sans font-semibold text-ink mb-1 flex items-center gap-2">
+          <Code2 size={16} className="text-violet" /> Developer
+        </h3>
+        <p className="text-xs text-steel font-mono mb-4">Interactive API reference — admin-only (your login cookie authorizes it).</p>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href="/api/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-blue bg-blue-wash rounded-lg hover:bg-blue/10 transition-colors"
+          >
+            Swagger UI <ExternalLink size={11} />
+          </a>
+          <a
+            href="/api/redoc"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-steel bg-cloud rounded-lg hover:bg-mist transition-colors"
+          >
+            ReDoc <ExternalLink size={11} />
+          </a>
+        </div>
+      </SectionCard>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <SectionCard>

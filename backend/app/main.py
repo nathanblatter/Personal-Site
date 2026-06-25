@@ -9,11 +9,14 @@ from contextlib import asynccontextmanager
 from difflib import SequenceMatcher
 from html import escape
 from pathlib import Path
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import select
+
+from app.auth import require_auth
 
 from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report, newsletter, site_content, health
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
@@ -215,9 +218,11 @@ def _static_og_html(route: str, index_html: str) -> str | None:
 
 app = FastAPI(
     title="Portfolio API",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    # Built-in docs disabled here and re-served below behind admin auth, so the
+    # OpenAPI schema (every route + shape) isn't publicly exposed.
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
     lifespan=lifespan,
 )
 
@@ -352,6 +357,27 @@ async def security_txt():
 @app.get("/humans.txt", include_in_schema=False)
 async def humans_txt():
     return Response(content=_HUMANS_TXT, media_type="text/plain")
+
+
+# ── API docs — admin-only ──────────────────────────────────────────────────────
+# Built-in docs are disabled on the FastAPI() constructor; we re-serve Swagger UI,
+# ReDoc, and the OpenAPI schema here behind require_auth so the full route schema
+# isn't public. The admin auth is a same-origin cookie, so Swagger UI's in-browser
+# fetch of /api/openapi.json carries it automatically.
+
+@app.get("/api/openapi.json", include_in_schema=False)
+async def openapi_schema(_: None = Depends(require_auth)):
+    return JSONResponse(app.openapi())
+
+
+@app.get("/api/docs", include_in_schema=False)
+async def swagger_ui(_: None = Depends(require_auth)):
+    return get_swagger_ui_html(openapi_url="/api/openapi.json", title="Portfolio API — Docs")
+
+
+@app.get("/api/redoc", include_in_schema=False)
+async def redoc_ui(_: None = Depends(require_auth)):
+    return get_redoc_html(openapi_url="/api/openapi.json", title="Portfolio API — ReDoc")
 
 
 @app.get("/api/v1/suggest", include_in_schema=False)
