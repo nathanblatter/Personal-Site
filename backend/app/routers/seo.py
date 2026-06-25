@@ -1,4 +1,5 @@
 import io
+import re
 import textwrap
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +14,18 @@ from app import models
 router = APIRouter(tags=["seo"])
 
 DOMAIN = "https://nathanblatter.com"
+
+
+def clean_description(text: str | None, limit: int = 160) -> str:
+    """Flatten markdown/whitespace into a clean meta description, truncated on a word boundary."""
+    if not text:
+        return ""
+    # Strip the most common markdown noise so previews read as prose, not source.
+    flat = re.sub(r"[#*_`>~\[\]()]", " ", text)
+    flat = re.sub(r"\s+", " ", flat).strip()
+    if len(flat) <= limit:
+        return flat
+    return flat[:limit].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
 
 STATIC_PAGES = [
     "/",
@@ -111,6 +124,53 @@ async def og_image(slug: str, db: AsyncSession = Depends(get_db)):
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
+@router.get("/og/project/{project_id}.png", include_in_schema=False)
+async def project_og_image(project_id: str, db: AsyncSession = Depends(get_db)):
+    """Branded OG card for a case study (title + tags + one-line summary)."""
+    cache_key = f"project:{project_id}"
+    if cache_key in _og_cache:
+        return Response(content=_og_cache[cache_key], media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+    result = await db.execute(
+        select(models.Project).where(models.Project.project_id == project_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    png = _generate_og_image(project.title, project.tags or [], clean_description(project.description, 90))
+    _og_cache[cache_key] = png
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@router.get("/og/page/{slug}.png", include_in_schema=False)
+async def page_og_image(slug: str):
+    """Branded OG card for a static content page (driven by the title/description map)."""
+    cache_key = f"page:{slug}"
+    if cache_key in _og_cache:
+        return Response(content=_og_cache[cache_key], media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+    meta = PAGE_OG.get(slug)
+    if not meta:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    png = _generate_og_image(meta["title"], meta.get("tags", []), meta.get("subtitle", ""))
+    _og_cache[cache_key] = png
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+# Branded-OG-image source for static pages. Keyed by route (no leading slash).
+# Home and About intentionally omitted — those share the personal headshot.
+PAGE_OG: dict[str, dict] = {
+    "projects": {"title": "Projects", "subtitle": "Selected work from research, coursework, and real-world clients.", "tags": ["portfolio", "engineering", "case studies"]},
+    "blog": {"title": "Blog", "subtitle": "Technical writing on software engineering, AI, and data systems.", "tags": ["writing", "ai", "software"]},
+    "resume": {"title": "Résumé", "subtitle": "Full-stack engineer — Python, React, SQL, and AI systems.", "tags": ["resume", "full-stack"]},
+    "contact": {"title": "Contact", "subtitle": "Open to internships, collaborations, and interesting projects.", "tags": ["contact", "consulting"]},
+    "now": {"title": "Now", "subtitle": "What I'm focused on, building, and learning right now.", "tags": ["now"]},
+    "uses": {"title": "Uses", "subtitle": "The hardware, software, and services I build with.", "tags": ["uses", "tools"]},
+}
+
+
 @router.get("/sitemap.xml", include_in_schema=False)
 async def sitemap_xml(db: AsyncSession = Depends(get_db)):
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -120,6 +180,15 @@ async def sitemap_xml(db: AsyncSession = Depends(get_db)):
     # Static pages
     for page in STATIC_PAGES:
         urls.append({"loc": f"{DOMAIN}{page}", "lastmod": now, "priority": "1.0" if page == "/" else "0.8"})
+
+    # Dynamic case studies (live projects)
+    proj_result = await db.execute(
+        select(models.Project.project_id)
+        .where(models.Project.status == "live")
+        .order_by(models.Project.sort_order)
+    )
+    for (project_id,) in proj_result.all():
+        urls.append({"loc": f"{DOMAIN}/projects/{project_id}", "lastmod": now, "priority": "0.7"})
 
     # Dynamic blog posts
     result = await db.execute(

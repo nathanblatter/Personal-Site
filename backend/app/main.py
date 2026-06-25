@@ -189,7 +189,8 @@ def _static_og_html(route: str, index_html: str) -> str | None:
     title = escape(og["title"])
     desc = escape(og["description"])
     url = og["url"]
-    image = f"{DOMAIN}/headshot.webp"
+    # Content pages get a branded title-card; home/about keep the personal headshot.
+    image = f"{DOMAIN}/og/page/{route}.png" if route in seo.PAGE_OG else f"{DOMAIN}/headshot.webp"
     og_tags = (
         f'<meta property="og:title" content="{title}" />\n'
         f'    <meta property="og:description" content="{desc}" />\n'
@@ -443,6 +444,56 @@ async def _blog_og_html(slug: str, index_html: str) -> str | None:
     return html
 
 
+async def _case_study_og_html(project_id: str, index_html: str) -> str | None:
+    """If project_id matches a project, return index.html with injected case-study OG tags."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(models.Project).where(models.Project.project_id == project_id)
+        )
+        project = result.scalar_one_or_none()
+    if not project:
+        return None
+
+    title = escape(f"{project.title} — Nathan Blatter")
+    desc = escape(seo.clean_description(project.description))
+    url = f"{DOMAIN}/projects/{project.project_id}"
+    image = f"{DOMAIN}/og/project/{project.project_id}.png"
+
+    jsonld = _json.dumps({
+        "@context": "https://schema.org",
+        "@type": "CreativeWork",
+        "name": project.title,
+        "description": seo.clean_description(project.description),
+        "url": url,
+        "image": image,
+        "keywords": ", ".join(project.tags or []),
+        "author": {"@type": "Person", "name": "Nathan Blatter", "url": DOMAIN},
+    })
+
+    og_tags = (
+        f'<meta property="og:title" content="{title}" />\n'
+        f'    <meta property="og:description" content="{desc}" />\n'
+        f'    <meta property="og:image" content="{image}" />\n'
+        f'    <meta property="og:url" content="{url}" />\n'
+        f'    <meta property="og:type" content="article" />\n'
+        f'    <meta name="twitter:card" content="summary_large_image" />\n'
+        f'    <meta name="twitter:title" content="{title}" />\n'
+        f'    <meta name="twitter:description" content="{desc}" />\n'
+        f'    <meta name="twitter:image" content="{image}" />\n'
+        f'    <title>{title}</title>\n'
+        f'    <script type="application/ld+json">{jsonld}</script>'
+    )
+
+    html = re.sub(r'<title>[^<]*</title>', '', index_html, count=1)
+    html = re.sub(
+        r'<!-- Open Graph -->.*?<!-- Twitter Card -->.*?<meta name="twitter:image"[^>]*/>',
+        og_tags,
+        html,
+        flags=re.DOTALL,
+    )
+    return html
+
+
 @app.get("/{full_path:path}", include_in_schema=False)
 async def serve_spa(full_path: str = "", request: Request = None):
     index_html = _read_index_html()
@@ -479,6 +530,12 @@ async def serve_spa(full_path: str = "", request: Request = None):
             slug = route.removeprefix("blog/")
             if slug:
                 modified = await _blog_og_html(slug, index_html)
+                if modified:
+                    return HTMLResponse(modified)
+        elif route.startswith("projects/"):
+            project_id = route.removeprefix("projects/")
+            if project_id:
+                modified = await _case_study_og_html(project_id, index_html)
                 if modified:
                     return HTMLResponse(modified)
         else:
