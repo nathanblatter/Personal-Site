@@ -5,7 +5,7 @@ import TimelineItem from '../components/TimelineItem'
 import GitHubSection from '../components/GitHubSection'
 import ClaudeSection from '../components/ClaudeSection'
 import Skeleton from '../components/Skeleton'
-import { Quote, ExternalLink } from 'lucide-react'
+import { Quote, ExternalLink, Star } from 'lucide-react'
 import { api, type AboutResponse, type InterestResponse, type CourseworkResponse, type ExperienceResponse, type TestimonialResponse, type CertificationResponse } from '../lib/api'
 import { usePortfolioCtx } from '../lib/usePortfolioCtx'
 import { getIcon } from '../lib/iconMap'
@@ -291,54 +291,125 @@ export default function About() {
             title="Certifications"
             subtitle="Verified credentials and professional certifications."
           />
-          <div className="flex flex-wrap gap-5">
-            {loading
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-5 p-5 rounded-xl border border-mist bg-white max-w-sm w-[320px]">
-                    <Skeleton className="w-16 h-16 rounded-lg shrink-0" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-40" />
-                      <Skeleton className="h-3 w-24" />
-                      <Skeleton className="h-3 w-16" />
+          {loading ? (
+            <div className="flex flex-wrap gap-5">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-5 p-5 rounded-xl border border-mist bg-white max-w-sm w-[320px]">
+                  <Skeleton className="w-16 h-16 rounded-lg shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (() => {
+            const certHref = (c: CertificationResponse) => (c.verify_slug ? `/go/${c.verify_slug}` : c.verify_url)
+            const featured = certifications.filter(c => c.featured)
+            const rest = certifications.filter(c => !c.featured)
+            // Preserve first-seen order of categories; uncategorized fall under "Other".
+            const groups: { category: string; items: CertificationResponse[] }[] = []
+            for (const c of rest) {
+              const cat = (c.category || '').trim() || 'Other'
+              let g = groups.find(x => x.category === cat)
+              if (!g) { g = { category: cat, items: [] }; groups.push(g) }
+              g.items.push(c)
+            }
+
+            return (
+              <div className="space-y-12">
+                {/* Featured — large detailed cards */}
+                {featured.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    {featured.map((cert, i) => {
+                      const href = certHref(cert)
+                      return (
+                        <motion.a
+                          key={cert.id}
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          initial={{ opacity: 0, y: 20 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: i * 0.08 }}
+                          className="group relative flex items-center gap-5 p-6 rounded-xl border border-blue/20 bg-gradient-to-br from-blue-wash to-white hover:border-blue/40 hover:shadow-lg hover:shadow-blue/5 transition-all"
+                        >
+                          <span className="absolute top-3 right-3 inline-flex items-center gap-1 font-mono text-[10px] text-violet">
+                            <Star size={10} fill="currentColor" /> Featured
+                          </span>
+                          {cert.image_url && (
+                            <img
+                              src={cert.image_url}
+                              alt={cert.name}
+                              loading="lazy"
+                              className="w-20 h-20 object-contain shrink-0 bg-[#ffffff] rounded-lg p-2 border border-mist"
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-sans font-semibold text-ink text-lg leading-snug mb-1">{cert.name}</p>
+                            <p className="font-mono text-[11px] text-steel mb-3">{cert.issuer}</p>
+                            {href && (
+                              <span className="inline-flex items-center gap-1 font-mono text-[11px] text-blue group-hover:underline">
+                                Verify <ExternalLink size={10} />
+                              </span>
+                            )}
+                          </div>
+                        </motion.a>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Grouped by category — compact strips */}
+                {groups.map(group => (
+                  <div key={group.category}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <h3 className="font-mono text-[11px] text-steel tracking-wider uppercase shrink-0">{group.category}</h3>
+                      <div className="flex-1 h-px bg-mist" />
+                      <span className="font-mono text-[11px] text-silver shrink-0">{group.items.length}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {group.items.map((cert, i) => {
+                        const href = certHref(cert)
+                        return (
+                          <motion.a
+                            key={cert.id}
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            initial={{ opacity: 0, y: 12 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: Math.min(i * 0.05, 0.3) }}
+                            title={href ? `Verify ${cert.name}` : cert.name}
+                            className="group flex items-center gap-3 px-3.5 py-2.5 rounded-lg border border-mist bg-white hover:border-blue/30 hover:shadow-sm transition-all"
+                          >
+                            {cert.image_url && (
+                              <img
+                                src={cert.image_url}
+                                alt={cert.name}
+                                loading="lazy"
+                                className="w-9 h-9 object-contain shrink-0 bg-[#ffffff] rounded p-0.5"
+                              />
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-sans text-sm font-medium text-ink leading-tight truncate">{cert.name}</p>
+                              <p className="font-mono text-[10px] text-steel truncate">{cert.issuer}</p>
+                            </div>
+                            {href && (
+                              <ExternalLink size={11} className="text-silver group-hover:text-blue shrink-0 transition-colors" />
+                            )}
+                          </motion.a>
+                        )
+                      })}
                     </div>
                   </div>
-                ))
-              : null}
-            {certifications.map((cert, i) => {
-              const href = cert.verify_slug ? `/go/${cert.verify_slug}` : cert.verify_url
-              return (
-                <motion.a
-                  key={cert.id}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.08 }}
-                  className="group flex items-center gap-5 p-5 rounded-xl border border-mist bg-white hover:border-blue/30 hover:shadow-lg hover:shadow-blue/5 transition-all max-w-sm"
-                >
-                  {cert.image_url && (
-                    <img
-                      src={cert.image_url}
-                      alt={cert.name}
-                      loading="lazy"
-                      className="w-16 h-16 object-contain shrink-0 bg-[#ffffff] rounded-lg p-1.5"
-                    />
-                  )}
-                  <div className="min-w-0">
-                    <p className="font-sans font-semibold text-ink leading-snug mb-1">{cert.name}</p>
-                    <p className="font-mono text-[11px] text-steel mb-3">{cert.issuer}</p>
-                    {href && (
-                      <span className="inline-flex items-center gap-1 font-mono text-[11px] text-blue group-hover:underline">
-                        Verify <ExternalLink size={10} />
-                      </span>
-                    )}
-                  </div>
-                </motion.a>
-              )
-            })}
-          </div>
+                ))}
+              </div>
+            )
+          })()}
         </div>
       </section>
 

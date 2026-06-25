@@ -100,6 +100,8 @@ export interface CertificationResponse {
   image_url?: string
   image_key?: string
   verify_url?: string
+  category?: string
+  featured?: boolean
   sort_order: number
   tracked_link_id?: number
   verify_slug?: string

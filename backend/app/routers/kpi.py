@@ -14,7 +14,7 @@ from typing import Optional
 from urllib.parse import urlparse, urlunparse
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Form
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -117,6 +117,11 @@ async def init_kpi_db() -> None:
         await conn.execute(
             "ALTER TABLE kpi_daily_log ADD COLUMN IF NOT EXISTS instagram_pickups INTEGER DEFAULT 0"
         )
+        # Post-workout weigh-in: weight + derived BMI, plus the magic-link scheduling state.
+        await conn.execute("ALTER TABLE kpi_daily_log ADD COLUMN IF NOT EXISTS weight_lbs NUMERIC")
+        await conn.execute("ALTER TABLE kpi_daily_log ADD COLUMN IF NOT EXISTS bmi NUMERIC")
+        await conn.execute("ALTER TABLE kpi_daily_log ADD COLUMN IF NOT EXISTS weight_due_at TIMESTAMPTZ")
+        await conn.execute("ALTER TABLE kpi_daily_log ADD COLUMN IF NOT EXISTS weight_reminded_at TIMESTAMPTZ")
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS location_log (
                 id        BIGSERIAL PRIMARY KEY,
@@ -276,6 +281,20 @@ async def workout_completion(
         )
         count = await conn.fetchval(
             "SELECT workout_type FROM kpi_daily_log WHERE date = $1", today
+        )
+        # Schedule a one-shot weigh-in nudge ~30 min out — but only if weight isn't
+        # already logged today and nothing is already pending/sent (no nagging on a
+        # second workout the same day).
+        await conn.execute(
+            """
+            UPDATE kpi_daily_log
+               SET weight_due_at = NOW() + INTERVAL '30 minutes'
+             WHERE date = $1
+               AND weight_lbs IS NULL
+               AND weight_due_at IS NULL
+               AND weight_reminded_at IS NULL
+            """,
+            today,
         )
     return {"status": "ok", "date": today.isoformat(), "workout_type": count}
 
@@ -466,6 +485,181 @@ async def send_church_reminder(force: bool = False) -> str:
     return f"{result} (test)" if force else result
 
 
+# ---------------------------------------------------------------------------
+# Post-workout weigh-in — magic link (signed token, no API key)
+# ---------------------------------------------------------------------------
+#
+# Flow: logging a workout (POST /workout) arms a weigh-in ~30 min out by setting
+# weight_due_at on today's row (only when no weight is logged and nothing is
+# already pending). A short supervised loop (send_weight_reminders) texts a
+# one-tap magic link when due, then marks weight_reminded_at so it fires once.
+# Tapping GET /w/{token} serves a 1-field form; POST /w/{token} stores the weight
+# and computes BMI. Token is an HMAC over the date, valid for a couple of days.
+
+WEIGHT_LINK_SECRET = os.getenv("WEIGHT_LINK_SECRET", "") or CHURCH_LINK_SECRET
+# Height in metres for BMI (200 cm). 6'7" ≈ 2.0066 m; 200 cm is close enough.
+HEIGHT_M = float(os.getenv("HEIGHT_CM", "200")) / 100.0
+
+weight_link_router = APIRouter(tags=["kpi"])
+
+
+def _weight_signature(date_str: str) -> str:
+    sig = hmac.new(WEIGHT_LINK_SECRET.encode(), b"weight:" + date_str.encode(), hashlib.sha256).digest()
+    return _b64url_encode(sig)
+
+
+def sign_weight_token(date_str: str) -> str:
+    return f"{_b64url_encode(date_str.encode())}.{_weight_signature(date_str)}"
+
+
+def verify_weight_token(token: str) -> Optional[date_type]:
+    """Return the signed date if the token is valid, else None."""
+    if not WEIGHT_LINK_SECRET:
+        return None
+    try:
+        payload_b64, sig = token.split(".", 1)
+        date_str = _b64url_decode(payload_b64).decode()
+        if not hmac.compare_digest(_weight_signature(date_str), sig):
+            return None
+        return date_type.fromisoformat(date_str)
+    except Exception:
+        return None
+
+
+def _bmi_from_lbs(weight_lbs: float) -> float:
+    kg = weight_lbs * 0.45359237
+    return round(kg / (HEIGHT_M * HEIGHT_M), 1)
+
+
+def _weight_form_page(token: str, pretty: str, error: str = "") -> str:
+    err_html = f'<p class="err">{error}</p>' if error else ""
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Weigh in</title>
+<style>
+  html,body{{height:100%;margin:0}}
+  body{{display:flex;align-items:center;justify-content:center;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    background:#0b0b0f;color:#f5f5f7;text-align:center;padding:24px}}
+  .card{{max-width:340px;width:100%}}
+  .glyph{{font-size:48px;line-height:1}}
+  h1{{font-size:22px;margin:16px 0 4px}}
+  p.sub{{font-size:14px;color:#a1a1aa;margin:0 0 24px}}
+  input{{width:100%;box-sizing:border-box;font-size:28px;text-align:center;
+    padding:16px;border-radius:14px;border:1px solid #2a2a32;background:#15151b;
+    color:#f5f5f7;-webkit-appearance:none;outline:none}}
+  input:focus{{border-color:#3b6cf5}}
+  button{{width:100%;margin-top:16px;font-size:16px;font-weight:600;padding:16px;
+    border:0;border-radius:14px;background:#3b6cf5;color:#fff}}
+  .err{{color:#f87171;font-size:13px;margin:12px 0 0}}
+</style></head>
+<body><div class="card">
+  <div class="glyph">💪</div>
+  <h1>Weigh-in</h1>
+  <p class="sub">Post-workout · {pretty}</p>
+  <form method="post" action="/w/{token}">
+    <input name="weight_lbs" type="number" step="0.1" min="50" max="600"
+      inputmode="decimal" placeholder="Weight (lbs)" autofocus required>
+    <button type="submit">Log it</button>
+    {err_html}
+  </form>
+</div></body></html>"""
+
+
+@weight_link_router.get("/w/{token}", response_class=HTMLResponse, include_in_schema=False)
+async def weight_form(token: str):
+    signed_date = verify_weight_token(token)
+    if signed_date is None:
+        return HTMLResponse(
+            _church_page("Invalid link", "This weigh-in link isn't valid.", ok=False),
+            status_code=400, headers=_NO_STORE,
+        )
+    today = datetime.now(LOCAL_TZ).date()
+    if abs((today - signed_date).days) > 2:
+        return HTMLResponse(
+            _church_page("Link expired", "This weigh-in link is no longer valid.", ok=False),
+            status_code=410, headers=_NO_STORE,
+        )
+    pretty = signed_date.strftime("%A, %B ") + str(signed_date.day)
+    return HTMLResponse(_weight_form_page(token, pretty), headers=_NO_STORE)
+
+
+@weight_link_router.post("/w/{token}", response_class=HTMLResponse, include_in_schema=False)
+async def weight_submit(token: str, weight_lbs: float = Form(...)):
+    signed_date = verify_weight_token(token)
+    if signed_date is None:
+        return HTMLResponse(
+            _church_page("Invalid link", "This weigh-in link isn't valid.", ok=False),
+            status_code=400, headers=_NO_STORE,
+        )
+    today = datetime.now(LOCAL_TZ).date()
+    if abs((today - signed_date).days) > 2:
+        return HTMLResponse(
+            _church_page("Link expired", "This weigh-in link is no longer valid.", ok=False),
+            status_code=410, headers=_NO_STORE,
+        )
+    pretty = signed_date.strftime("%A, %B ") + str(signed_date.day)
+    if not (50 <= weight_lbs <= 600):
+        return HTMLResponse(
+            _weight_form_page(token, pretty, "Enter a weight between 50 and 600 lbs."),
+            status_code=400, headers=_NO_STORE,
+        )
+
+    bmi = _bmi_from_lbs(weight_lbs)
+    async with _KPI_POOL.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO kpi_daily_log (date, weight_lbs, bmi, weight_due_at)
+            VALUES ($1, $2, $3, NULL)
+            ON CONFLICT (date) DO UPDATE
+              SET weight_lbs = EXCLUDED.weight_lbs,
+                  bmi = EXCLUDED.bmi,
+                  weight_due_at = NULL
+            """,
+            signed_date, weight_lbs, bmi,
+        )
+    return HTMLResponse(
+        _church_page("Logged", f"{weight_lbs:g} lbs · BMI {bmi} recorded for {pretty}. 💪", ok=True),
+        headers=_NO_STORE,
+    )
+
+
+async def send_weight_reminders() -> str:
+    """Text the weigh-in magic link for any day whose 30-min timer is due.
+
+    Runs on a short supervised interval. Fires once per armed day (the
+    weight_reminded_at stamp is the guard), and never if weight is already logged.
+    """
+    if not _KPI_POOL:
+        return "skip: no pool"
+    if not WEIGHT_LINK_SECRET:
+        return "skip: no secret configured"
+
+    async with _KPI_POOL.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT date FROM kpi_daily_log
+             WHERE weight_due_at IS NOT NULL
+               AND weight_due_at <= NOW()
+               AND weight_lbs IS NULL
+               AND weight_reminded_at IS NULL
+            """
+        )
+        for r in rows:
+            d = r["date"]
+            url = f"{SITE_BASE_URL}/w/{sign_weight_token(d.isoformat())}"
+            await imessage_service.send_alert(
+                f"Post-workout check-in 💪 Tap to log your weight:\n{url}"
+            )
+            await conn.execute(
+                "UPDATE kpi_daily_log SET weight_reminded_at = NOW() WHERE date = $1", d
+            )
+
+    return f"sent {len(rows)} weight reminder(s)"
+
+
 class LocationIngestRequest(BaseModel):
     lat: float
     lon: float
@@ -580,6 +774,25 @@ async def church_test_reminder(_=Depends(verify_kpi_key)):
     return {"result": result}
 
 
+@router.post("/weight/test-reminder")
+async def weight_test_reminder(_=Depends(verify_kpi_key)):
+    """Arm + immediately send a weigh-in link for today, to test the flow end-to-end."""
+    today = date_type.today()
+    async with _KPI_POOL.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO kpi_daily_log (date, weight_due_at)
+            VALUES ($1, NOW())
+            ON CONFLICT (date) DO UPDATE
+              SET weight_due_at = NOW(), weight_reminded_at = NULL
+            WHERE kpi_daily_log.weight_lbs IS NULL
+            """,
+            today,
+        )
+    result = await send_weight_reminders()
+    return {"result": result}
+
+
 @router.get("")
 async def get_kpi(_=Depends(verify_kpi_key)):
     umami_base = os.getenv("UMAMI_BASE_URL", "http://100.79.61.79:3333")
@@ -657,6 +870,29 @@ async def get_kpi(_=Depends(verify_kpi_key)):
     except Exception as e:
         log.warning("GitHub KPI unavailable: %s", e)
 
+    # Weight & BMI — per-day series
+    weight_days = []
+    try:
+        async with _KPI_POOL.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT date, weight_lbs, bmi
+                FROM kpi_daily_log
+                WHERE weight_lbs IS NOT NULL
+                ORDER BY date ASC
+                """
+            )
+            weight_days = [
+                {
+                    "date": str(r["date"]),
+                    "weight_lbs": float(r["weight_lbs"]),
+                    "bmi": float(r["bmi"]) if r["bmi"] is not None else None,
+                }
+                for r in rows
+            ]
+    except Exception as e:
+        log.warning("Weight KPI unavailable: %s", e)
+
     return {
         "project": "personal_site",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -695,6 +931,11 @@ async def get_kpi(_=Depends(verify_kpi_key)):
                 "value": gh_days,
                 "label": "GitHub Commits & PRs per Day",
                 "unit": "count",
+            },
+            "weight": {
+                "value": weight_days,
+                "label": "Weight & BMI per Day",
+                "unit": "lbs",
             },
         },
     }

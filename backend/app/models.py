@@ -138,6 +138,8 @@ class Certification(Base):
     image_url = Column(String, nullable=True)            # logo download URL
     image_key = Column(String, nullable=True)            # storage key in image storage
     verify_url = Column(String, nullable=True)           # raw credential verification URL
+    category = Column(String, nullable=True)             # group label, e.g. "Anthropic Education"
+    featured = Column(Boolean, nullable=False, default=False, server_default="false")
     # Auto-created tracked link so /go/{slug} redirects to verify_url and counts clicks.
     tracked_link_id = Column(Integer, ForeignKey("tracked_links.id", ondelete="SET NULL"), nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)

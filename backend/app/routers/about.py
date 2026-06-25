@@ -39,6 +39,8 @@ def _cert_response(cert: models.Certification) -> schemas.CertificationResponse:
         image_url=cert.image_url,
         image_key=cert.image_key,
         verify_url=cert.verify_url,
+        category=cert.category,
+        featured=cert.featured,
         sort_order=cert.sort_order,
         tracked_link_id=cert.tracked_link_id,
         verify_slug=cert.tracked_link.slug if cert.tracked_link else None,

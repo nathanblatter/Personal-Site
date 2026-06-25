@@ -543,7 +543,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-sans font-semibold text-ink mb-1">Internship Tracker</h2>
           <p className="text-steel text-sm">
@@ -553,7 +553,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
             }
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {(['dashboard', 'pipeline', 'list'] as const).map(v => (
             <button
               key={v}
@@ -567,7 +567,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
           ))}
           <button
             onClick={() => setIntView('add')}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue text-white font-mono text-xs font-semibold rounded-lg hover:bg-blue-dim transition-colors shadow-sm ml-2"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue text-white font-mono text-xs font-semibold rounded-lg hover:bg-blue-dim transition-colors shadow-sm sm:ml-2"
           >
             <Plus size={14} /> Add
           </button>

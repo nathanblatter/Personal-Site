@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
-import { Plus, Trash2, Save, Eye, X, Check, ExternalLink, Copy, Award } from 'lucide-react'
+import { Plus, Trash2, Save, Eye, X, Check, ExternalLink, Copy, Award, Star } from 'lucide-react'
 import {
   api,
   type AboutResponse,
@@ -60,6 +60,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
       const updated = await api.certifications.update(cert.id, {
         name: cert.name, issuer: cert.issuer, verify_url: cert.verify_url,
         image_url: cert.image_url, image_key: cert.image_key, sort_order: cert.sort_order,
+        category: cert.category ?? '', featured: cert.featured ?? false,
       })
       setCerts(prev => prev.map(c => c.id === updated.id ? updated : c))
       showToast(updated.verify_slug ? `Saved · tracked at /go/${updated.verify_slug}` : 'Certification saved')
@@ -338,6 +339,11 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
             <Plus size={12} /> Add
           </button>
         </div>
+        <datalist id="cert-categories">
+          {Array.from(new Set(certs.map(c => c.category).filter(Boolean))).map(cat => (
+            <option key={cat} value={cat as string} />
+          ))}
+        </datalist>
         <div className="space-y-3">
           {certs.map(cert => (
             <div key={cert.id} className="flex gap-4 p-4 rounded-lg bg-white border border-mist">
@@ -363,12 +369,21 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                   className="w-full text-sm text-ink font-medium bg-transparent focus:outline-none focus:bg-snow focus:ring-2 focus:ring-blue/10 rounded px-2 py-1.5 transition-all border border-mist"
                   placeholder="Certification name"
                 />
-                <input
-                  value={cert.issuer}
-                  onChange={e => updateCertLocal(cert.id, 'issuer', e.target.value)}
-                  className="w-full text-sm text-steel bg-transparent focus:outline-none focus:bg-snow focus:ring-2 focus:ring-blue/10 rounded px-2 py-1.5 transition-all border border-mist"
-                  placeholder="Issuer"
-                />
+                <div className="flex gap-2">
+                  <input
+                    value={cert.issuer}
+                    onChange={e => updateCertLocal(cert.id, 'issuer', e.target.value)}
+                    className="flex-1 min-w-0 text-sm text-steel bg-transparent focus:outline-none focus:bg-snow focus:ring-2 focus:ring-blue/10 rounded px-2 py-1.5 transition-all border border-mist"
+                    placeholder="Issuer"
+                  />
+                  <input
+                    value={cert.category ?? ''}
+                    onChange={e => updateCertLocal(cert.id, 'category', e.target.value)}
+                    list="cert-categories"
+                    className="flex-1 min-w-0 text-sm text-steel bg-transparent focus:outline-none focus:bg-snow focus:ring-2 focus:ring-blue/10 rounded px-2 py-1.5 transition-all border border-mist"
+                    placeholder="Category (e.g. Anthropic Education)"
+                  />
+                </div>
                 <input
                   value={cert.verify_url ?? ''}
                   onChange={e => updateCertLocal(cert.id, 'verify_url', e.target.value)}
@@ -387,6 +402,13 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
               </div>
               {/* Actions */}
               <div className="flex flex-col items-center gap-1 shrink-0">
+                <button
+                  onClick={() => setCerts(prev => prev.map(c => c.id === cert.id ? { ...c, featured: !c.featured } : c))}
+                  className={`p-1.5 transition-colors ${cert.featured ? 'text-violet' : 'text-silver hover:text-violet'}`}
+                  title={cert.featured ? 'Featured — click to unfeature' : 'Feature this cert'}
+                >
+                  <Star size={13} fill={cert.featured ? 'currentColor' : 'none'} />
+                </button>
                 <button onClick={() => saveCert(cert)} className="p-1.5 text-steel hover:text-blue transition-colors" title="Save">
                   <Save size={13} />
                 </button>

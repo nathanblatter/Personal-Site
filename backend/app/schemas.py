@@ -359,6 +359,8 @@ class CertificationBase(BaseModel):
     image_url: Optional[str] = None
     image_key: Optional[str] = None
     verify_url: Optional[str] = None
+    category: Optional[str] = None
+    featured: bool = False
     sort_order: int = 0
 
 
@@ -372,6 +374,8 @@ class CertificationUpdate(BaseModel):
     image_url: Optional[str] = None
     image_key: Optional[str] = None
     verify_url: Optional[str] = None
+    category: Optional[str] = None
+    featured: Optional[bool] = None
     sort_order: Optional[int] = None
 
 
