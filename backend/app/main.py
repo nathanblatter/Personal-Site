@@ -206,7 +206,7 @@ def _static_og_html(route: str, index_html: str) -> str | None:
     html = re.sub(r'<title>[^<]*</title>', '', index_html, count=1)
     html = re.sub(
         r'<!-- Open Graph -->.*?<!-- Twitter Card -->.*?<meta name="twitter:image"[^>]*/>',
-        og_tags,
+        lambda _m: og_tags,  # function repl → backslashes (e.g. \uXXXX in JSON-LD) are literal
         html,
         flags=re.DOTALL,
     )
@@ -437,7 +437,7 @@ async def _blog_og_html(slug: str, index_html: str) -> str | None:
     html = re.sub(r'<title>[^<]*</title>', '', index_html, count=1)
     html = re.sub(
         r'<!-- Open Graph -->.*?<!-- Twitter Card -->.*?<meta name="twitter:image"[^>]*/>',
-        og_tags,
+        lambda _m: og_tags,  # function repl → backslashes (e.g. \uXXXX in JSON-LD) are literal
         html,
         flags=re.DOTALL,
     )
@@ -487,7 +487,7 @@ async def _case_study_og_html(project_id: str, index_html: str) -> str | None:
     html = re.sub(r'<title>[^<]*</title>', '', index_html, count=1)
     html = re.sub(
         r'<!-- Open Graph -->.*?<!-- Twitter Card -->.*?<meta name="twitter:image"[^>]*/>',
-        og_tags,
+        lambda _m: og_tags,  # function repl → backslashes (e.g. \uXXXX in JSON-LD) are literal
         html,
         flags=re.DOTALL,
     )
