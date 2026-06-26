@@ -518,6 +518,61 @@ async def ensure_certifications(db) -> None:
     print("Seeded certifications.")
 
 
+RESUME_VARIANTS = [
+    {
+        "key": "swe",
+        "label": "Software Engineering",
+        "headline": "Full-Stack Software Engineer (Information Systems, BYU)",
+        "summary": (
+            "with experience across C#, Java, Python, TypeScript, SQL, and cloud platforms. Builds and ships "
+            "production full-stack applications end to end — from data model to UI — with strong ownership, clean "
+            "code practices, and measurable technical impact in collaborative teams."
+        ),
+        "emphasis_tags": ["react", "typescript", "python", "fastapi", "full-stack", "web", "api", "backend", "frontend"],
+        "sort_order": 0,
+        "is_default": True,
+    },
+    {
+        "key": "data",
+        "label": "Data & Analytics",
+        "headline": "Data Analyst & Engineer (Information Systems, STEM-designated)",
+        "summary": (
+            "with a Data Analytics focus and hands-on experience in SQL, Python, BI tooling, and building analytics "
+            "pipelines and dashboards. Turns messy data into decisions, pairing a systems background (SCM, ERP) with "
+            "modern data engineering to deliver measurable business insight."
+        ),
+        "emphasis_tags": ["sql", "data", "analytics", "bi", "python", "pandas", "etl", "dashboard"],
+        "sort_order": 1,
+        "is_default": False,
+    },
+    {
+        "key": "ai",
+        "label": "AI / ML",
+        "headline": "AI Engineer (Information Systems, BYU)",
+        "summary": (
+            "building intelligent, AI-driven applications — including a voice-enabled AI platform deployed for clinical "
+            "research. Experienced with LLM APIs, agentic systems, retrieval, and shipping AI features into real "
+            "products, backed by full-stack engineering depth."
+        ),
+        "emphasis_tags": ["ai", "ml", "llm", "claude", "openai", "nlp", "agents", "rag"],
+        "sort_order": 2,
+        "is_default": False,
+    },
+]
+
+
+async def ensure_resume_variants(db) -> None:
+    """Backfill the SWE/Data/AI résumé flavors once. No-op if any already exist,
+    so it never fights admin edits. Runs independent of the main seed guard."""
+    existing = await db.execute(select(models.ResumeVariant))
+    if existing.scalars().first():
+        return
+    for data in RESUME_VARIANTS:
+        db.add(models.ResumeVariant(**data))
+    await db.commit()
+    print("Seeded résumé variants.")
+
+
 async def seed() -> None:
     # Ensure tables exist (safe to call even after alembic migrations)
     async with engine.begin() as conn:
@@ -527,6 +582,7 @@ async def seed() -> None:
         # Backfill editable content blocks regardless of the seed guard below.
         await ensure_site_content(db)
         await ensure_certifications(db)
+        await ensure_resume_variants(db)
 
         # Skip if already seeded
         result = await db.execute(select(models.Project))

@@ -58,7 +58,7 @@ def _section_rule():
     return HRFlowable(width="100%", thickness=0.5, color=RULE_COLOR, spaceBefore=2, spaceAfter=4)
 
 
-def generate_resume_pdf(about, experience, skills, projects, coursework) -> bytes:
+def generate_resume_pdf(about, experience, skills, projects, coursework, variant=None) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -81,15 +81,18 @@ def generate_resume_pdf(about, experience, skills, projects, coursework) -> byte
         s_contact,
     ))
 
-    # ── SUMMARY ──
-    story.append(Paragraph(
-        f'<b>Information Systems student (Full-Stack Software Engineering emphasis)</b>'
-        f' with experience in C#, Java, Python, SQL, and cloud platforms, complemented by a background in SCM, ERP, and '
-        f'AI-driven systems. Proven ability to build full-stack analytics and intelligent applications, including a '
-        f'voice-enabled AI platform deployed for clinical research. Known for strong ownership, clean code practices, '
-        f'and delivering measurable technical impact in collaborative team environments.',
-        s_summary,
-    ))
+    # ── SUMMARY (variant-aware) ──
+    if variant and variant.get("headline") and variant.get("summary"):
+        summary_html = f'<b>{variant["headline"]}</b> {variant["summary"]}'
+    else:
+        summary_html = (
+            '<b>Information Systems student (Full-Stack Software Engineering emphasis)</b>'
+            ' with experience in C#, Java, Python, SQL, and cloud platforms, complemented by a background in SCM, ERP, and '
+            'AI-driven systems. Proven ability to build full-stack analytics and intelligent applications, including a '
+            'voice-enabled AI platform deployed for clinical research. Known for strong ownership, clean code practices, '
+            'and delivering measurable technical impact in collaborative team environments.'
+        )
+    story.append(Paragraph(summary_html, s_summary))
 
     # ── EDUCATION ──
     story.append(Paragraph("<b>EDUCATION</b>", s_section))

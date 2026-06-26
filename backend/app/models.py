@@ -147,6 +147,21 @@ class Certification(Base):
     tracked_link = relationship("TrackedLink", lazy="joined")
 
 
+class ResumeVariant(Base):
+    """A tailored résumé flavor (e.g. SWE / Data / AI) — overrides the summary
+    headline + paragraph and surfaces projects matching its emphasis tags."""
+    __tablename__ = "resume_variants"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key = Column(String, unique=True, index=True, nullable=False)   # swe, data, ai
+    label = Column(String, nullable=False)                          # "Software Engineering"
+    headline = Column(String, nullable=False)                       # bold lead-in of the summary
+    summary = Column(Text, nullable=False)                          # rest of the summary paragraph
+    emphasis_tags = Column(JSON, nullable=False, default=list)      # lowercase tags to surface first
+    sort_order = Column(Integer, nullable=False, default=0)
+    is_default = Column(Boolean, nullable=False, default=False, server_default="false")
+
+
 class Social(Base):
     __tablename__ = "socials"
 

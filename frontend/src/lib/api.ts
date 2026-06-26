@@ -351,12 +351,24 @@ export interface HomeResponse {
 
 // ── Resume Page Types ─────────────────────────────────────────────────────────
 
+export interface ResumeVariantResponse {
+  id: number
+  key: string
+  label: string
+  headline: string
+  summary: string
+  emphasis_tags: string[]
+  sort_order: number
+  is_default: boolean
+}
+
 export interface ResumeDataResponse {
   about: AboutResponse
   experience: ExperienceResponse[]
   skills: SkillResponse[]
   projects: ProjectResponse[]
   coursework: CourseworkResponse[]
+  variants: ResumeVariantResponse[]
 }
 
 // ── About Page Types ──────────────────────────────────────────────────────────
@@ -937,6 +949,14 @@ export const api = {
 
   resume: {
     data: () => request<ResumeDataResponse>('GET', '/resume/data'),
+    variants: {
+      list: () => request<ResumeVariantResponse[]>('GET', '/resume/variants'),
+      create: (data: Partial<Omit<ResumeVariantResponse, 'id'>>) =>
+        request<ResumeVariantResponse>('POST', '/resume/variants', data),
+      update: (id: number, data: Partial<Omit<ResumeVariantResponse, 'id'>>) =>
+        request<ResumeVariantResponse>('PUT', `/resume/variants/${id}`, data),
+      delete: (id: number) => request<void>('DELETE', `/resume/variants/${id}`),
+    },
   },
 
   github: {

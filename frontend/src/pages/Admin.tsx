@@ -19,6 +19,7 @@ import {
   Calendar,
   Handshake,
   FileStack,
+  ScrollText,
   ChevronsLeft,
   ChevronsRight,
   Rows3,
@@ -58,6 +59,7 @@ import BioSection from './admin/BioSection'
 import InternshipsSection from './admin/InternshipsSection'
 import ConsultingSection from './admin/ConsultingSection'
 import PagesSection from './admin/PagesSection'
+import ResumeVariantsSection from './admin/ResumeVariantsSection'
 
 /* ═══════════════════════════════════════════════
    SIDEBAR NAV CONFIG
@@ -72,6 +74,7 @@ const sections = [
   { id: 'coursework', label: 'Coursework', icon: BookOpen },
   { id: 'contact', label: 'Contact', icon: AtSign },
   { id: 'blog', label: 'Blog', icon: FileText },
+  { id: 'resume', label: 'Résumé Variants', icon: ScrollText },
   { id: 'pages', label: 'Pages', icon: FileStack },
   { id: 'files', label: 'Files', icon: HardDrive },
   { id: 'links', label: 'Links', icon: Link2 },
@@ -214,6 +217,7 @@ export default function Admin() {
     coursework: () => <CourseworkSection showToast={showToast} showError={showError} coursework={coursework} setCoursework={setCoursework} />,
     contact: () => <ContactSection showToast={showToast} showError={showError} socials={socials} setSocials={setSocials} contactMeta={contactMeta} setContactMeta={setContactMeta} />,
     blog: () => <BlogSection showToast={showToast} showError={showError} blogs={blogs} setBlogs={setBlogs} />,
+    resume: () => <ResumeVariantsSection showToast={showToast} showError={showError} />,
     pages: () => <PagesSection showToast={showToast} showError={showError} />,
     files: () => <FilesSection showToast={showToast} showError={showError} />,
     links: () => (

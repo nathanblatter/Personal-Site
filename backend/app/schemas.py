@@ -387,6 +387,38 @@ class CertificationResponse(CertificationBase):
     model_config = {"from_attributes": True}
 
 
+# ── Résumé variants ───────────────────────────────────────────────────────────
+
+class ResumeVariantBase(BaseModel):
+    key: str
+    label: str
+    headline: str
+    summary: str
+    emphasis_tags: List[str] = []
+    sort_order: int = 0
+    is_default: bool = False
+
+
+class ResumeVariantCreate(ResumeVariantBase):
+    pass
+
+
+class ResumeVariantUpdate(BaseModel):
+    key: Optional[str] = None
+    label: Optional[str] = None
+    headline: Optional[str] = None
+    summary: Optional[str] = None
+    emphasis_tags: Optional[List[str]] = None
+    sort_order: Optional[int] = None
+    is_default: Optional[bool] = None
+
+
+class ResumeVariantResponse(ResumeVariantBase):
+    id: int
+
+    model_config = {"from_attributes": True}
+
+
 # ── Socials ───────────────────────────────────────────────────────────────────
 
 class SocialBase(BaseModel):

@@ -2,7 +2,7 @@ import io
 import re
 import textwrap
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -224,7 +224,7 @@ async def sitemap_xml(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/resume.pdf", include_in_schema=False)
-async def resume_pdf(db: AsyncSession = Depends(get_db)):
+async def resume_pdf(variant: str = Query(""), db: AsyncSession = Depends(get_db)):
     from app.resume_pdf import generate_resume_pdf
 
     # Fetch all data
@@ -239,19 +239,34 @@ async def resume_pdf(db: AsyncSession = Depends(get_db)):
     )).scalars().all()
     cw_rows = (await db.execute(select(models.Coursework).order_by(models.Coursework.sort_order))).scalars().all()
 
+    # Optional résumé flavor: overrides the summary and surfaces matching projects first.
+    variant_dict = None
+    if variant:
+        vrow = (await db.execute(
+            select(models.ResumeVariant).where(models.ResumeVariant.key == variant)
+        )).scalar_one_or_none()
+        if vrow:
+            variant_dict = {"headline": vrow.headline, "summary": vrow.summary, "emphasis_tags": vrow.emphasis_tags or []}
+
     about = {"bio_paragraphs": about_row.bio_paragraphs, "gpa": about_row.gpa}
     experience = [{"title": e.title, "subtitle": e.subtitle, "year": e.year, "description": e.description} for e in exp_rows]
     skills = [{"name": s.name, "category": s.category} for s in skill_rows]
     projects = [{"title": p.title, "description": p.description, "tags": p.tags or [], "year": p.year, "link": p.link, "metrics": p.metrics or []} for p in proj_rows]
     coursework = [{"name": c.name} for c in cw_rows]
 
-    pdf_bytes = generate_resume_pdf(about, experience, skills, projects[:5], coursework)
+    # Surface projects whose tags match the variant emphasis (stable: matched first).
+    if variant_dict and variant_dict["emphasis_tags"]:
+        emphasis = {t.lower() for t in variant_dict["emphasis_tags"]}
+        projects.sort(key=lambda p: 0 if {t.lower() for t in p["tags"]} & emphasis else 1)
 
+    pdf_bytes = generate_resume_pdf(about, experience, skills, projects[:5], coursework, variant=variant_dict)
+
+    suffix = f"_{variant}" if variant_dict else ""
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": 'inline; filename="NathanBlatter_Resume.pdf"',
+            "Content-Disposition": f'inline; filename="NathanBlatter_Resume{suffix}.pdf"',
             "Cache-Control": "no-cache, no-store, must-revalidate",
         },
     )
