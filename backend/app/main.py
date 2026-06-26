@@ -16,7 +16,7 @@ from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from sqlalchemy import select
 
-from app.auth import require_auth
+from app.auth import assert_secure_secrets, require_auth
 
 from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report, newsletter, site_content, health
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
@@ -167,6 +167,7 @@ async def _periodic_weight_reminder():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    assert_secure_secrets()  # fail closed in prod if JWT/admin/MinIO secrets are defaults
     await kpi.init_kpi_db()
     _tasks = [
         asyncio.create_task(github.warmup()),

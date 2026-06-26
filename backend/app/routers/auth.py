@@ -1,9 +1,34 @@
-from fastapi import APIRouter, Depends, HTTPException
+import os
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
-from app.auth import ADMIN_USERNAME, ADMIN_PASSWORD, EXPIRE_DAYS, COOKIE_SECURE, create_token, require_auth
+from app.auth import EXPIRE_DAYS, COOKIE_SECURE, check_admin_credentials, create_token, require_auth
+from app.cache import cache
+from app.utils import get_client_ip
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# Per-IP login throttle (brute-force defense). Fails open if Redis is unavailable.
+LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS", "10"))
+LOGIN_WINDOW_SECONDS = int(os.getenv("LOGIN_WINDOW_SECONDS", "900"))  # 15 min
+
+
+async def login_rate_limit(request: Request) -> None:
+    ip = get_client_ip(request)
+    key = f"cache:rl:login:{ip}"
+    try:
+        r = await cache._conn()
+        n = await r.incr(key)
+        if n == 1:
+            await r.expire(key, LOGIN_WINDOW_SECONDS)
+    except Exception:
+        return  # never lock out admin because Redis is down
+    if n > LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts. Try again later.",
+        )
 
 
 class LoginRequest(BaseModel):
@@ -12,8 +37,8 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/login", status_code=204)
-def login(payload: LoginRequest, response: Response):
-    if payload.username != ADMIN_USERNAME or payload.password != ADMIN_PASSWORD:
+def login(payload: LoginRequest, response: Response, _: None = Depends(login_rate_limit)):
+    if not check_admin_credentials(payload.username, payload.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     response.set_cookie(
         key="auth_token",
