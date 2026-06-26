@@ -351,6 +351,14 @@ export interface HomeResponse {
 
 // ── Resume Page Types ─────────────────────────────────────────────────────────
 
+export interface SearchResult {
+  type: 'blog' | 'project' | 'page'
+  title: string
+  subtitle: string
+  url: string
+  tags: string[]
+}
+
 export interface ResumeVariantResponse {
   id: number
   key: string
@@ -946,6 +954,9 @@ export const api = {
   home: {
     get: () => request<HomeResponse>('GET', '/home'),
   },
+
+  search: (q: string) =>
+    request<{ results: SearchResult[] }>('GET', `/search?q=${encodeURIComponent(q)}`),
 
   resume: {
     data: () => request<ResumeDataResponse>('GET', '/resume/data'),

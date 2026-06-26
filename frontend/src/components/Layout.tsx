@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
-import { Menu, X, Sun, Moon } from 'lucide-react'
+import { Menu, X, Sun, Moon, Search } from 'lucide-react'
 import { useTheme } from '../lib/useTheme'
 import CookieBanner from './CookieBanner'
 import BugReport from './BugReport'
+import SearchPalette from './SearchPalette'
 
 const navLinks = [
   { to: '/', label: 'Home', code: '00' },
@@ -30,7 +31,20 @@ const prefetched = new Set<string>()
 export default function Layout() {
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const { theme, toggle } = useTheme()
+
+  // ⌘K / Ctrl+K opens search anywhere on the public site.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setSearchOpen(o => !o)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const prefetch = useCallback((to: string) => {
     if (prefetched.has(to) || !chunkMap[to]) return
@@ -87,6 +101,16 @@ export default function Layout() {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
+            {/* Search trigger */}
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="flex items-center gap-2 pl-2.5 pr-2 py-1.5 rounded-lg border border-mist text-steel hover:text-ink hover:border-blue/30 transition-colors"
+              aria-label="Search"
+            >
+              <Search size={14} />
+              <kbd className="font-mono text-[10px] text-silver border border-mist rounded px-1 py-px">⌘K</kbd>
+            </button>
+
             {/* Status indicator */}
             <div className="flex items-center gap-2.5">
               <div className="w-2 h-2 rounded-full bg-teal animate-pulse" />
@@ -105,6 +129,13 @@ export default function Layout() {
 
           {/* Mobile controls */}
           <div className="md:hidden flex items-center gap-2">
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="p-2 rounded-lg text-steel hover:text-ink transition-colors"
+              aria-label="Search"
+            >
+              <Search size={18} />
+            </button>
             <button
               onClick={toggle}
               className="p-2 rounded-lg text-steel hover:text-ink transition-colors"
@@ -208,6 +239,7 @@ export default function Layout() {
         </div>
       </footer>
 
+      <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <CookieBanner />
       <BugReport />
     </div>
