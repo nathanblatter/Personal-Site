@@ -1,8 +1,11 @@
-"""Public service-health aggregator backing the /status page."""
-import os
+"""Public service-health aggregator backing the /status page.
+
+Only user-facing infrastructure is reported here. Internal-only services (e.g.
+Flightdeck) are intentionally excluded so this public endpoint doesn't disclose
+the internal stack — monitor those behind auth if needed.
+"""
 import time
 
-import httpx
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,8 +14,6 @@ from app.database import get_db
 from app.utils import get_redis
 
 router = APIRouter(prefix="/health", tags=["health"])
-
-FLIGHTDECK_URL = os.getenv("FLIGHTDECK_URL", "http://flightdeck:8080")
 
 
 async def _timed(coro) -> tuple[bool, int]:
@@ -41,15 +42,6 @@ async def service_health(db: AsyncSession = Depends(get_db)):
         await get_redis().ping()
     ok, ms = await _timed(_ping_redis())
     services.append({"name": "Cache (Redis)", "status": "operational" if ok else "down", "latency_ms": ms})
-
-    # Flightdeck (internal service)
-    async def _ping_flightdeck():
-        async with httpx.AsyncClient(timeout=3) as client:
-            resp = await client.get(FLIGHTDECK_URL.rstrip("/") + "/")
-            if resp.status_code >= 500:
-                raise RuntimeError("5xx")
-    ok, ms = await _timed(_ping_flightdeck())
-    services.append({"name": "Flightdeck", "status": "operational" if ok else "down", "latency_ms": ms})
 
     overall = "operational" if all(s["status"] == "operational" for s in services) else "degraded"
     return {"overall": overall, "services": services}
