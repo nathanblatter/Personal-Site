@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { ArrowLeft, Calendar, Clock, Eye, Link2, Check, List, X } from 'lucide-react'
+import { ArrowLeft, Calendar, Clock, Eye, Link2, Check, List, X, Copy } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkFrontmatter from 'remark-frontmatter'
 import remarkEmoji from 'remark-emoji'
 import remarkMath from 'remark-math'
 import rehypeRaw from 'rehype-raw'
+import rehypeHighlight from 'rehype-highlight'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
+import 'highlight.js/styles/atom-one-dark.css'
 import { api, type BlogPostResponse } from '../lib/api'
 import { readTime, formatDate } from '../lib/blogUtils'
 
@@ -26,6 +28,34 @@ function headingId(node: unknown): string {
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/[\s]+/g, '-')
     .replace(/^-|-$/g, '')
+}
+
+function CodeBlock({ language, raw, children }: { language: string; raw: string; children: React.ReactNode }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(raw)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1600)
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+  return (
+    <div className="my-6 rounded-xl overflow-hidden border border-white/10 bg-[#282c34]">
+      <div className="flex items-center justify-between px-4 py-2 bg-black/25 border-b border-white/5">
+        <span className="font-mono text-[11px] text-white/40 uppercase tracking-wider">{language || 'code'}</span>
+        <button
+          onClick={copy}
+          className="inline-flex items-center gap-1.5 font-mono text-[11px] text-white/50 hover:text-white transition-colors"
+          aria-label="Copy code"
+        >
+          {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
+        </button>
+      </div>
+      <pre className="p-5 overflow-x-auto text-sm leading-relaxed font-mono text-[#abb2bf]">{children}</pre>
+    </div>
+  )
 }
 
 interface TocItem { id: string; text: string; level: number }
@@ -212,7 +242,7 @@ export default function BlogPost() {
       >
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkFrontmatter, remarkEmoji, remarkMath]}
-          rehypePlugins={[rehypeRaw, rehypeKatex]}
+          rehypePlugins={[rehypeRaw, [rehypeHighlight, { ignoreMissing: true, detect: true }], rehypeKatex]}
           components={{
             h1: ({ children, node }) => {
               const id = headingId(node)
@@ -263,13 +293,17 @@ export default function BlogPost() {
                 {children}
               </blockquote>
             ),
-            pre: ({ children }) => (
-              <pre className="bg-[#1a1a2e] text-[#e2e8f0] p-5 rounded-xl overflow-x-auto my-6 text-sm leading-relaxed font-mono">
-                {children}
-              </pre>
-            ),
+            pre: ({ children, node }) => {
+              // rehype-highlight tags the inner <code> with language-* + hljs classes.
+              const codeNode = (node?.children as Array<{ tagName?: string; properties?: { className?: string[] } }> | undefined)
+                ?.find(c => c.tagName === 'code')
+              const cls = codeNode?.properties?.className ?? []
+              const language = (cls.find(c => c.startsWith('language-')) ?? '').replace('language-', '')
+              const raw = textContent(node)
+              return <CodeBlock language={language} raw={raw}>{children}</CodeBlock>
+            },
             code: ({ className, children, ...props }) => {
-              const isBlock = className?.startsWith('language-')
+              const isBlock = className?.includes('language-') || className?.includes('hljs')
               if (isBlock) {
                 return <code className={className} {...props}>{children}</code>
               }
