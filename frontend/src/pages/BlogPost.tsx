@@ -8,10 +8,25 @@ import remarkFrontmatter from 'remark-frontmatter'
 import remarkEmoji from 'remark-emoji'
 import remarkMath from 'remark-math'
 import rehypeRaw from 'rehype-raw'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import rehypeHighlight from 'rehype-highlight'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import 'highlight.js/styles/atom-one-dark.css'
+
+// Sanitize runs right after rehype-raw (so raw HTML in posts is cleaned —
+// <script>/on*-handlers/javascript: URLs stripped) but BEFORE highlight + katex,
+// whose trusted output then renders normally. We keep className/id so code
+// language- classes, math-inline/display classes, and footnote ids survive.
+const sanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'className', 'id'],
+    section: [...(defaultSchema.attributes?.section ?? []), 'dataFootnotes'],
+    a: [...(defaultSchema.attributes?.a ?? []), 'dataFootnoteRef', 'dataFootnoteBackref', 'ariaDescribedby'],
+  },
+}
 import { api, type BlogPostResponse } from '../lib/api'
 import { readTime, formatDate } from '../lib/blogUtils'
 
@@ -242,7 +257,7 @@ export default function BlogPost() {
       >
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkFrontmatter, remarkEmoji, remarkMath]}
-          rehypePlugins={[rehypeRaw, [rehypeHighlight, { ignoreMissing: true, detect: true }], rehypeKatex]}
+          rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], [rehypeHighlight, { ignoreMissing: true, detect: true }], rehypeKatex]}
           components={{
             h1: ({ children, node }) => {
               const id = headingId(node)

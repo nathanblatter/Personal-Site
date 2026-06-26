@@ -1,4 +1,6 @@
 import asyncio
+import base64
+import hashlib
 import json as _json
 import logging
 import mimetypes
@@ -179,7 +181,7 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_supervised("church_reminder", _periodic_church_reminder, 600)),
         asyncio.create_task(_supervised("weight_reminder", _periodic_weight_reminder, 300)),
     ]
-    _read_index_html()
+    _CSP["value"] = _build_csp(_read_index_html())
     yield
     for t in _tasks:
         t.cancel()
@@ -259,27 +261,53 @@ async def request_logging(request: Request, call_next):
     return response
 
 
-CSP = "; ".join([
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https:",
-    "connect-src 'self' https://api.github.com https://ip-api.com",
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-])
+PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+
+
+def _inline_script_hashes(index_html: str) -> list[str]:
+    """sha256 of each inline <script> body (those without src) in index.html."""
+    hashes = []
+    for m in re.finditer(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>', index_html, re.DOTALL):
+        digest = hashlib.sha256(m.group(1).encode()).digest()
+        hashes.append("'sha256-" + base64.b64encode(digest).decode() + "'")
+    return hashes
+
+
+def _build_csp(index_html: str | None) -> str:
+    """script-src drops 'unsafe-inline' in favour of sha256 hashes of the page's
+    own inline scripts (theme-flash + JSON-LD), self-healing from index.html.
+    Falls back to 'unsafe-inline' if the file can't be read so the theme script
+    never silently breaks. style-src keeps 'unsafe-inline' — React uses inline
+    style attributes throughout."""
+    hashes = _inline_script_hashes(index_html) if index_html else []
+    script_src = ("script-src 'self' " + " ".join(hashes)) if hashes else "script-src 'self' 'unsafe-inline'"
+    return "; ".join([
+        "default-src 'self'",
+        script_src,
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        "img-src 'self' data: https:",
+        "connect-src 'self' https://api.github.com https://ip-api.com",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "object-src 'none'",
+    ])
+
+
+# Computed at startup from the served index.html (see lifespan); safe default until then.
+_CSP = {"value": _build_csp(None)}
 
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
     if not request.url.path.startswith("/api/"):
-        response.headers["Content-Security-Policy"] = CSP
+        response.headers["Content-Security-Policy"] = _CSP["value"]
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = PERMISSIONS_POLICY
     return response
 
 
