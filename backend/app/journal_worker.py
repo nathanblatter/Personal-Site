@@ -132,6 +132,34 @@ async def _connect_pool() -> asyncpg.Pool:
     raise RuntimeError(f"journal DB never became available: {last_exc}")
 
 
+async def _handle(pool: asyncpg.Pool, r: aioredis.Redis, msg_id, fields) -> None:
+    entry_id = fields.get(b"entry_id", b"").decode()
+    try:
+        await _process_entry(pool, entry_id)
+        await r.xack(SUBMIT_STREAM, GROUP, msg_id)
+    except Exception:
+        # Leave unacked (stays pending) so it can be retried on a later boot.
+        log.exception("failed to process entry %s", entry_id)
+
+
+async def _drain_pending(pool: asyncpg.Pool, r: aioredis.Redis) -> None:
+    """Reprocess this consumer's unacked messages (e.g. entries submitted while a
+    prior boot was broken). Reading id '0' returns our pending list; stop once it's
+    empty or a pass makes no progress, so a persistently-failing message can't hot-loop."""
+    while True:
+        resp = await r.xreadgroup(GROUP, CONSUMER, {SUBMIT_STREAM: "0"}, count=10)
+        msgs = resp[0][1] if resp else []
+        if not msgs:
+            return
+        pending_before = (await r.xpending(SUBMIT_STREAM, GROUP))["pending"]
+        for msg_id, fields in msgs:
+            await _handle(pool, r, msg_id, fields)
+        pending_after = (await r.xpending(SUBMIT_STREAM, GROUP))["pending"]
+        if pending_after >= pending_before:
+            log.warning("pending drain made no progress; leaving %d for next boot", pending_after)
+            return
+
+
 async def main() -> None:
     # Whisper needs ffmpeg-decodable input; the model loads on first transcribe.
     pool = await _connect_pool()
@@ -145,6 +173,7 @@ async def main() -> None:
             raise
 
     log.info("journal worker ready, consuming %s as %s/%s", SUBMIT_STREAM, GROUP, CONSUMER)
+    await _drain_pending(pool, r)  # recover entries submitted while a prior boot was broken
     while True:
         try:
             resp = await r.xreadgroup(GROUP, CONSUMER, {SUBMIT_STREAM: ">"}, count=1, block=15000)
@@ -152,13 +181,7 @@ async def main() -> None:
                 continue
             for _stream, messages in resp:
                 for msg_id, fields in messages:
-                    entry_id = fields.get(b"entry_id", b"").decode()
-                    try:
-                        await _process_entry(pool, entry_id)
-                        await r.xack(SUBMIT_STREAM, GROUP, msg_id)
-                    except Exception:
-                        # Leave unacked (stays pending) so it can be retried.
-                        log.exception("failed to process entry %s", entry_id)
+                    await _handle(pool, r, msg_id, fields)
         except Exception:
             log.exception("worker loop error; backing off")
             await asyncio.sleep(5)

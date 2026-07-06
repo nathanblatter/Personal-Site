@@ -2,3 +2,4 @@
 # Dockerfile.worker). faster-whisper is CTranslate2-based (no torch) and pulls in
 # PyAV, which bundles ffmpeg — no system ffmpeg package needed.
 faster-whisper==1.0.3
+requests==2.32.3  # faster-whisper imports it but doesn't declare it as a dep
