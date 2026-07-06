@@ -34,10 +34,12 @@ log = logging.getLogger("journal_worker")
 GROUP = "journal-workers"
 CONSUMER = os.getenv("WORKER_NAME", "worker-1")
 
-WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small.en")
+# large-v3 is markedly better on proper nouns than small.en; the box is idle so
+# the extra CPU time per (once-daily) entry is fine. Override via env if needed.
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "large-v3")
 WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 WHISPER_COMPUTE = os.getenv("WHISPER_COMPUTE", "int8")
-# Bias recurring proper nouns to cut misrecognition (edit app/journal_vocab.py).
+# Recurring proper nouns fed as `hotwords` (a stronger bias than initial_prompt).
 WHISPER_PROMPT = os.getenv("WHISPER_PROMPT") or journal_vocab.whisper_prompt()
 
 _model = None
@@ -58,7 +60,8 @@ def _transcribe(audio_bytes: bytes, suffix: str) -> str:
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as f:
         f.write(audio_bytes)
         f.flush()
-        segments, _info = model.transcribe(f.name, initial_prompt=WHISPER_PROMPT)
+        # hotwords only take effect when initial_prompt is None (faster-whisper).
+        segments, _info = model.transcribe(f.name, hotwords=WHISPER_PROMPT)
         return " ".join(seg.text.strip() for seg in segments).strip()
 
 

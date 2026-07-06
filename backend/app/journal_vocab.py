@@ -12,7 +12,7 @@ Map each canonical spelling to the ways Whisper tends to mis-transcribe it.
 CANONICAL: dict[str, list[str]] = {
     # People
     "Jaxon": ["Jackson", "Jaxson", "Jaxen"],
-    "Kami": ["Cammie", "Cami", "Kammy"],
+    "Kammi": ["Cammie", "Cami", "Kammy"],
     "Macy": ["Maci", "Macey"],
     "Megan": ["Meghan", "Meagan"],
     "Colton Brown": ["Colton", "Coulton"],
@@ -25,8 +25,6 @@ CANONICAL: dict[str, list[str]] = {
     "Tahoe": ["Taho"],
     "In-N-Out": ["in and out", "In and Out"],
     # Projects / recurring topics
-    "Gengar": [],
-    "Alakazam": [],
     "FinForge": ["Fin Forge"],
     "flightdeck": ["flight deck"],
     "Marriott": ["Mariott"],
