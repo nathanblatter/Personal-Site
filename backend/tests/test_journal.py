@@ -46,6 +46,19 @@ def test_old_unsubmitted_day_never_expires():
     assert journal.verify_journal_token(journal.sign_journal_token(old)) is not None
 
 
+# ── Day navigation ────────────────────────────────────────────────────────────
+
+def test_day_nav_today_has_prev_but_no_future():
+    html = journal._day_nav(date.today())
+    assert "&larr;" in html          # previous day link present
+    assert "&rarr;" not in html      # no navigating into the future
+
+
+def test_day_nav_past_day_has_both_directions():
+    html = journal._day_nav(date.today() - timedelta(days=3))
+    assert "&larr;" in html and "&rarr;" in html
+
+
 def test_verify_returns_none_without_secret(monkeypatch):
     monkeypatch.setattr(journal, "JOURNAL_LINK_SECRET", "")
     # Signing with empty secret then verifying must fail closed.

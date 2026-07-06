@@ -20,7 +20,7 @@ import json
 import logging
 import os
 import uuid
-from datetime import date as date_type, datetime, timezone
+from datetime import date as date_type, datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlparse, urlunparse
 from zoneinfo import ZoneInfo
@@ -430,9 +430,10 @@ async def journal_page(token: str):
     async with _pool().acquire() as conn:
         entry = await _ensure_entry(conn, signed_date)
     pretty = signed_date.strftime("%A, %B ") + str(signed_date.day)
+    nav = _day_nav(signed_date)
     if entry["submitted_at"] is not None:
-        return HTMLResponse(_read_only_page(pretty, entry), headers=_NO_STORE)
-    return HTMLResponse(_recording_page(token, signed_date, pretty), headers=_NO_STORE)
+        return HTMLResponse(_read_only_page(pretty, entry, nav), headers=_NO_STORE)
+    return HTMLResponse(_recording_page(token, signed_date, pretty, nav), headers=_NO_STORE)
 
 
 # ---------------------------------------------------------------------------
@@ -533,10 +534,28 @@ _BASE_CSS = """
   .take .del{background:transparent;color:#f87171;padding:6px 10px;font-size:13px}
   .take .n{color:#71717a;font-size:13px;min-width:20px}
   .muted{color:#71717a;font-size:13px}
+  .nav{display:flex;justify-content:space-between;align-items:center;margin:0 0 16px}
+  .nav a{color:#60a5fa;text-decoration:none;font-size:15px;padding:6px 4px}
   .glyph{font-size:48px;text-align:center}
   .narrative{white-space:pre-wrap;line-height:1.6;background:#18181b;border:1px solid #27272a;
     border-radius:12px;padding:16px;margin-top:16px}
 """
+
+
+def _day_nav(signed_date: date_type) -> str:
+    """Prev/next-day links. Previous day is always available (past never expires);
+    next day only up to today (no navigating into the future)."""
+    today = datetime.now(LOCAL_TZ).date()
+    prev_d = signed_date - timedelta(days=1)
+    prev_lbl = prev_d.strftime("%b ") + str(prev_d.day)
+    left = f'<a href="/journal/{sign_journal_token(prev_d.isoformat())}">&larr; {prev_lbl}</a>'
+    next_d = signed_date + timedelta(days=1)
+    if next_d <= today:
+        next_lbl = next_d.strftime("%b ") + str(next_d.day)
+        right = f'<a href="/journal/{sign_journal_token(next_d.isoformat())}">{next_lbl} &rarr;</a>'
+    else:
+        right = "<span></span>"  # keep prev pinned left
+    return f'<div class="nav">{left}{right}</div>'
 
 
 def _shell(heading: str, message: str, ok: bool) -> str:
@@ -550,33 +569,34 @@ def _shell(heading: str, message: str, ok: bool) -> str:
 <p class="sub" style="text-align:center">{message}</p></body></html>"""
 
 
-def _read_only_page(pretty: str, entry) -> str:
+def _read_only_page(pretty: str, entry, nav: str = "") -> str:
     status = entry["status"]
     if entry["narrative"]:
         body = f'<div class="narrative">{_esc(entry["narrative"])}</div>'
     elif status == "submitted":
-        body = '<p class="muted">Submitted — transcribing and weaving your entry. Check back soon.</p>'
+        body = '<p class="muted">Submitted. Transcribing and weaving your entry, check back soon.</p>'
     else:
         body = '<p class="muted">This day is closed.</p>'
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex"><title>Journal — {pretty}</title>
+<meta name="robots" content="noindex"><title>Journal · {pretty}</title>
 <style>{_BASE_CSS}</style></head>
-<body><h1>{pretty}</h1><p class="sub">Submitted · {status}</p>{body}</body></html>"""
+<body>{nav}<h1>{pretty}</h1><p class="sub">Submitted · {status}</p>{body}</body></html>"""
 
 
-def _recording_page(token: str, signed_date: date_type, pretty: str) -> str:
+def _recording_page(token: str, signed_date: date_type, pretty: str, nav: str = "") -> str:
     # Token is embedded so the inline JS can hit the token-scoped endpoints.
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex"><title>Journal — {pretty}</title>
+<meta name="robots" content="noindex"><title>Journal · {pretty}</title>
 <style>{_BASE_CSS}</style></head>
 <body>
+{nav}
 <h1>{pretty}</h1>
 <p class="sub">Talk as much as you want, in as many takes as you want. Submit when you're happy.</p>
 <button id="rec" class="rec">● Record</button>
 <div id="takes"></div>
-<p id="empty" class="muted">No takes yet — tap Record to start.</p>
+<p id="empty" class="muted">No takes yet. Tap Record to start.</p>
 <button id="submit" class="submit" disabled>Submit day</button>
 <p id="msg" class="muted"></p>
 <script>
