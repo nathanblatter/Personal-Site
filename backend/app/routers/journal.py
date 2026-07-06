@@ -38,10 +38,10 @@ LOCAL_TZ = ZoneInfo(os.getenv("LOCAL_TZ", "America/Denver"))  # fallback when lo
 KPI_DSN = os.getenv("DATABASE_URL_KPI", "postgresql://postgres:postgres@host.docker.internal:5432/kpi")
 SITE_BASE_URL = os.getenv("SITE_BASE_URL", "https://nathanblatter.com")
 # The link is a convenience for finding/opening a day, not the access-control layer
-# (that's the Tailscale-only tunnel). Long window so a missed day can be back-filled
-# by scrolling Messages: accept up to a year in the past, a day into the future.
+# (that's the Tailscale-only tunnel). A day's link never expires by time — an
+# unsubmitted day stays recordable forever (miss Jul 5, record it Jul 6 or later).
+# Submission is the only thing that closes a day; submitted days resolve read-only.
 JOURNAL_LINK_SECRET = os.getenv("JOURNAL_LINK_SECRET", "") or os.getenv("CHURCH_LINK_SECRET", "")
-JOURNAL_MAX_PAST_DAYS = int(os.getenv("JOURNAL_MAX_PAST_DAYS", "400"))
 
 AUDIO_PREFIX = "journal/audio"
 SUBMIT_STREAM = "journal:submitted"
@@ -220,7 +220,12 @@ def sign_journal_token(date_str: str) -> str:
 
 
 def verify_journal_token(token: str) -> Optional[date_type]:
-    """Return the signed date if the token is valid and within the allowed window."""
+    """Return the signed date if the token is valid.
+
+    No past expiry — an unsubmitted day stays recordable indefinitely. The only
+    time guard is rejecting far-future dates (allowing +1 day for timezone edges),
+    so a guessed/replayed token can't open a day that hasn't happened yet.
+    """
     if not JOURNAL_LINK_SECRET:
         return None
     try:
@@ -232,8 +237,7 @@ def verify_journal_token(token: str) -> Optional[date_type]:
     except Exception:
         return None
     today = datetime.now(LOCAL_TZ).date()
-    delta = (today - signed_date).days
-    if delta < -1 or delta > JOURNAL_MAX_PAST_DAYS:
+    if (today - signed_date).days < -1:  # more than a day in the future
         return None
     return signed_date
 

@@ -35,15 +35,15 @@ def test_far_future_date_is_rejected():
     assert journal.verify_journal_token(journal.sign_journal_token(future)) is None
 
 
-def test_backfill_within_window_is_allowed():
-    # Two weeks ago should still open for backfill (window is ~a year).
+def test_backfill_two_weeks_ago_is_allowed():
     past = (date.today() - timedelta(days=14)).isoformat()
     assert journal.verify_journal_token(journal.sign_journal_token(past)) is not None
 
 
-def test_date_older_than_window_is_rejected():
-    old = (date.today() - timedelta(days=journal.JOURNAL_MAX_PAST_DAYS + 5)).isoformat()
-    assert journal.verify_journal_token(journal.sign_journal_token(old)) is None
+def test_old_unsubmitted_day_never_expires():
+    # A day's link stays open indefinitely until submitted — no past expiry.
+    old = (date.today() - timedelta(days=500)).isoformat()
+    assert journal.verify_journal_token(journal.sign_journal_token(old)) is not None
 
 
 def test_verify_returns_none_without_secret(monkeypatch):
