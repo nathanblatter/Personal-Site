@@ -34,7 +34,8 @@ from app.routers.storage import get_s3_client, ensure_bucket, MINIO_BUCKET
 
 log = logging.getLogger("journal")
 
-LOCAL_TZ = ZoneInfo(os.getenv("LOCAL_TZ", "America/Denver"))
+LOCAL_TZ = ZoneInfo(os.getenv("LOCAL_TZ", "America/Denver"))  # fallback when location lookup fails
+KPI_DSN = os.getenv("DATABASE_URL_KPI", "postgresql://postgres:postgres@host.docker.internal:5432/kpi")
 SITE_BASE_URL = os.getenv("SITE_BASE_URL", "https://nathanblatter.com")
 # The link is a convenience for finding/opening a day, not the access-control layer
 # (that's the Tailscale-only tunnel). Long window so a missed day can be back-filled
@@ -436,8 +437,39 @@ async def journal_page(token: str):
 
 # In-memory guard so the supervised loop texts at most once per day.
 _last_journal_reminder: Optional[date_type] = None
-JOURNAL_REMINDER_HOUR = int(os.getenv("JOURNAL_REMINDER_HOUR", "21"))          # 9pm local
+JOURNAL_REMINDER_HOUR = int(os.getenv("JOURNAL_REMINDER_HOUR", "19"))          # 7pm local
 JOURNAL_REMINDER_WINDOW_HOURS = int(os.getenv("JOURNAL_REMINDER_WINDOW_HOURS", "3"))
+
+# Timezone follows Nathan's latest location fix (he travels UT/CA), cached briefly.
+_tz_cache: Optional[tuple] = None
+_TZ_CACHE_TTL_SEC = 3600
+
+
+async def resolve_local_tz() -> ZoneInfo:
+    """Current timezone from the most recent KPI location fix, so '7pm local' tracks
+    where Nathan actually is. Falls back to the static LOCAL_TZ on any failure."""
+    global _tz_cache
+    now = datetime.now(timezone.utc)
+    if _tz_cache and (now - _tz_cache[0]).total_seconds() < _TZ_CACHE_TTL_SEC:
+        return _tz_cache[1]
+    tz = LOCAL_TZ
+    try:
+        conn = await asyncpg.connect(KPI_DSN, timeout=5)
+        try:
+            row = await conn.fetchrow(
+                "SELECT lat, lon FROM location_log WHERE lat IS NOT NULL ORDER BY ts DESC LIMIT 1"
+            )
+        finally:
+            await conn.close()
+        if row:
+            from tzfpy import get_tz
+            name = get_tz(float(row["lon"]), float(row["lat"]))
+            if name:
+                tz = ZoneInfo(name)
+    except Exception as exc:
+        log.info("tz resolve fell back to %s: %s", LOCAL_TZ.key, exc)
+    _tz_cache = (now, tz)
+    return tz
 
 
 async def send_journal_reminder(force: bool = False) -> str:
@@ -450,7 +482,8 @@ async def send_journal_reminder(force: bool = False) -> str:
     global _last_journal_reminder
     from app import imessage_service  # local import mirrors kpi's usage pattern
 
-    now = datetime.now(LOCAL_TZ)
+    tz = await resolve_local_tz()
+    now = datetime.now(tz)
     today = now.date()
 
     if not force:
