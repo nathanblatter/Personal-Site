@@ -24,7 +24,7 @@ import uuid
 import asyncpg
 import redis.asyncio as aioredis
 
-from app import weave_service
+from app import journal_vocab, weave_service
 from app.routers.journal import journal_dsn, SUBMIT_STREAM
 from app.routers.storage import get_s3_client, MINIO_BUCKET
 
@@ -37,11 +37,8 @@ CONSUMER = os.getenv("WORKER_NAME", "worker-1")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "small.en")
 WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 WHISPER_COMPUTE = os.getenv("WHISPER_COMPUTE", "int8")
-# Bias recurring proper nouns to cut misrecognition (PRD custom-vocabulary note).
-WHISPER_PROMPT = os.getenv(
-    "WHISPER_PROMPT",
-    "Gengar, Alakazam, Marriott, Gaskin, Tahoe, BYU, FinForge, flightdeck.",
-)
+# Bias recurring proper nouns to cut misrecognition (edit app/journal_vocab.py).
+WHISPER_PROMPT = os.getenv("WHISPER_PROMPT") or journal_vocab.whisper_prompt()
 
 _model = None
 

@@ -79,6 +79,31 @@ def test_parse_strips_code_fences():
 
 def test_parse_falls_back_to_raw_on_garbage():
     out = weave_service._parse_response("not json at all", RAW)
-    # A memory is never lost to a bad parse — raw transcripts are preserved.
+    # A memory is never lost to a bad parse; raw transcripts are preserved.
     assert "derrick" in out["narrative"]
     assert out["drift_score"] == 999.0
+
+
+# ── Style: no em/en dashes, ever ──────────────────────────────────────────────
+
+def test_narrative_has_no_em_or_en_dashes():
+    out = weave_service._parse_response(
+        '{"narrative": "It was good \\u2014 really good \\u2013 all day.", "drift_flags": []}',
+        RAW,
+    )
+    assert "—" not in out["narrative"] and "–" not in out["narrative"]
+    assert out["narrative"] == "It was good, really good, all day."
+
+
+def test_strip_dashes_collapses_doubled_commas():
+    assert weave_service._strip_dashes("a, — b") == "a, b"
+
+
+# ── Name glossary flows into the weave prompt ─────────────────────────────────
+
+def test_weave_prompt_includes_name_glossary():
+    from app import journal_vocab
+    assert "Jaxon" in weave_service.WEAVE_PROMPT
+    assert "Lake Tulloch" in weave_service.WEAVE_PROMPT
+    # canonical -> mis-hearing mapping is surfaced to the model
+    assert "Jackson" in journal_vocab.weave_glossary()

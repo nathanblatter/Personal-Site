@@ -15,6 +15,8 @@ from typing import Optional
 
 import httpx
 
+from app import journal_vocab
+
 log = logging.getLogger("weave")
 
 WEAVE_PROVIDER = os.getenv("WEAVE_PROVIDER", "claude").lower()
@@ -25,24 +27,43 @@ ANTHROPIC_MODEL = os.getenv("WEAVE_MODEL", "claude-sonnet-4-6")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
 OLLAMA_MODEL = os.getenv("WEAVE_OLLAMA_MODEL", "llama3.1:8b")
 
-# Verbatim PRD weave prompt, with a machine-readable output contract appended.
+# PRD weave prompt + style constraints, name glossary, and a JSON output contract.
 WEAVE_PROMPT = """You're given one or more raw transcripts from the same day, in chronological order. Some may cover different topics, or return to the same topic later in the day. Organize this into one coherent journal entry that reads narratively, roughly following the arc of the day.
 
 Rules:
 - Prefer the person's own words and phrasing over paraphrase, especially for anything opinionated, emotional, funny, or specific. Light editing for grammar and filler is fine; full rewriting is not.
-- You may reorder content for narrative flow (e.g. grouping a topic that was mentioned twice into one place) but do not invent transitions implying something happened that didn't, and do not drop hedges, uncertainty, or contradictions — those are real content.
+- You may reorder content for narrative flow (e.g. grouping a topic that was mentioned twice into one place) but do not invent transitions implying something happened that didn't, and do not drop hedges, uncertainty, or contradictions, since those are real content.
 - If takes are disjoint (different topics, no natural order), use simple time-of-day framing rather than forcing a false narrative thread between them.
 - Do not summarize. Every concrete detail, name, and claim in the raw transcripts should appear in the output.
-- Alongside the narrative, output a structured list of any place where your version drops, adds, or alters a factual claim, hedge, or emotional qualifier versus the raw transcripts. Tag each as "structural" (reordering, merged repeated topic, added transition) or "content" (changed meaning). Only "content" tags matter for review.
+
+Style:
+- NEVER use em dashes or en dashes (— or –). Use periods or commas instead. This is a hard rule.
+- Write plainly and naturally in the person's own voice. Do not add literary flourish, dramatic phrasing, or "writerly" transitions the person wouldn't say.
+
+Names: the transcript may misspell recurring people/places. Normalize them to these canonical spellings when clearly the same person/place. This is a correction, NOT drift, so do NOT create a drift flag for it:
+{glossary}
+
+Alongside the narrative, output a structured list of any place where your version drops, adds, or alters a factual CLAIM, hedge, or emotional qualifier versus the raw transcripts. Tag each as "structural" (reordering, merged repeated topic, added transition) or "content" (changed meaning). Only "content" tags matter for review. Do not flag grammar/filler cleanup or the name normalizations above.
 
 Return ONLY valid JSON, no prose outside it, in exactly this shape:
-{
+{{
   "narrative": "<the woven journal entry>",
   "drift_flags": [
-    {"category": "structural" | "content", "note": "<what changed>", "raw_span": "<the affected phrase from the raw transcript>"}
+    {{"category": "structural" | "content", "note": "<what changed>", "raw_span": "<the affected phrase from the raw transcript>"}}
   ]
-}
-If nothing drifted, return an empty drift_flags array."""
+}}
+If nothing drifted, return an empty drift_flags array.""".format(glossary=journal_vocab.weave_glossary())
+
+
+# Nathan dislikes em/en dashes; strip them deterministically so we never depend on
+# the model obeying the style rule. Separator dashes become commas.
+def _strip_dashes(text: str) -> str:
+    text = re.sub(r"\s*[—–]\s*", ", ", text)     # em/en dash -> comma
+    text = re.sub(r"\s+--\s+", ", ", text)                 # double hyphen -> comma
+    text = re.sub(r"\s*,(\s*,)+\s*", ", ", text)           # collapse runs of commas -> ", "
+    text = re.sub(r"\s+([,.;:!?])", r"\1", text)           # no space before punctuation
+    text = re.sub(r" {2,}", " ", text)                     # collapse multiple spaces
+    return text
 
 
 def _build_input(raw_texts: list[str]) -> str:
@@ -69,13 +90,13 @@ def _parse_response(text: str, raw_texts: list[str]) -> dict:
     except Exception as exc:
         log.warning("weave parse failed (%s); falling back to raw concatenation", exc)
         return {
-            "narrative": "\n\n".join(t.strip() for t in raw_texts),
-            "drift_flags": [{"category": "content", "note": "weave failed to parse — showing raw", "raw_span": ""}],
+            "narrative": _strip_dashes("\n\n".join(t.strip() for t in raw_texts)),
+            "drift_flags": [{"category": "content", "note": "weave failed to parse, showing raw", "raw_span": ""}],
             "drift_score": 999.0,
         }
     content_flags = [f for f in flags if (f or {}).get("category") == "content"]
     return {
-        "narrative": narrative,
+        "narrative": _strip_dashes(narrative),
         "drift_flags": flags,
         "drift_score": float(len(content_flags)),
     }
