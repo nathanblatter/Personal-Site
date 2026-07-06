@@ -117,9 +117,24 @@ async def _process_entry(pool: asyncpg.Pool, entry_id_str: str) -> None:
     log.info("entry %s processed (drift_score=%s)", entry_id, woven["drift_score"])
 
 
+async def _connect_pool() -> asyncpg.Pool:
+    """Wait for the `journal` DB, which the API creates on its own boot. Retrying
+    here (instead of crashing) avoids a restart crash-loop when the worker wins the
+    startup race against the API."""
+    last_exc = None
+    for attempt in range(30):
+        try:
+            return await asyncpg.create_pool(journal_dsn())
+        except (asyncpg.exceptions.InvalidCatalogNameError, OSError, ConnectionError) as exc:
+            last_exc = exc
+            log.info("journal DB not ready yet (attempt %d): %s", attempt + 1, exc)
+            await asyncio.sleep(2)
+    raise RuntimeError(f"journal DB never became available: {last_exc}")
+
+
 async def main() -> None:
     # Whisper needs ffmpeg-decodable input; the model loads on first transcribe.
-    pool = await asyncpg.create_pool(journal_dsn())
+    pool = await _connect_pool()
     r = aioredis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
 
     # Create the consumer group (idempotent), starting from new messages.
