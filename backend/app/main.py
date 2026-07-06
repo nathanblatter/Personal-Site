@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from app.auth import assert_secure_secrets, require_auth
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report, newsletter, site_content, health, search
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report, newsletter, site_content, health, search, journal
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
 from app.database import AsyncSessionLocal
 from app import models
@@ -165,10 +165,15 @@ async def _periodic_weight_reminder():
     return await kpi.send_weight_reminders()
 
 
+async def _periodic_journal_reminder():
+    return await journal.send_journal_reminder()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     assert_secure_secrets()  # fail closed in prod if JWT/admin/MinIO secrets are defaults
     await kpi.init_kpi_db()
+    await journal.init_journal_db()
     _tasks = [
         asyncio.create_task(github.warmup()),
         asyncio.create_task(_supervised("claude_snapshot", _periodic_claude_snapshot, 86400)),
@@ -178,12 +183,14 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(_supervised("crm_reminders", _periodic_crm_reminders, 21600)),
         asyncio.create_task(_supervised("church_reminder", _periodic_church_reminder, 600)),
         asyncio.create_task(_supervised("weight_reminder", _periodic_weight_reminder, 300)),
+        asyncio.create_task(_supervised("journal_reminder", _periodic_journal_reminder, 600)),
     ]
     _read_index_html()
     yield
     for t in _tasks:
         t.cancel()
     await kpi.close_kpi_db()
+    await journal.close_journal_db()
 
 
 def _static_og_html(route: str, index_html: str) -> str | None:
@@ -323,6 +330,7 @@ app.include_router(bug_report.router, prefix=API_PREFIX)
 app.include_router(kpi.health_ingest_router, prefix="/api")
 app.include_router(kpi.church_link_router)
 app.include_router(kpi.weight_link_router)
+app.include_router(journal.router)  # top-level /journal/{token}, no /api prefix
 app.include_router(claude_usage.router, prefix=API_PREFIX)
 app.include_router(home.router, prefix=API_PREFIX)
 app.include_router(about_page.router, prefix=API_PREFIX)

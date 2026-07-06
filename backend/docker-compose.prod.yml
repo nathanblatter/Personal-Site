@@ -7,6 +7,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/portfolio
       DATABASE_URL_KPI: postgresql://postgres:postgres@host.docker.internal:5432/kpi
+      DATABASE_URL_JOURNAL: postgresql://postgres:postgres@host.docker.internal:5432/journal
       STATIC_DIR: /dist
       SMTP_HOST: docker-services-postfix-1
       SMTP_PORT: 25
@@ -30,6 +31,24 @@ services:
       - portfolio
       - docker-services
 
+  journal-worker:
+    image: backend-worker:latest
+    env_file: .env.prod
+    environment:
+      DATABASE_URL_JOURNAL: postgresql://postgres:postgres@host.docker.internal:5432/journal
+      REDIS_URL: redis://host.docker.internal:6379
+      MINIO_ENDPOINT: docker-services-minio-1:9000
+      MINIO_BUCKET: portfolio
+      WEAVE_PROVIDER: claude
+      TZ: America/Denver
+      HF_HOME: /models
+    volumes:
+      - whisper_models:/models
+    restart: unless-stopped
+    networks:
+      - portfolio
+      - docker-services
+
   tunnel:
     image: cloudflare/cloudflared:latest
     env_file: .env.prod
@@ -39,6 +58,9 @@ services:
       - api
     networks:
       - portfolio
+
+volumes:
+  whisper_models:
 
 networks:
   portfolio:

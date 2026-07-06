@@ -28,10 +28,16 @@ jobs:
           # Build image — frontend pre-built, single-stage Python image
           cd $GITHUB_WORKSPACE
           DOCKER_BUILDKIT=0 docker build --pull=false -f backend/Dockerfile -t backend-api:latest .
+          # Journal transcription/weave worker image (separate: faster-whisper is heavy)
+          DOCKER_BUILDKIT=0 docker build --pull=false -f backend/Dockerfile.worker -t backend-worker:latest .
 
           # Get current running container ID
           cd $GITHUB_WORKSPACE/backend
           OLD_CONTAINER=$(docker compose $COMPOSE_ARGS ps -q api 2>/dev/null | head -1)
+
+          # (Re)start the journal worker with the freshly built image, out of band
+          # from the api's zero-downtime dance.
+          docker compose $COMPOSE_ARGS up -d journal-worker
 
           if [ -z "$OLD_CONTAINER" ]; then
             echo "No existing container, starting fresh..."

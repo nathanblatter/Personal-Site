@@ -1,0 +1,136 @@
+"""Weave / cleanup service — turns a day's raw transcripts into one coherent,
+quote-biased journal entry plus structured drift flags.
+
+Provider-pluggable (WEAVE_PROVIDER=claude|ollama, default claude). Claude is the
+default for quote-fidelity now; the Ollama-local path keeps everything on-box for
+the privacy pilot (PRD open decision #1). One LLM call over all of a day's takes,
+concatenated in sequence order.
+"""
+
+import json
+import logging
+import os
+import re
+from typing import Optional
+
+import httpx
+
+log = logging.getLogger("weave")
+
+WEAVE_PROVIDER = os.getenv("WEAVE_PROVIDER", "claude").lower()
+
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.getenv("WEAVE_MODEL", "claude-sonnet-4-6")
+
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
+OLLAMA_MODEL = os.getenv("WEAVE_OLLAMA_MODEL", "llama3.1:8b")
+
+# Verbatim PRD weave prompt, with a machine-readable output contract appended.
+WEAVE_PROMPT = """You're given one or more raw transcripts from the same day, in chronological order. Some may cover different topics, or return to the same topic later in the day. Organize this into one coherent journal entry that reads narratively, roughly following the arc of the day.
+
+Rules:
+- Prefer the person's own words and phrasing over paraphrase, especially for anything opinionated, emotional, funny, or specific. Light editing for grammar and filler is fine; full rewriting is not.
+- You may reorder content for narrative flow (e.g. grouping a topic that was mentioned twice into one place) but do not invent transitions implying something happened that didn't, and do not drop hedges, uncertainty, or contradictions — those are real content.
+- If takes are disjoint (different topics, no natural order), use simple time-of-day framing rather than forcing a false narrative thread between them.
+- Do not summarize. Every concrete detail, name, and claim in the raw transcripts should appear in the output.
+- Alongside the narrative, output a structured list of any place where your version drops, adds, or alters a factual claim, hedge, or emotional qualifier versus the raw transcripts. Tag each as "structural" (reordering, merged repeated topic, added transition) or "content" (changed meaning). Only "content" tags matter for review.
+
+Return ONLY valid JSON, no prose outside it, in exactly this shape:
+{
+  "narrative": "<the woven journal entry>",
+  "drift_flags": [
+    {"category": "structural" | "content", "note": "<what changed>", "raw_span": "<the affected phrase from the raw transcript>"}
+  ]
+}
+If nothing drifted, return an empty drift_flags array."""
+
+
+def _build_input(raw_texts: list[str]) -> str:
+    """Concatenate the day's raw transcripts in sequence order for the prompt."""
+    parts = []
+    for i, text in enumerate(raw_texts, 1):
+        parts.append(f"--- Take {i} ---\n{text.strip()}")
+    return "\n\n".join(parts)
+
+
+def _parse_response(text: str, raw_texts: list[str]) -> dict:
+    """Parse the model's JSON. On failure, fall back to raw concatenation so a
+    memory is never lost to a bad parse (the raw transcripts remain the source of truth)."""
+    cleaned = text.strip()
+    # Strip ```json ... ``` fences if present.
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.MULTILINE).strip()
+    try:
+        m = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        data = json.loads(m.group(0) if m else cleaned)
+        narrative = (data.get("narrative") or "").strip()
+        flags = data.get("drift_flags") or []
+        if not narrative:
+            raise ValueError("empty narrative")
+    except Exception as exc:
+        log.warning("weave parse failed (%s); falling back to raw concatenation", exc)
+        return {
+            "narrative": "\n\n".join(t.strip() for t in raw_texts),
+            "drift_flags": [{"category": "content", "note": "weave failed to parse — showing raw", "raw_span": ""}],
+            "drift_score": 999.0,
+        }
+    content_flags = [f for f in flags if (f or {}).get("category") == "content"]
+    return {
+        "narrative": narrative,
+        "drift_flags": flags,
+        "drift_score": float(len(content_flags)),
+    }
+
+
+async def _weave_claude(prompt_input: str) -> str:
+    if not ANTHROPIC_API_KEY:
+        raise RuntimeError("ANTHROPIC_API_KEY not set")
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        resp = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": ANTHROPIC_MODEL,
+                "max_tokens": 4096,
+                "system": WEAVE_PROMPT,
+                "messages": [{"role": "user", "content": prompt_input}],
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return "".join(block.get("text", "") for block in data.get("content", []))
+
+
+async def _weave_ollama(prompt_input: str) -> str:
+    async with httpx.AsyncClient(timeout=300.0) as client:
+        resp = await client.post(
+            f"{OLLAMA_URL}/api/chat",
+            json={
+                "model": OLLAMA_MODEL,
+                "stream": False,
+                "format": "json",
+                "messages": [
+                    {"role": "system", "content": WEAVE_PROMPT},
+                    {"role": "user", "content": prompt_input},
+                ],
+            },
+        )
+        resp.raise_for_status()
+        return resp.json().get("message", {}).get("content", "")
+
+
+async def weave_day(raw_texts: list[str]) -> dict:
+    """Weave a day's raw transcripts. Returns {narrative, drift_flags, drift_score}."""
+    raw_texts = [t for t in raw_texts if t and t.strip()]
+    if not raw_texts:
+        return {"narrative": "", "drift_flags": [], "drift_score": 0.0}
+
+    prompt_input = _build_input(raw_texts)
+    if WEAVE_PROVIDER == "ollama":
+        text = await _weave_ollama(prompt_input)
+    else:
+        text = await _weave_claude(prompt_input)
+    return _parse_response(text, raw_texts)

@@ -1,0 +1,4 @@
+# Journal transcription worker extras (installed on top of requirements.txt in
+# Dockerfile.worker). faster-whisper is CTranslate2-based (no torch) and pulls in
+# PyAV, which bundles ffmpeg — no system ffmpeg package needed.
+faster-whisper==1.0.3

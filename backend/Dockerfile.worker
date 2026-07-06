@@ -1,0 +1,10 @@
+# Journal transcription + weave worker image (separate from the API image so
+# faster-whisper stays out of the API runtime). Same app code, different entrypoint.
+FROM python:3.12-slim
+WORKDIR /app
+COPY backend/requirements.txt backend/requirements-worker.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-worker.txt
+COPY backend/ .
+# Whisper model cache lives on a mounted volume so it isn't re-downloaded per deploy.
+ENV HF_HOME=/models
+CMD ["python", "-m", "app.journal_worker"]

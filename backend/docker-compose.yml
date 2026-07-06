@@ -21,6 +21,8 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://portfolio:portfolio@db:5432/portfolio
+      DATABASE_URL_JOURNAL: postgresql://portfolio:portfolio@db:5432/journal
+      JOURNAL_LINK_SECRET: change-me-dev-journal
       STATIC_DIR: /dist
       JWT_SECRET: change-me-dev
       ADMIN_USERNAME: admin
@@ -41,6 +43,28 @@ services:
     volumes:
       - ../frontend/dist:/dist:ro
 
+  journal-worker:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile.worker
+    environment:
+      DATABASE_URL_JOURNAL: postgresql://portfolio:portfolio@db:5432/journal
+      REDIS_URL: redis://host.docker.internal:6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: portfolio
+      WEAVE_PROVIDER: claude
+      # ANTHROPIC_API_KEY passed through from the host shell for the weave pass.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    volumes:
+      - whisper_models:/models
+
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
@@ -56,3 +80,4 @@ services:
 volumes:
   pgdata:
   minio_data:
+  whisper_models:
