@@ -112,6 +112,12 @@ def test_strip_dashes_collapses_doubled_commas():
     assert weave_service._strip_dashes("a, — b") == "a, b"
 
 
+def test_strip_spaced_hyphen_dash_substitute():
+    assert weave_service._strip_dashes("great day - loved it") == "great day, loved it"
+    # hyphenated compounds (no surrounding spaces) are untouched
+    assert weave_service._strip_dashes("In-N-Out was well-known") == "In-N-Out was well-known"
+
+
 # ── Name glossary flows into the weave prompt ─────────────────────────────────
 
 def test_weave_prompt_includes_name_glossary():

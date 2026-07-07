@@ -59,7 +59,7 @@ If nothing drifted, return an empty drift_flags array.""".format(glossary=journa
 # the model obeying the style rule. Separator dashes become commas.
 def _strip_dashes(text: str) -> str:
     text = re.sub(r"\s*[—–]\s*", ", ", text)     # em/en dash -> comma
-    text = re.sub(r"\s+--\s+", ", ", text)                 # double hyphen -> comma
+    text = re.sub(r"\s+--?\s+", ", ", text)                # spaced hyphen/double-hyphen dash-substitute -> comma
     text = re.sub(r"\s*,(\s*,)+\s*", ", ", text)           # collapse runs of commas -> ", "
     text = re.sub(r"\s+([,.;:!?])", r"\1", text)           # no space before punctuation
     text = re.sub(r" {2,}", " ", text)                     # collapse multiple spaces
