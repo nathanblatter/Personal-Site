@@ -24,7 +24,7 @@ import uuid
 import asyncpg
 import redis.asyncio as aioredis
 
-from app import journal_vocab, weave_service
+from app import journal_vocab, prompt_service, weave_service
 from app.routers.journal import journal_dsn, SUBMIT_STREAM
 from app.routers.storage import get_s3_client, MINIO_BUCKET
 
@@ -104,17 +104,31 @@ async def _process_entry(pool: asyncpg.Pool, entry_id_str: str) -> None:
 
     woven = await weave_service.weave_day(raw_texts)
     async with pool.acquire() as conn:
-        await conn.execute(
+        entry_date = await conn.fetchval(
             "UPDATE entries SET narrative = $2, "
             "final_text = COALESCE(final_text, $2), "
             "drift_flags = $3::jsonb, drift_score = $4, status = 'processed' "
-            "WHERE id = $1",
+            "WHERE id = $1 RETURNING entry_date",
             entry_id,
             woven["narrative"],
             json.dumps(woven["drift_flags"]),
             woven["drift_score"],
         )
     log.info("entry %s processed (drift_score=%s)", entry_id, woven["drift_score"])
+
+    # Extract next-day content prompts from the narrative (best-effort; never blocks).
+    try:
+        prompts = await prompt_service.extract_forward_prompts(woven["narrative"], entry_date)
+        if prompts:
+            async with pool.acquire() as conn:
+                await conn.executemany(
+                    "INSERT INTO prompt_suggestions (entry_id, target_date, prompt_text, confidence, source) "
+                    "VALUES ($1, $2, $3, $4, 'content')",
+                    [(entry_id, p["target_date"], p["prompt_text"], p["confidence"]) for p in prompts],
+                )
+            log.info("entry %s produced %d content prompt(s)", entry_id, len(prompts))
+    except Exception:
+        log.exception("prompt extraction failed for entry %s", entry_id)
 
 
 async def _connect_pool() -> asyncpg.Pool:

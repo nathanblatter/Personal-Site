@@ -102,7 +102,7 @@ def _parse_response(text: str, raw_texts: list[str]) -> dict:
     }
 
 
-async def _weave_claude(prompt_input: str) -> str:
+async def _claude(system: str, user: str, max_tokens: int, want_json: bool) -> str:
     if not ANTHROPIC_API_KEY:
         raise RuntimeError("ANTHROPIC_API_KEY not set")
     async with httpx.AsyncClient(timeout=120.0) as client:
@@ -115,9 +115,9 @@ async def _weave_claude(prompt_input: str) -> str:
             },
             json={
                 "model": ANTHROPIC_MODEL,
-                "max_tokens": 4096,
-                "system": WEAVE_PROMPT,
-                "messages": [{"role": "user", "content": prompt_input}],
+                "max_tokens": max_tokens,
+                "system": system,
+                "messages": [{"role": "user", "content": user}],
             },
         )
         resp.raise_for_status()
@@ -125,22 +125,28 @@ async def _weave_claude(prompt_input: str) -> str:
         return "".join(block.get("text", "") for block in data.get("content", []))
 
 
-async def _weave_ollama(prompt_input: str) -> str:
+async def _ollama(system: str, user: str, max_tokens: int, want_json: bool) -> str:
     async with httpx.AsyncClient(timeout=300.0) as client:
-        resp = await client.post(
-            f"{OLLAMA_URL}/api/chat",
-            json={
-                "model": OLLAMA_MODEL,
-                "stream": False,
-                "format": "json",
-                "messages": [
-                    {"role": "system", "content": WEAVE_PROMPT},
-                    {"role": "user", "content": prompt_input},
-                ],
-            },
-        )
+        payload = {
+            "model": OLLAMA_MODEL,
+            "stream": False,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        }
+        if want_json:
+            payload["format"] = "json"
+        resp = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
         resp.raise_for_status()
         return resp.json().get("message", {}).get("content", "")
+
+
+async def call_llm(system: str, user: str, max_tokens: int = 4096, want_json: bool = True) -> str:
+    """Provider-agnostic single-turn completion, reused by weave + prompt extraction."""
+    if WEAVE_PROVIDER == "ollama":
+        return await _ollama(system, user, max_tokens, want_json)
+    return await _claude(system, user, max_tokens, want_json)
 
 
 async def weave_day(raw_texts: list[str]) -> dict:
@@ -149,9 +155,5 @@ async def weave_day(raw_texts: list[str]) -> dict:
     if not raw_texts:
         return {"narrative": "", "drift_flags": [], "drift_score": 0.0}
 
-    prompt_input = _build_input(raw_texts)
-    if WEAVE_PROVIDER == "ollama":
-        text = await _weave_ollama(prompt_input)
-    else:
-        text = await _weave_claude(prompt_input)
+    text = await call_llm(WEAVE_PROMPT, _build_input(raw_texts))
     return _parse_response(text, raw_texts)

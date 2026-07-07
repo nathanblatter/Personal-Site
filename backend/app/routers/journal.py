@@ -18,6 +18,7 @@ import hashlib
 import hmac
 import json
 import logging
+import math
 import os
 import uuid
 from datetime import date as date_type, datetime, timedelta, timezone
@@ -168,6 +169,11 @@ async def init_journal_db() -> None:
         await c.execute(_CREATE_TRANSCRIPTS)
         await c.execute(_CREATE_PHOTOS)
         await c.execute(_CREATE_PROMPT_SUGGESTIONS)
+        # Next-day prompts: location/fallback prompts have no source entry, and we
+        # track delivery + source. Additive so existing rows are unaffected.
+        await c.execute("ALTER TABLE prompt_suggestions ALTER COLUMN entry_id DROP NOT NULL")
+        await c.execute("ALTER TABLE prompt_suggestions ADD COLUMN IF NOT EXISTS source TEXT")
+        await c.execute("ALTER TABLE prompt_suggestions ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ")
         await c.execute(_CREATE_MAGIC_LINKS)
         await c.execute(_CREATE_UPDATED_AT_FN)
         await c.execute(_DROP_ENTRIES_TRIGGER)
@@ -477,6 +483,80 @@ async def resolve_local_tz() -> ZoneInfo:
     return tz
 
 
+# ---------------------------------------------------------------------------
+# Next-day prompt suggestions (content-derived + location-derived + fallback)
+# ---------------------------------------------------------------------------
+
+def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    r = 6371000.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlmb = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlmb / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def _match_visited(points: list[tuple[float, float]], labels: list[dict]) -> list[str]:
+    """Return labeled place names visited, ordered by dwell (number of trail points
+    that fell inside the label's radius)."""
+    counts: dict[str, int] = {}
+    for plat, plon in points:
+        for lb in labels:
+            if _haversine_m(plat, plon, lb["lat"], lb["lon"]) <= (lb["radius_m"] or 100):
+                counts[lb["name"]] = counts.get(lb["name"], 0) + 1
+    return [name for name, _ in sorted(counts.items(), key=lambda kv: -kv[1])]
+
+
+async def _visited_labels(day: date_type, tz: ZoneInfo) -> list[str]:
+    """Labeled places (from the KPI location system) visited on the given local day."""
+    start = datetime(day.year, day.month, day.day, tzinfo=tz)
+    end = start + timedelta(days=1)
+    try:
+        conn = await asyncpg.connect(KPI_DSN, timeout=5)
+        try:
+            labels = await conn.fetch("SELECT name, lat, lon, radius_m FROM location_labels")
+            points = await conn.fetch(
+                "SELECT lat, lon FROM location_log WHERE lat IS NOT NULL AND ts >= $1 AND ts < $2",
+                start, end,
+            )
+        finally:
+            await conn.close()
+    except Exception as exc:
+        log.info("location lookup skipped: %s", exc)
+        return []
+    return _match_visited(
+        [(p["lat"], p["lon"]) for p in points],
+        [dict(l) for l in labels],
+    )
+
+
+async def _todays_prompt(today: date_type, tz: ZoneInfo) -> Optional[str]:
+    """Pick one gentle suggestion for today's text: best stored content prompt, else
+    a location prompt from today's visited places, else a fallback. Records the choice."""
+    from app import prompt_service
+
+    async with _pool().acquire() as conn:
+        content = await conn.fetchrow(
+            "SELECT id, prompt_text FROM prompt_suggestions "
+            "WHERE target_date = $1 AND source = 'content' AND sent_at IS NULL "
+            "ORDER BY confidence DESC NULLS LAST, created_at LIMIT 1",
+            today,
+        )
+        if content:
+            await conn.execute("UPDATE prompt_suggestions SET sent_at = NOW() WHERE id = $1", content["id"])
+            return content["prompt_text"]
+
+        # No pending content prompt: try today's labeled places.
+        loc = await prompt_service.location_prompt(await _visited_labels(today, tz))
+        chosen = loc or prompt_service.pick_fallback()
+        await conn.execute(
+            "INSERT INTO prompt_suggestions (target_date, prompt_text, confidence, source, sent_at) "
+            "VALUES ($1, $2, $3, $4, NOW())",
+            today, chosen, 0.7 if loc else 0.0, "location" if loc else "fallback",
+        )
+        return chosen
+
+
 async def send_journal_reminder(force: bool = False) -> str:
     """Text tonight's journal magic link, at most once per evening.
 
@@ -505,7 +585,14 @@ async def send_journal_reminder(force: bool = False) -> str:
     url = f"{SITE_BASE_URL}/journal/{sign_journal_token(today.isoformat())}"
     label = today.strftime("%b ") + str(today.day)
     prefix = "[test] " if force else ""
-    await imessage_service.send_alert(f"{prefix}{label} journal 🎙️ tap to record:\n{url}")
+    text = f"{prefix}{label} journal 🎙️ tap to record:\n{url}"
+    try:
+        prompt = await _todays_prompt(today, tz)
+        if prompt:
+            text += f"\n\n💭 Maybe talk about: {prompt}"
+    except Exception:
+        log.exception("prompt suggestion failed; sending plain reminder")
+    await imessage_service.send_alert(text)
     if not force:
         _last_journal_reminder = today
     result = f"sent journal reminder for {today.isoformat()}"

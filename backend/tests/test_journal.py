@@ -7,7 +7,7 @@ from datetime import date, timedelta
 import pytest
 
 from app.routers import journal
-from app import weave_service
+from app import prompt_service, weave_service
 
 
 @pytest.fixture(autouse=True)
@@ -120,3 +120,64 @@ def test_weave_prompt_includes_name_glossary():
     assert "Lake Tulloch" in weave_service.WEAVE_PROMPT
     # canonical -> mis-hearing mapping is surfaced to the model
     assert "Jackson" in journal_vocab.weave_glossary()
+
+
+# ── Next-day prompt suggestions ───────────────────────────────────────────────
+
+D = date(2026, 7, 4)
+
+
+def test_extract_parses_and_gates_by_confidence():
+    js = ('{"prompts": ['
+          '{"prompt_text": "How did the filling appointment go?", "target_date": "2026-07-05", "confidence": 0.9},'
+          '{"prompt_text": "weak hypothetical", "confidence": 0.2}]}')
+    out = prompt_service._parse_prompts(js, D)
+    assert len(out) == 1                                  # low-confidence dropped
+    assert out[0]["prompt_text"].startswith("How did the filling")
+    assert out[0]["target_date"] == date(2026, 7, 5)
+
+
+def test_extract_defaults_target_to_next_day():
+    out = prompt_service._parse_prompts(
+        '{"prompts": [{"prompt_text": "Anything come of it?", "confidence": 0.8}]}', D
+    )
+    assert out[0]["target_date"] == D + timedelta(days=1)
+
+
+def test_extract_strips_em_dashes_from_prompt():
+    out = prompt_service._parse_prompts(
+        '{"prompts": [{"prompt_text": "The trip \\u2014 how was it?", "confidence": 0.8}]}', D
+    )
+    assert "—" not in out[0]["prompt_text"]
+
+
+def test_extract_empty_on_garbage():
+    assert prompt_service._parse_prompts("not json", D) == []
+
+
+def test_fallback_prompt_from_bank():
+    assert prompt_service.pick_fallback() in prompt_service.FALLBACK_PROMPTS
+
+
+# ── Location label matching (haversine) ───────────────────────────────────────
+
+_LABELS = [
+    {"name": "Home", "lat": 40.2434, "lon": -111.6535, "radius_m": 100},
+    {"name": "Gym", "lat": 37.7700, "lon": -121.9780, "radius_m": 150},
+]
+
+
+def test_point_inside_radius_matches_label():
+    # A point right at Home plus one ~2m away both count as Home.
+    visited = journal._match_visited([(40.2434, -111.6535), (40.24342, -111.6535)], _LABELS)
+    assert visited == ["Home"]
+
+
+def test_point_outside_all_radii_matches_nothing():
+    assert journal._match_visited([(34.0, -118.0)], _LABELS) == []
+
+
+def test_visited_ordered_by_dwell():
+    # Two points at Gym, one at Home -> Gym ranked first (more dwell).
+    pts = [(37.7700, -121.9780), (37.7700, -121.9780), (40.2434, -111.6535)]
+    assert journal._match_visited(pts, _LABELS) == ["Gym", "Home"]
