@@ -45,6 +45,10 @@ services:
     volumes:
       - whisper_models:/models
     restart: unless-stopped
+    # Whisper large-v3 on CPU can starve the whole machine without these caps
+    # (took down every tunnel + Postgres connections on 2026-07-06).
+    cpus: 4
+    mem_limit: 6g
     networks:
       - portfolio
       - docker-services
