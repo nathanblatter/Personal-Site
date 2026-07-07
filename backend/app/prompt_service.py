@@ -35,7 +35,12 @@ Return ONLY valid JSON, no prose outside it:
 {"prompts": [{"prompt_text": "...", "target_date": "YYYY-MM-DD", "confidence": 0.0-1.0}]}
 Return an empty array if there are no clear forward-looking items."""
 
-_LOCATION_SYSTEM = """You're told which of the person's saved places they spent time at today. Write ONE short, casual journaling prompt inviting them to talk about their time at the most interesting of those places. Phrase it as a friendly invitation, not an interrogation, and make it specific to the place (a gym -> the workout; work -> the workday; a family home -> who they saw). Never use em dashes. Return only the prompt text, with no quotes and no preamble."""
+_LOCATION_SYSTEM = """You're told the date and which of the person's saved places they spent time at today. Write ONE short, casual journaling prompt inviting them to talk about their time at the most interesting of those places.
+
+Rules:
+- Phrase it as a friendly invitation, not an interrogation, and keep it specific to what the place IS (a gym -> the workout; work -> the workday; a family cabin/home -> who they saw and the time together).
+- Do NOT invent or assume specific activities you have no evidence for, especially season- or weather-dependent ones. It is a factual error to suggest skiing/the slopes in summer, or the lake/swimming in winter. Use the date to stay season-appropriate, and when unsure just ask openly what they got up to.
+- Never use em dashes. Return only the prompt text, with no quotes and no preamble."""
 
 FALLBACK_PROMPTS = [
     "What stood out about today?",
@@ -95,11 +100,12 @@ async def extract_forward_prompts(narrative: str, entry_date: date_type) -> list
     return _parse_prompts(text, entry_date)
 
 
-async def location_prompt(visited_labels: list[str]) -> Optional[str]:
-    """Craft one gentle prompt from the labeled places visited today, or None."""
+async def location_prompt(visited_labels: list[str], day: Optional[date_type] = None) -> Optional[str]:
+    """Craft one gentle, season-aware prompt from the labeled places visited, or None."""
     if not visited_labels:
         return None
-    user = "Places today: " + "; ".join(visited_labels)
+    when = (day or date_type.today())
+    user = f"Date: {when.strftime('%A, %B %-d, %Y')}\nPlaces today: " + "; ".join(visited_labels)
     try:
         text = await weave_service.call_llm(_LOCATION_SYSTEM, user, max_tokens=200, want_json=False)
     except Exception:

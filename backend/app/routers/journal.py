@@ -536,18 +536,21 @@ async def _todays_prompt(today: date_type, tz: ZoneInfo) -> Optional[str]:
     from app import prompt_service
 
     async with _pool().acquire() as conn:
+        # Follow up on forward-looking items from recent entries that are now due
+        # (target on/before today, within the last week, not yet sent).
         content = await conn.fetchrow(
             "SELECT id, prompt_text FROM prompt_suggestions "
-            "WHERE target_date = $1 AND source = 'content' AND sent_at IS NULL "
-            "ORDER BY confidence DESC NULLS LAST, created_at LIMIT 1",
+            "WHERE source = 'content' AND sent_at IS NULL "
+            "AND target_date <= $1 AND target_date >= $1 - 7 "
+            "ORDER BY target_date DESC, confidence DESC NULLS LAST, created_at LIMIT 1",
             today,
         )
         if content:
             await conn.execute("UPDATE prompt_suggestions SET sent_at = NOW() WHERE id = $1", content["id"])
             return content["prompt_text"]
 
-        # No pending content prompt: try today's labeled places.
-        loc = await prompt_service.location_prompt(await _visited_labels(today, tz))
+        # No pending follow-up: try today's labeled places (season-aware).
+        loc = await prompt_service.location_prompt(await _visited_labels(today, tz), today)
         chosen = loc or prompt_service.pick_fallback()
         await conn.execute(
             "INSERT INTO prompt_suggestions (target_date, prompt_text, confidence, source, sent_at) "
