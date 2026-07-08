@@ -691,8 +691,10 @@ def _recording_page(token: str, signed_date: date_type, pretty: str, nav: str = 
 <p id="msg" class="muted"></p>
 <script>
 const TOKEN = {json.dumps(token)};
+const DATE = {json.dumps(signed_date.isoformat())};
 const base = "/journal/" + encodeURIComponent(TOKEN);
 let mediaRecorder, chunks = [], startedAt = 0, recording = false;
+let unsentCount = 0;
 const recBtn = document.getElementById('rec');
 const submitBtn = document.getElementById('submit');
 const takesEl = document.getElementById('takes');
@@ -701,11 +703,69 @@ const msgEl = document.getElementById('msg');
 
 function fmt(s) {{ if (s == null) return ''; const m = Math.floor(s/60), r = s%60; return m + ':' + String(r).padStart(2,'0'); }}
 
-async function refresh() {{
-  const res = await fetch(base + '/takes');
-  const data = await res.json();
+// ---- Durable take queue ----------------------------------------------------
+// Every finished take is written to IndexedDB *before* we attempt to upload it,
+// and only removed once the server confirms receipt. A failed upload, a dropped
+// connection, a locked phone, or a page reload can therefore no longer destroy
+// a recording: it stays on disk and is retried on the next opportunity.
+const DB_NAME = 'journal-takes', STORE = 'pending';
+let _db;
+function db() {{
+  if (_db) return Promise.resolve(_db);
+  return new Promise((resolve, reject) => {{
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(STORE, {{ keyPath: 'id' }});
+    req.onsuccess = () => {{ _db = req.result; resolve(_db); }};
+    req.onerror = () => reject(req.error);
+  }});
+}}
+function tx(mode, fn) {{
+  return db().then(d => new Promise((resolve, reject) => {{
+    const req = fn(d.transaction(STORE, mode).objectStore(STORE));
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  }}));
+}}
+const idbPut = rec => tx('readwrite', s => s.put(rec));
+const idbDel = id => tx('readwrite', s => s.delete(id));
+async function pendingForDay() {{
+  const all = await tx('readonly', s => s.getAll());
+  return (all || []).filter(r => r.token === TOKEN).sort((a, b) => a.createdAt - b.createdAt);
+}}
+
+// Upload every queued take for this day. Success → drop from disk. A hard
+// server rejection (409, the day is already locked) → mark it so we stop
+// retrying but keep the audio for the user to download. Anything else
+// (offline, 5xx) → stop and leave it queued for the next retry.
+let flushing = false;
+async function flush() {{
+  if (flushing) return; flushing = true;
+  try {{
+    for (const rec of await pendingForDay()) {{
+      if (rec.blocked) continue;
+      const fd = new FormData();
+      fd.append('file', rec.blob, 'take' + rec.ext);
+      fd.append('duration_sec', rec.dur);
+      let r;
+      try {{ r = await fetch(base + '/takes', {{ method: 'POST', body: fd }}); }}
+      catch (e) {{ break; }}
+      if (r.ok) await idbDel(rec.id);
+      else if (r.status === 409) {{ rec.blocked = true; await idbPut(rec); }}
+      else break;
+    }}
+  }} finally {{ flushing = false; }}
+  await render();
+}}
+
+async function render() {{
+  let serverTakes = [];
+  try {{
+    const res = await fetch(base + '/takes');
+    if (res.ok) serverTakes = (await res.json()).takes || [];
+  }} catch (e) {{}}
+  const pend = await pendingForDay();
   takesEl.innerHTML = '';
-  (data.takes || []).forEach(t => {{
+  serverTakes.forEach(t => {{
     const row = document.createElement('div'); row.className = 'take';
     row.innerHTML = '<span class="n">' + t.sequence + '</span>' +
       '<audio controls preload="none" src="' + base + '/audio/' + t.id + '"></audio>' +
@@ -713,34 +773,46 @@ async function refresh() {{
       '<button class="del" data-id="' + t.id + '">Delete</button>';
     takesEl.appendChild(row);
   }});
-  const n = (data.takes || []).length;
+  pend.forEach(rec => {{
+    const row = document.createElement('div'); row.className = 'take';
+    const url = URL.createObjectURL(rec.blob);
+    const state = rec.blocked ? '⚠ day locked — download to keep' : '⏳ not uploaded yet';
+    row.innerHTML = '<span class="n">•</span>' +
+      '<audio controls preload="none" src="' + url + '"></audio>' +
+      '<span class="muted">' + fmt(rec.dur) + '</span>' +
+      '<a class="del" download="take-' + DATE + rec.ext + '" href="' + url + '">Download</a>' +
+      '<span class="muted">' + state + '</span>';
+    takesEl.appendChild(row);
+  }});
+  unsentCount = pend.filter(r => !r.blocked).length;
+  const n = serverTakes.length + pend.length;
   emptyEl.style.display = n ? 'none' : 'block';
-  submitBtn.disabled = n === 0;
-  takesEl.querySelectorAll('.del').forEach(b => b.onclick = () => del(b.dataset.id));
+  submitBtn.disabled = serverTakes.length === 0 || unsentCount > 0;
+  msgEl.textContent = unsentCount ? (unsentCount + ' take(s) still uploading…') : '';
+  takesEl.querySelectorAll('.del[data-id]').forEach(b => b.onclick = () => del(b.dataset.id));
 }}
 
 async function del(id) {{
-  await fetch(base + '/takes/' + id, {{ method: 'DELETE' }});
-  refresh();
+  try {{ await fetch(base + '/takes/' + id, {{ method: 'DELETE' }}); }} catch (e) {{}}
+  render();
 }}
 
 async function startRec() {{
   const stream = await navigator.mediaDevices.getUserMedia({{ audio: true }});
   mediaRecorder = new MediaRecorder(stream);
   chunks = []; startedAt = Date.now();
-  mediaRecorder.ondataavailable = e => chunks.push(e.data);
+  mediaRecorder.ondataavailable = e => {{ if (e.data && e.data.size) chunks.push(e.data); }};
   mediaRecorder.onstop = async () => {{
     stream.getTracks().forEach(t => t.stop());
     const blob = new Blob(chunks, {{ type: mediaRecorder.mimeType || 'audio/webm' }});
     const dur = Math.round((Date.now() - startedAt) / 1000);
     const ext = (blob.type.indexOf('mp4') >= 0) ? '.mp4' : '.webm';
-    const fd = new FormData();
-    fd.append('file', blob, 'take' + ext);
-    fd.append('duration_sec', dur);
-    msgEl.textContent = 'Saving…';
-    const r = await fetch(base + '/takes', {{ method: 'POST', body: fd }});
-    msgEl.textContent = r.ok ? '' : 'Save failed';
-    refresh();
+    const rec = {{ id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+                   token: TOKEN, blob: blob, dur: dur, ext: ext, createdAt: Date.now() }};
+    try {{ await idbPut(rec); }}
+    catch (e) {{ msgEl.textContent = 'Could not save recording — do not close this page.'; return; }}
+    await render();
+    flush();
   }};
   mediaRecorder.start();
   recording = true; recBtn.textContent = '■ Stop'; recBtn.classList.add('recording');
@@ -756,14 +828,24 @@ recBtn.onclick = async () => {{
 }};
 
 submitBtn.onclick = async () => {{
+  if (unsentCount > 0) {{ msgEl.textContent = 'Wait for all takes to finish uploading first.'; return; }}
   if (!confirm('Submit and lock this day? You won\\'t be able to edit takes after this.')) return;
   submitBtn.disabled = true; msgEl.textContent = 'Submitting…';
-  const r = await fetch(base + '/submit', {{ method: 'POST' }});
+  let r;
+  try {{ r = await fetch(base + '/submit', {{ method: 'POST' }}); }}
+  catch (e) {{ msgEl.textContent = 'Submit failed — check your connection.'; submitBtn.disabled = false; return; }}
   if (r.ok) {{ location.reload(); }}
   else {{ msgEl.textContent = 'Submit failed'; submitBtn.disabled = false; }}
 }};
 
-refresh();
+// Warn before leaving if any take hasn't reached the server yet (it's safe in
+// IndexedDB and will retry on next open, but the warning avoids confusion).
+window.addEventListener('beforeunload', e => {{
+  if (unsentCount > 0) {{ e.preventDefault(); e.returnValue = ''; }}
+}});
+window.addEventListener('online', flush);
+setInterval(flush, 15000);   // steady background retry for anything stuck
+flush();
 </script>
 </body></html>"""
 
