@@ -69,7 +69,7 @@ export default function Home() {
           >
             <div className="h-px w-8 md:w-12 bg-blue" />
             <span className="font-mono text-[10px] md:text-xs text-blue tracking-[0.3em] uppercase">
-              Information Systems
+              Forward Deployed Engineer | Full-Stack Developer | AI Enthusiast
             </span>
             <div className="h-px w-8 md:w-12 bg-blue" />
           </div>
