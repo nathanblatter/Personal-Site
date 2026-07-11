@@ -99,19 +99,15 @@ python3 -c "import json;json.load(open('$API/home.json'))" || die "/api/v1/home 
 grep -q "__FAILOVER__" "$STAGE/index.html" || die "failover flag not injected"
 log "snapshot OK: $(find "$API" -type f | wc -l | tr -d ' ') API files, $(du -sh "$STAGE" | cut -f1) total"
 
-# ---- ship atomically to the iMac ------------------------------------------
-log "shipping to $IMAC:$REMOTE_BASE"
-ssh "${SSH_OPTS[@]}" "$IMAC" "mkdir -p '$REMOTE_BASE'" \
+# ---- ship to the iMac -----------------------------------------------------
+# rsync IN PLACE into www (not a dir-swap): Caddy bind-mounts www by inode, so
+# renaming the directory out from under it would leave it serving a deleted
+# inode. In-place updates keep the mount valid. The snapshot was already
+# validated above, so www never receives a broken build.
+log "shipping to $IMAC:$REMOTE_BASE/www"
+ssh "${SSH_OPTS[@]}" "$IMAC" "mkdir -p '$REMOTE_BASE/www'" \
   || die "cannot reach iMac over SSH"
-rsync -az --delete -e "ssh ${SSH_OPTS[*]}" "$STAGE/" "$IMAC:$REMOTE_BASE/www.tmp/" \
+rsync -az --delete -e "ssh ${SSH_OPTS[*]}" "$STAGE/" "$IMAC:$REMOTE_BASE/www/" \
   || die "rsync failed"
-ssh "${SSH_OPTS[@]}" "$IMAC" "
-  set -e
-  cd '$REMOTE_BASE'
-  rm -rf www.old
-  [ -d www ] && mv www www.old || true
-  mv www.tmp www
-  rm -rf www.old
-" || die "atomic swap on iMac failed"
 
 log "done — mirror published to $IMAC:$REMOTE_BASE/www"
