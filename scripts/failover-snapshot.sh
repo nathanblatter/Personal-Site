@@ -107,7 +107,10 @@ log "snapshot OK: $(find "$API" -type f | wc -l | tr -d ' ') API files, $(du -sh
 log "shipping to $IMAC:$REMOTE_BASE/www"
 ssh "${SSH_OPTS[@]}" "$IMAC" "mkdir -p '$REMOTE_BASE/www'" \
   || die "cannot reach iMac over SSH"
-rsync -az --delete -e "ssh ${SSH_OPTS[*]}" "$STAGE/" "$IMAC:$REMOTE_BASE/www/" \
+# Exclude the MinIO-mirrored assets: they're maintained by sync-minio.sh, not
+# this snapshot, so --delete must not prune them.
+rsync -az --delete --exclude='/api/v1/storage/' -e "ssh ${SSH_OPTS[*]}" \
+  "$STAGE/" "$IMAC:$REMOTE_BASE/www/" \
   || die "rsync failed"
 
 log "done — mirror published to $IMAC:$REMOTE_BASE/www"

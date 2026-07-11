@@ -4,6 +4,13 @@
 	root * /srv/www
 	encode gzip zstd
 
+	# Mirrored object-storage assets (images, PDFs, video) — served as real
+	# files so Caddy sets the right content-type by extension. Must precede the
+	# JSON handler below (which would otherwise force application/json).
+	handle /api/v1/storage/download/* {
+		file_server
+	}
+
 	# Mirrored public API snapshots. Stored as <path>.json; map the
 	# extension-less request path to the file. A path that wasn't mirrored
 	# simply 404s; the SPA's fetch-error handling degrades to skeletons.
