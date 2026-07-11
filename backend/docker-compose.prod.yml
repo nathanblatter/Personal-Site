@@ -63,6 +63,23 @@ services:
     networks:
       - portfolio
 
+  # Tiny reverse-proxy exposing the api's health check on the mini's Tailscale
+  # IP so the iMac failover watcher can probe THIS origin directly (not via the
+  # public CNAME, which points at the iMac during failover). Proxies by service
+  # name, so it survives the api's zero-downtime rescale. Not scaled → no port
+  # clash with the api replicas.
+  health-probe:
+    image: caddy:2-alpine
+    container_name: portfolio-health-probe
+    command: caddy reverse-proxy --from :8891 --to api:8000
+    restart: unless-stopped
+    ports:
+      - "100.79.61.79:8891:8891"
+    depends_on:
+      - api
+    networks:
+      - portfolio
+
 volumes:
   whisper_models:
 

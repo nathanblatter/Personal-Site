@@ -6,6 +6,7 @@ import { useTheme } from '../lib/useTheme'
 import CookieBanner from './CookieBanner'
 import BugReport from './BugReport'
 import SearchPalette from './SearchPalette'
+import FailoverBanner from './FailoverBanner'
 
 const navLinks = [
   { to: '/', label: 'Home', code: '00' },
@@ -242,6 +243,7 @@ export default function Layout() {
       <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
       <CookieBanner />
       <BugReport />
+      <FailoverBanner />
     </div>
   )
 }

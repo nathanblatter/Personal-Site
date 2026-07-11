@@ -1,0 +1,43 @@
+# iMac NAS failover serving stack.
+# Deployed to /home/nathan/site-failover on the iMac (imac-nas, 100.126.147.122).
+# `www/` is managed by the daily snapshot (scripts/failover-snapshot.sh) and is
+# NOT tracked here. `.env` (Cloudflare secrets) and `cloudflared/*.json` (tunnel
+# credentials) are iMac-only and gitignored.
+services:
+  # Serves the static mirror (SPA + snapshotted public API JSON).
+  caddy:
+    image: caddy:2-alpine
+    container_name: site-failover-caddy
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./www:/srv/www:ro
+
+  # Standby tunnel. Connected to Cloudflare at all times, but receives traffic
+  # only while the apex CNAME points at it (i.e. during failover).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: site-failover-tunnel
+    restart: unless-stopped
+    # run as root so it can read the 600-perm tunnel credentials (keeps the
+    # secret non-world-readable rather than chmod 644).
+    user: root
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    depends_on:
+      - caddy
+
+  # Health watcher: probes the mini over Tailscale and flips the apex CNAME.
+  # host networking so it can reach the mini's Tailscale IP (100.79.61.79).
+  watcher:
+    image: alpine:3.20
+    container_name: site-failover-watcher
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env
+    volumes:
+      - ./watcher.sh:/watcher.sh:ro
+    command: sh -c "apk add --no-cache curl jq >/dev/null && exec sh /watcher.sh"

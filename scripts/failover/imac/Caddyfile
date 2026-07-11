@@ -1,0 +1,21 @@
+# Static failover mirror of nathanblatter.com, served on the iMac NAS.
+# Populated daily by scripts/failover-snapshot.sh (rsync → ./www).
+:8088 {
+	root * /srv/www
+	encode gzip zstd
+
+	# Mirrored public API snapshots. Stored as <path>.json; map the
+	# extension-less request path to the file. A path that wasn't mirrored
+	# simply 404s; the SPA's fetch-error handling degrades to skeletons.
+	handle /api/* {
+		try_files {path} {path}.json
+		header Content-Type application/json
+		file_server
+	}
+
+	# SPA: serve the requested asset, else fall back to index.html (history routing).
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

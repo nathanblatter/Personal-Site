@@ -1,0 +1,32 @@
+name: Failover snapshot
+
+# Daily static mirror of the site → iMac NAS failover host.
+# Runs on the self-hosted runner (which has the filesystem access that macOS TCC
+# denies cron/launchd) and operates entirely inside the runner workspace, so it
+# never touches the TCC-protected ~/Desktop. If the Mac mini is down the run just
+# doesn't fire — that's fine, the iMac keeps serving the last good snapshot.
+on:
+  schedule:
+    - cron: '30 11 * * *'   # 11:30 UTC ≈ 04:30 America/Denver (MST) / 05:30 (MDT)
+  workflow_dispatch:
+
+jobs:
+  snapshot:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        run: cd frontend && npm ci && npm run build
+
+      - name: Snapshot + ship to iMac
+        env:
+          REPO: ${{ github.workspace }}   # build lives in the workspace, not ~/Desktop
+        run: bash scripts/failover-snapshot.sh

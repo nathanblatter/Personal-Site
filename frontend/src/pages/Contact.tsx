@@ -4,6 +4,7 @@ import { Send, MapPin, ArrowUpRight, Calendar, Clock, ChevronLeft, ChevronRight,
 import SectionHeader from '../components/SectionHeader'
 import { api, type SocialResponse, type ContactMetaResponse, type ContactSubmitRequest, type AvailableSlot, type BookingSettingsResponse } from '../lib/api'
 import { getIcon } from '../lib/iconMap'
+import { useFailover } from '../lib/useFailover'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -47,6 +48,7 @@ function BookACall() {
   const [bookingError, setBookingError] = useState<string | null>(null)
   const [dateOffset, setDateOffset] = useState(0)
   const [settingsLoading, setSettingsLoading] = useState(true)
+  const failover = useFailover()
 
   useEffect(() => {
     api.bookings.settingsPublic()
@@ -85,7 +87,7 @@ function BookACall() {
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedSlot) return
+    if (!selectedSlot || failover) return
     setBookingLoading(true)
     setBookingError(null)
     try {
@@ -361,11 +363,11 @@ function BookACall() {
 
                   <button
                     type="submit"
-                    disabled={bookingLoading}
+                    disabled={bookingLoading || failover}
                     className="group w-full flex items-center justify-center gap-3 px-6 py-3.5 bg-blue text-white font-mono text-sm font-semibold rounded-xl hover:bg-blue-dim transition-colors shadow-lg shadow-blue/20 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {bookingLoading ? 'Requesting...' : 'Request Call'}
-                    {!bookingLoading && <Calendar size={14} className="group-hover:scale-110 transition-transform" />}
+                    {failover ? 'Booking paused — running from backup' : bookingLoading ? 'Requesting...' : 'Request Call'}
+                    {!bookingLoading && !failover && <Calendar size={14} className="group-hover:scale-110 transition-transform" />}
                   </button>
                 </div>
               </motion.form>
@@ -384,6 +386,7 @@ export default function Contact() {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const failover = useFailover()
 
   useEffect(() => {
     api.contactPage.get()
@@ -393,6 +396,7 @@ export default function Contact() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (failover) return
     setLoading(true)
     setError(null)
     try {
@@ -533,13 +537,18 @@ export default function Contact() {
                 {error && (
                   <p className="font-mono text-xs text-red-500">{error}</p>
                 )}
+                {failover && (
+                  <p className="font-mono text-xs text-steel">
+                    Messaging is paused while the site runs from backup. Reach me via the links on the left, or try again shortly.
+                  </p>
+                )}
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || failover}
                   className="group w-full flex items-center justify-center gap-3 px-6 py-3.5 bg-blue text-white font-mono text-sm font-semibold rounded-xl hover:bg-blue-dim transition-colors shadow-lg shadow-blue/20 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {loading ? 'Sending...' : 'Send Message'}
-                  {!loading && <Send size={14} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />}
+                  {failover ? 'Messaging paused' : loading ? 'Sending...' : 'Send Message'}
+                  {!loading && !failover && <Send size={14} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />}
                 </button>
               </form>
             )}

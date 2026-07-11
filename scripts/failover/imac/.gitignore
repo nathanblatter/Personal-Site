@@ -1,0 +1,4 @@
+# iMac-only secrets and generated content — never commit
+.env
+cloudflared/*.json
+www/

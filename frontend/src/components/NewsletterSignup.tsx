@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Mail, Check, Loader2 } from 'lucide-react'
 import { api } from '../lib/api'
+import { useFailover } from '../lib/useFailover'
 
 type Status = 'idle' | 'loading' | 'done' | 'error'
 
@@ -9,10 +10,11 @@ export default function NewsletterSignup() {
   const [honeypot, setHoneypot] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
+  const failover = useFailover()
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (status === 'loading') return
+    if (status === 'loading' || failover) return
     setStatus('loading')
     setError('')
     try {
@@ -58,20 +60,26 @@ export default function NewsletterSignup() {
           <input
             type="email"
             required
+            disabled={failover}
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="flex-1 px-4 py-2.5 text-sm font-mono bg-white border border-mist rounded-lg text-ink placeholder:text-silver focus:outline-none focus:border-blue/40 focus:ring-1 focus:ring-blue/20 transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-mono bg-white border border-mist rounded-lg text-ink placeholder:text-silver focus:outline-none focus:border-blue/40 focus:ring-1 focus:ring-blue/20 transition-colors disabled:opacity-60"
           />
           <button
             type="submit"
-            disabled={status === 'loading'}
+            disabled={status === 'loading' || failover}
             className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-blue text-white font-mono text-xs tracking-wider hover:bg-blue-dim transition-colors disabled:opacity-60"
           >
             {status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : null}
             Subscribe
           </button>
         </form>
+      )}
+      {failover && (
+        <p className="text-steel font-mono text-xs mt-3">
+          Newsletter signup is paused while the site runs from backup — check back shortly.
+        </p>
       )}
       {status === 'error' && (
         <p className="text-ember font-mono text-xs mt-3">{error}</p>

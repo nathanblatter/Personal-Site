@@ -1,0 +1,9 @@
+# iMac failover tunnel (imac-failover). Routes the site's hostname to the local
+# static mirror served by Caddy. The credentials JSON referenced here lives only
+# on the iMac (gitignored) — created via `cloudflared tunnel create imac-failover`.
+tunnel: ec71f17e-83e8-4456-81f4-afdf4c018093
+credentials-file: /etc/cloudflared/ec71f17e-83e8-4456-81f4-afdf4c018093.json
+ingress:
+  - hostname: nathanblatter.com
+    service: http://caddy:8088
+  - service: http_status:404
