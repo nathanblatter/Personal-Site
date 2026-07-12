@@ -35,10 +35,8 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: portfolio
-      # X-API-KEY for the health-ingest / kpi endpoints (and the /test-log sink).
+      # X-API-KEY for the health-ingest / shortcut-ingest / kpi endpoints.
       HEALTH_INGEST_API_KEY: ${HEALTH_INGEST_API_KEY:-dev-test-key}
-      # Throwaway test sink writes here; the bind-mount below lands it on ~/Desktop.
-      KPI_TEST_LOG_PATH: /desktop/kpi-test-requests.txt
     depends_on:
       db:
         condition: service_healthy
@@ -46,7 +44,6 @@ services:
         condition: service_started
     volumes:
       - ../frontend/dist:/dist:ro
-      - ${HOME}/Desktop:/desktop
 
   journal-worker:
     build:

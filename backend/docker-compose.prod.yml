@@ -17,12 +17,9 @@ services:
       MINIO_BUCKET: portfolio
       TZ: America/Denver
       CLAUDE_DATA_DIRS: /claude_data_mini,/claude_data_laptop
-      # Throwaway test sink; bind-mount below lands the file on the host Desktop.
-      KPI_TEST_LOG_PATH: /desktop/kpi-test-requests.txt
     volumes:
       - /Users/nathanblatter/.claude/projects:/claude_data_mini:ro
       - /Users/nathanblatter/.claude-laptop/projects:/claude_data_laptop:ro
-      - /Users/nathanblatter/Desktop:/desktop
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/status/healthz')"]
