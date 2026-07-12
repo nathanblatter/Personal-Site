@@ -464,6 +464,34 @@ async def temple_visit(_: None = Depends(_verify_health_ingest_key)):
     return {"status": "ok", "date": today.isoformat(), "temple": count}
 
 
+@health_ingest_router.post("/prayer")
+async def prayer_logged(_: None = Depends(_verify_health_ingest_key)):
+    """Log a prayer with one button. Picks prayer_am vs prayer_pm from the wall
+    clock in Salt Lake (Mountain) time: before noon -> am, noon or later -> pm.
+    Date + hour come from the same LOCAL_TZ instant so a late-night tap lands on
+    the right day and slot."""
+    now = datetime.now(LOCAL_TZ)
+    today = now.date()
+    column = "prayer_am" if now.hour < 12 else "prayer_pm"
+    # column is one of two hardcoded literals, never user input -> safe to inline.
+    async with _KPI_POOL.acquire() as conn:
+        await conn.execute(
+            f"""
+            INSERT INTO kpi_daily_log (date, {column})
+            VALUES ($1, TRUE)
+            ON CONFLICT (date) DO UPDATE
+              SET {column} = TRUE
+            """,
+            today,
+        )
+    return {
+        "status": "ok",
+        "date": today.isoformat(),
+        "slot": "am" if column == "prayer_am" else "pm",
+        "logged_at": now.strftime("%H:%M %Z"),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Church check-in — magic link (no API key; auth is the signed token itself)
 # ---------------------------------------------------------------------------
