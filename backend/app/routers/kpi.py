@@ -268,6 +268,12 @@ _KPI_COLUMNS = (
 )
 # alnum-only lowercase -> real column, so "activecal"/"active_cal"/"ActiveCal" match.
 _KPI_NORM_TO_COL = {re.sub(r"[^a-z0-9]", "", c.lower()): c for c in _KPI_COLUMNS}
+# Aliases for keys whose words are ordered differently than the column name, so
+# alnum-matching alone can't reach them (e.g. Shortcut sends "morninghrv" but the
+# column is hrv_morning). Keys here are already alnum-normalized.
+_KPI_NORM_TO_COL.update({
+    "morninghrv": "hrv_morning",
+})
 
 _KPI_NUM_RE = re.compile(r"-?\d+(?:\.\d+)?")
 
