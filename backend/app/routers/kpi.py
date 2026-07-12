@@ -11,6 +11,7 @@ import time
 import httpx
 import asyncpg
 from datetime import date as date_type, datetime, time as time_type, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 from urllib.parse import urlparse, urlunparse
 from zoneinfo import ZoneInfo
@@ -320,7 +321,11 @@ def _kpi_coerce(col: str, raw):
         return n
     if col in _KPI_FLOAT_FIELDS:
         n = _kpi_first_number(raw)
-        return round(n, 2) if n is not None else None
+        if n is None:
+            return None
+        # Quantize as Decimal so the NUMERIC column stores exactly 98.17, not the
+        # binary-float tail a Python float would carry in (98.170000000000017).
+        return Decimal(str(n)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     if col in _KPI_BOOL_FIELDS:
         return _kpi_coerce_bool(raw)
     if col in _KPI_TIME_FIELDS:
