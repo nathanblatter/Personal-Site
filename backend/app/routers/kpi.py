@@ -14,7 +14,7 @@ from typing import Optional
 from urllib.parse import urlparse, urlunparse
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Form
+from fastapi import APIRouter, Depends, HTTPException, Header, Form, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -199,6 +199,67 @@ health_ingest_router = APIRouter(tags=["kpi"])
 def _verify_health_ingest_key(x_api_key: Optional[str] = Header(None)) -> None:
     if x_api_key != os.getenv("HEALTH_INGEST_API_KEY"):
         raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+# ---------------------------------------------------------------------------
+# Test sink — accepts ANY request, dumps it to a text file. Throwaway debug tool.
+# ---------------------------------------------------------------------------
+#
+# Guarded by the same X-API-KEY as the health ingest endpoints. Accepts any
+# method/body (JSON, form, raw bytes) and appends a human-readable record to
+# KPI_TEST_LOG_PATH. Default path is /desktop/... which the dev compose bind-mounts
+# to ~/Desktop, so the file shows up on the host Desktop. Delete when done testing.
+
+_TEST_LOG_PATH = os.getenv("KPI_TEST_LOG_PATH", "/desktop/kpi-test-requests.txt")
+
+
+async def _log_test_request(request: Request) -> dict:
+    body_bytes = await request.body()
+    try:
+        body_text = body_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        body_text = repr(body_bytes)
+
+    now = datetime.now(timezone.utc).isoformat()
+    headers = {k: v for k, v in request.headers.items()}
+    # Don't echo the secret straight into a plaintext file.
+    if "x-api-key" in headers:
+        headers["x-api-key"] = "***"
+
+    lines = [
+        "=" * 72,
+        f"time    : {now}",
+        f"method  : {request.method}",
+        f"path    : {request.url.path}",
+        f"query   : {request.url.query or '(none)'}",
+        f"client  : {request.client.host if request.client else '(unknown)'}",
+        "headers :",
+        *[f"    {k}: {v}" for k, v in headers.items()],
+        "body    :",
+        f"    {body_text if body_text else '(empty)'}",
+        "",
+    ]
+    record = "\n".join(lines)
+
+    try:
+        os.makedirs(os.path.dirname(_TEST_LOG_PATH) or ".", exist_ok=True)
+        with open(_TEST_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(record)
+    except OSError as e:
+        log.error("Could not write test log to %s: %s", _TEST_LOG_PATH, e)
+        raise HTTPException(status_code=500, detail=f"log write failed: {e}")
+
+    return {"status": "ok", "logged_at": now, "bytes_received": len(body_bytes)}
+
+
+@health_ingest_router.api_route(
+    "/test-log",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    include_in_schema=False,
+)
+async def test_log(request: Request, _: None = Depends(_verify_health_ingest_key)):
+    """Throwaway sink: log any request (any method/body) to KPI_TEST_LOG_PATH."""
+    return await _log_test_request(request)
 
 
 @health_ingest_router.post("/health-ingest")
