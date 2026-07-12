@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Native MLX Whisper transcription service for the journal worker.
+  Runs on the Mac mini HOST (not Docker) so it can use the M4 GPU. The Dockerized
+  journal-worker POSTs audio to http://host.docker.internal:4310/transcribe.
+
+  Install:  backend/deploy/install-journal-mlx.sh
+  Logs:     /tmp/journal-mlx.log
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nathanblatter.journal-mlx</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/nathanblatter/journal-mlx/venv/bin/python</string>
+        <string>-m</string>
+        <string>app.journal_mlx_server</string>
+    </array>
+
+    <!-- cwd is put on sys.path[0] by `python -m`, so `app.journal_mlx_server` resolves. -->
+    <key>WorkingDirectory</key>
+    <string>/Users/nathanblatter/Desktop/Personal-Site/backend</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- /opt/homebrew/bin is required: mlx_whisper shells out to `ffmpeg` to decode audio. -->
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/nathanblatter/Desktop/Personal-Site/backend</string>
+        <key>MLX_HOST</key>
+        <string>0.0.0.0</string>
+        <key>MLX_PORT</key>
+        <string>4310</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/journal-mlx.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/journal-mlx.log</string>
+</dict>
+</plist>

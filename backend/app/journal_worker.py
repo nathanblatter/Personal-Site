@@ -22,6 +22,7 @@ import tempfile
 import uuid
 
 import asyncpg
+import httpx
 import redis.asyncio as aioredis
 
 from app import journal_vocab, prompt_service, weave_service
@@ -34,15 +35,36 @@ log = logging.getLogger("journal_worker")
 GROUP = "journal-workers"
 CONSUMER = os.getenv("WORKER_NAME", "worker-1")
 
-# large-v3 is markedly better on proper nouns than small.en; the box is idle so
-# the extra CPU time per (once-daily) entry is fine. Override via env if needed.
+# Preferred path: delegate transcription to the native MLX Whisper service on the
+# mini HOST (app.journal_mlx_server), which uses the M4 GPU (~12-16x realtime, and
+# at least as accurate as CPU large-v3). Docker can't reach the Mac GPU, so this
+# container itself is CPU-only; host.docker.internal lets it call the host service.
+# Empty/unset MLX_TRANSCRIBE_URL disables delegation and uses local CPU whisper.
+MLX_TRANSCRIBE_URL = os.getenv("MLX_TRANSCRIBE_URL", "http://host.docker.internal:4310/transcribe")
+
+# Fallback path: local faster-whisper on CPU. Used only when the MLX host service is
+# unreachable (e.g. it's down), so a nightly entry is never stuck. large-v3 is
+# markedly better on proper nouns than small.en; the box is idle so the extra CPU
+# time per (once-daily) entry is fine. Override via env if needed.
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "large-v3")
 WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 WHISPER_COMPUTE = os.getenv("WHISPER_COMPUTE", "int8")
-# Recurring proper nouns fed as `hotwords` (a stronger bias than initial_prompt).
+# Recurring proper nouns fed as `hotwords` (a stronger bias than initial_prompt) on
+# the CPU path, and as `initial_prompt` to the MLX service (which has no hotwords).
 WHISPER_PROMPT = os.getenv("WHISPER_PROMPT") or journal_vocab.whisper_prompt()
 
 _model = None
+
+
+def _transcribe_mlx(audio_bytes: bytes, suffix: str) -> str:
+    """Transcribe via the native MLX GPU service on the host. Raises on any failure
+    so the caller can fall back to local CPU whisper."""
+    files = {"file": (f"audio{suffix}", audio_bytes)}
+    data = {"prompt": WHISPER_PROMPT}
+    # A cold model load + long entry can take a while on first call; generous timeout.
+    resp = httpx.post(MLX_TRANSCRIBE_URL, files=files, data=data, timeout=600.0)
+    resp.raise_for_status()
+    return (resp.json().get("text") or "").strip()
 
 
 def _get_model():
@@ -55,7 +77,7 @@ def _get_model():
     return _model
 
 
-def _transcribe(audio_bytes: bytes, suffix: str) -> str:
+def _transcribe_cpu(audio_bytes: bytes, suffix: str) -> str:
     model = _get_model()
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as f:
         f.write(audio_bytes)
@@ -63,6 +85,18 @@ def _transcribe(audio_bytes: bytes, suffix: str) -> str:
         # hotwords only take effect when initial_prompt is None (faster-whisper).
         segments, _info = model.transcribe(f.name, hotwords=WHISPER_PROMPT)
         return " ".join(seg.text.strip() for seg in segments).strip()
+
+
+def _transcribe(audio_bytes: bytes, suffix: str) -> str:
+    """Prefer the native MLX GPU service on the host; fall back to local CPU whisper
+    if it's unreachable, so a nightly entry is never blocked by the host service
+    being down. Both paths use the same vocab bias."""
+    if MLX_TRANSCRIBE_URL:
+        try:
+            return _transcribe_mlx(audio_bytes, suffix)
+        except Exception as exc:
+            log.warning("MLX transcribe failed (%s); falling back to local CPU whisper", exc)
+    return _transcribe_cpu(audio_bytes, suffix)
 
 
 async def _process_entry(pool: asyncpg.Pool, entry_id_str: str) -> None:

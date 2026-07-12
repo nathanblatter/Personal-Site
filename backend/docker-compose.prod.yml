@@ -42,6 +42,11 @@ services:
       WEAVE_PROVIDER: claude
       TZ: America/Denver
       HF_HOME: /models
+      # Delegate transcription to the native MLX Whisper service on the mini host
+      # (M4 GPU, ~12-16x realtime). Docker can't reach the Mac GPU, so this is how the
+      # worker gets it. Falls back to local CPU whisper if the host service is down.
+      # Host setup: backend/deploy/install-journal-mlx.sh
+      MLX_TRANSCRIBE_URL: http://host.docker.internal:4310/transcribe
     volumes:
       - whisper_models:/models
     restart: unless-stopped
