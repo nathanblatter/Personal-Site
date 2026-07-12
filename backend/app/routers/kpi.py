@@ -6,6 +6,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import time
 import httpx
 import asyncpg
@@ -290,6 +291,151 @@ async def health_ingest(
         "status": "ok",
         "date": target_date.isoformat(),
         "fields_updated": list(fields_to_update.keys()),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Apple Shortcut daily ingest — forgiving, stringly-typed, Mountain-time dated
+# ---------------------------------------------------------------------------
+#
+# The end-of-day (11:50pm MT) Shortcut POSTs a flat JSON object of the day's KPI
+# values. Everything arrives as strings ("124"), keys may drop underscores
+# ("activecal"), and HealthKit quantities can carry extra sample lines
+# ("24.95\n0"). This endpoint normalizes keys, coerces each value to its column
+# type, and upserts into today's row (Mountain time) — inserting a null-filled
+# row first, then dropping in only the fields that were sent. Same X-API-KEY as
+# the other ingest endpoints.
+
+_KPI_INT_FIELDS = frozenset({
+    "steps", "active_cal", "workout_duration_min", "meaningful_convos",
+    "new_people", "ideas_count", "lc_solved", "github_commits", "github_prs",
+    "instagram_pickups", "energy_am", "life_sat",
+})
+_KPI_FLOAT_FIELDS = frozenset({
+    "resting_hr", "hrv_morning", "sleep_hrs", "deep_work_hrs", "weight_lbs", "bmi",
+})
+_KPI_BOOL_FIELDS = frozenset({
+    "prayer_am", "prayer_pm", "scripture", "church", "temple",
+})
+_KPI_TIME_FIELDS = frozenset({"sleep_bedtime"})
+_KPI_TEXT_FIELDS = frozenset({"workout_type", "notes"})
+# SMALLINT columns with a CHECK (val BETWEEN 1 AND 10); clamp so a stray value
+# can't 500 the whole request.
+_KPI_CLAMP_1_10 = frozenset({"energy_am", "life_sat"})
+
+_KPI_COLUMNS = (
+    _KPI_INT_FIELDS | _KPI_FLOAT_FIELDS | _KPI_BOOL_FIELDS
+    | _KPI_TIME_FIELDS | _KPI_TEXT_FIELDS
+)
+# alnum-only lowercase -> real column, so "activecal"/"active_cal"/"ActiveCal" match.
+_KPI_NORM_TO_COL = {re.sub(r"[^a-z0-9]", "", c.lower()): c for c in _KPI_COLUMNS}
+
+_KPI_NUM_RE = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def _kpi_first_number(raw) -> Optional[float]:
+    """First numeric token in the value. HealthKit can append extra sample
+    lines (e.g. "24.95\\n0"); we take 24.95 and disregard the rest."""
+    m = _KPI_NUM_RE.search(str(raw))
+    return float(m.group()) if m else None
+
+
+def _kpi_coerce_bool(raw) -> Optional[bool]:
+    s = str(raw).strip().lower()
+    if s in {"true", "1", "yes", "y", "on"}:
+        return True
+    if s in {"false", "0", "no", "n", "off"}:
+        return False
+    return None
+
+
+def _kpi_coerce_time(raw) -> Optional[time_type]:
+    s = str(raw).strip()
+    try:
+        return time_type.fromisoformat(s)  # "23:15" or "23:15:00"
+    except ValueError:
+        m = re.search(r"(\d{1,2}):(\d{2})", s)
+        if m:
+            return time_type(int(m.group(1)) % 24, int(m.group(2)))
+    return None
+
+
+def _kpi_coerce(col: str, raw):
+    """Coerce a raw (usually string) Shortcut value to the column's type.
+    Empty / unparseable -> None, which means 'leave it null / untouched'."""
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return None
+    if col in _KPI_INT_FIELDS:
+        n = _kpi_first_number(raw)
+        if n is None:
+            return None
+        n = int(round(n))
+        if col in _KPI_CLAMP_1_10:
+            n = max(1, min(10, n))
+        return n
+    if col in _KPI_FLOAT_FIELDS:
+        n = _kpi_first_number(raw)
+        return round(n, 2) if n is not None else None
+    if col in _KPI_BOOL_FIELDS:
+        return _kpi_coerce_bool(raw)
+    if col in _KPI_TIME_FIELDS:
+        return _kpi_coerce_time(raw)
+    return str(raw).strip()  # text
+
+
+@health_ingest_router.post("/shortcut-ingest")
+async def shortcut_ingest(request: Request, _: None = Depends(_verify_health_ingest_key)):
+    try:
+        raw = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="body must be a JSON object")
+    if not isinstance(raw, dict):
+        raise HTTPException(status_code=400, detail="body must be a JSON object")
+
+    # Date: an explicit `date` wins (backfill/testing); otherwise today in
+    # Mountain time so the 11:50pm run never rolls into tomorrow (UTC would).
+    explicit = raw.pop("date", None)
+    if explicit not in (None, ""):
+        try:
+            target_date = date_type.fromisoformat(str(explicit)[:10])
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"bad date: {explicit!r}")
+    else:
+        target_date = datetime.now(LOCAL_TZ).date()
+
+    fields: dict = {}
+    ignored: list[str] = []
+    for key, val in raw.items():
+        col = _KPI_NORM_TO_COL.get(re.sub(r"[^a-z0-9]", "", str(key).lower()))
+        if not col:
+            ignored.append(key)
+            continue
+        coerced = _kpi_coerce(col, val)
+        if coerced is None:
+            continue
+        fields[col] = coerced
+
+    async with _KPI_POOL.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO kpi_daily_log (date) VALUES ($1) ON CONFLICT (date) DO NOTHING",
+            target_date,
+        )
+        if fields:
+            cols = list(fields.keys())
+            vals = list(fields.values())
+            set_clause = ", ".join(f"{c} = ${i + 2}" for i, c in enumerate(cols))
+            await conn.execute(
+                f"UPDATE kpi_daily_log SET {set_clause} WHERE date = $1",
+                target_date,
+                *vals,
+            )
+
+    log.info("shortcut_ingest %s: set %s, ignored %s", target_date, fields, ignored)
+    return {
+        "status": "ok",
+        "date": target_date.isoformat(),
+        "fields_updated": fields,
+        "ignored": ignored,
     }
 
 
