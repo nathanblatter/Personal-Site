@@ -28,7 +28,9 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
 OLLAMA_MODEL = os.getenv("WEAVE_OLLAMA_MODEL", "llama3.1:8b")
 
 # PRD weave prompt + style constraints, name glossary, and a JSON output contract.
-WEAVE_PROMPT = """You're given one or more raw transcripts from the same day, in chronological order. Some may cover different topics, or return to the same topic later in the day. Organize this into one coherent journal entry that reads narratively, roughly following the arc of the day.
+# The glossary is filled per call (DB-backed vocab grows via the grading UI);
+# the static journal_vocab file is the fallback.
+_WEAVE_PROMPT_TEMPLATE = """You're given one or more raw transcripts from the same day, in chronological order. Some may cover different topics, or return to the same topic later in the day. Organize this into one coherent journal entry that reads narratively, roughly following the arc of the day.
 
 Rules:
 - Prefer the person's own words and phrasing over paraphrase, especially for anything opinionated, emotional, funny, or specific. Light editing for grammar and filler is fine; full rewriting is not.
@@ -52,7 +54,9 @@ Return ONLY valid JSON, no prose outside it, in exactly this shape:
     {{"category": "structural" | "content", "note": "<what changed>", "raw_span": "<the affected phrase from the raw transcript>"}}
   ]
 }}
-If nothing drifted, return an empty drift_flags array.""".format(glossary=journal_vocab.weave_glossary())
+If nothing drifted, return an empty drift_flags array."""
+
+WEAVE_PROMPT = _WEAVE_PROMPT_TEMPLATE.format(glossary=journal_vocab.weave_glossary())
 
 
 # Nathan dislikes em/en dashes; strip them deterministically so we never depend on
@@ -149,11 +153,14 @@ async def call_llm(system: str, user: str, max_tokens: int = 4096, want_json: bo
     return await _claude(system, user, max_tokens, want_json)
 
 
-async def weave_day(raw_texts: list[str]) -> dict:
-    """Weave a day's raw transcripts. Returns {narrative, drift_flags, drift_score}."""
+async def weave_day(raw_texts: list[str], glossary: Optional[str] = None) -> dict:
+    """Weave a day's raw transcripts. Returns {narrative, drift_flags, drift_score}.
+    `glossary` overrides the static name glossary (the worker passes the DB-backed
+    vocab so names accepted in the grading UI apply the same night)."""
     raw_texts = [t for t in raw_texts if t and t.strip()]
     if not raw_texts:
         return {"narrative": "", "drift_flags": [], "drift_score": 0.0}
 
-    text = await call_llm(WEAVE_PROMPT, _build_input(raw_texts))
+    prompt = _WEAVE_PROMPT_TEMPLATE.format(glossary=glossary) if glossary else WEAVE_PROMPT
+    text = await call_llm(prompt, _build_input(raw_texts))
     return _parse_response(text, raw_texts)

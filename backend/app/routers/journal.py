@@ -28,9 +28,11 @@ from zoneinfo import ZoneInfo
 
 import asyncpg
 import redis.asyncio as aioredis
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
+from app import vocab_service
+from app.auth import require_auth
 from app.routers.storage import get_s3_client, ensure_bucket, MINIO_BUCKET
 
 log = logging.getLogger("journal")
@@ -38,6 +40,9 @@ log = logging.getLogger("journal")
 LOCAL_TZ = ZoneInfo(os.getenv("LOCAL_TZ", "America/Denver"))  # fallback when location lookup fails
 KPI_DSN = os.getenv("DATABASE_URL_KPI", "postgresql://postgres:postgres@host.docker.internal:5432/kpi")
 SITE_BASE_URL = os.getenv("SITE_BASE_URL", "https://nathanblatter.com")
+# Where the standalone journal-builder web UI (docker-services/journal-builder) is
+# reachable — used to text a builder magic link. Tailscale IP by default.
+BUILDER_BASE_URL = os.getenv("BUILDER_BASE_URL", "http://100.79.61.79:4400")
 # The link is a convenience for finding/opening a day, not the access-control layer
 # (that's the Tailscale-only tunnel). A day's link never expires by time — an
 # unsubmitted day stays recordable forever (miss Jul 5, record it Jul 6 or later).
@@ -168,6 +173,15 @@ async def init_journal_db() -> None:
         await c.execute(_CREATE_RECORDINGS)
         await c.execute(_CREATE_TRANSCRIPTS)
         await c.execute(_CREATE_PHOTOS)
+        # EOY builder: photos are curated from Immich and cached into MinIO. Track the
+        # source asset id, ordering within a day, and a per-day cover pick. Additive so
+        # existing rows are unaffected; `photo_ref` holds the cached MinIO object key.
+        await c.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS immich_id TEXT")
+        await c.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'immich'")
+        await c.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0")
+        await c.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS is_cover BOOLEAN NOT NULL DEFAULT FALSE")
+        await c.execute("CREATE UNIQUE INDEX IF NOT EXISTS photos_entry_immich_uq "
+                        "ON photos (entry_id, immich_id) WHERE immich_id IS NOT NULL")
         await c.execute(_CREATE_PROMPT_SUGGESTIONS)
         # Next-day prompts: location/fallback prompts have no source entry, and we
         # track delivery + source. Additive so existing rows are unaffected.
@@ -175,6 +189,14 @@ async def init_journal_db() -> None:
         await c.execute("ALTER TABLE prompt_suggestions ADD COLUMN IF NOT EXISTS source TEXT")
         await c.execute("ALTER TABLE prompt_suggestions ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ")
         await c.execute(_CREATE_MAGIC_LINKS)
+        # Self-learning vocab: graded terms + the candidate queue feeding the
+        # /journal/vocab grading UI. Seeds are ON CONFLICT DO NOTHING, so grades
+        # are never overwritten by a redeploy.
+        await c.execute(vocab_service.CREATE_VOCAB_TERMS)
+        await c.execute(vocab_service.CREATE_VOCAB_CANDIDATES)
+        await c.execute("ALTER TABLE transcripts ADD COLUMN IF NOT EXISTS vocab_scanned_at TIMESTAMPTZ")
+        await vocab_service.ensure_seed(c)
+        await vocab_service.seed_audit(c)
         await c.execute(_CREATE_UPDATED_AT_FN)
         await c.execute(_DROP_ENTRIES_TRIGGER)
         await c.execute(_CREATE_ENTRIES_TRIGGER)
@@ -246,6 +268,24 @@ def verify_journal_token(token: str) -> Optional[date_type]:
     if (today - signed_date).days < -1:  # more than a day in the future
         return None
     return signed_date
+
+
+# Builder token — the standalone journal-builder app spans the whole year (not one
+# date), so it's a single opaque HMAC over a constant. The builder shares
+# JOURNAL_LINK_SECRET and verifies the same signature locally.
+def _builder_signature() -> str:
+    sig = hmac.new(JOURNAL_LINK_SECRET.encode(), b"journal-builder", hashlib.sha256).digest()
+    return _b64url_encode(sig)
+
+
+def sign_builder_token() -> str:
+    return _builder_signature()
+
+
+def verify_builder_token(token: str) -> bool:
+    if not JOURNAL_LINK_SECRET:
+        return False
+    return hmac.compare_digest(_builder_signature(), token or "")
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +465,150 @@ async def submit_day(token: str):
         await r.xadd(SUBMIT_STREAM, {"entry_id": str(locked["id"]), "date": entry_date.isoformat()})
         log.info("journal day %s submitted, enqueued %s", entry_date, locked["id"])
     return JSONResponse({"submitted": True, "date": entry_date.isoformat()}, headers=_NO_STORE)
+
+
+@router.post("/journal/builder-link", include_in_schema=False)
+async def builder_link(_: None = Depends(require_auth)):
+    """Text a magic link to the standalone EOY journal-builder app. Authed (admin),
+    reusing the same iMessage relay as the nightly reminder. Defined before the
+    /journal/{token} catch-all so this static path isn't captured as a token."""
+    if not JOURNAL_LINK_SECRET:
+        raise HTTPException(status_code=503, detail="JOURNAL_LINK_SECRET not configured")
+    from app import imessage_service  # local import mirrors the reminder's pattern
+    url = f"{BUILDER_BASE_URL}/?t={sign_builder_token()}"
+    await imessage_service.send_alert(f"📖 Journal builder — tap to open:\n{url}")
+    return JSONResponse({"ok": True, "url": url}, headers=_NO_STORE)
+
+
+# ---------------------------------------------------------------------------
+# Vocab grading UI — Tailscale-only, token-gated like the builder. Opening the
+# page kicks off a scan of un-scanned transcripts (heuristic + local 3B model),
+# so extraction inference only runs while Nathan is actually grading.
+# Registered before the /journal/{token} catch-all so "vocab" isn't read as a token.
+# ---------------------------------------------------------------------------
+
+def _vocab_signature() -> str:
+    sig = hmac.new(JOURNAL_LINK_SECRET.encode(), b"journal-vocab", hashlib.sha256).digest()
+    return _b64url_encode(sig)
+
+
+def sign_vocab_token() -> str:
+    return _vocab_signature()
+
+
+def verify_vocab_token(token: str) -> bool:
+    if not JOURNAL_LINK_SECRET:
+        return False
+    return hmac.compare_digest(_vocab_signature(), token or "")
+
+
+def _require_vocab_token(t: str) -> None:
+    if not verify_vocab_token(t):
+        raise HTTPException(status_code=403, detail="invalid vocab token")
+
+
+@router.get("/journal/vocab", response_class=HTMLResponse, include_in_schema=False)
+async def vocab_page(t: str = ""):
+    if not verify_vocab_token(t):
+        return HTMLResponse(_shell("Invalid link", "This vocab link isn't valid.", ok=False),
+                            status_code=403, headers=_NO_STORE)
+    return HTMLResponse(_vocab_grading_page(t), headers=_NO_STORE)
+
+
+@router.get("/journal/vocab/state", include_in_schema=False)
+async def vocab_state(t: str = ""):
+    _require_vocab_token(t)
+    async with _pool().acquire() as conn:
+        pending = await conn.fetch(
+            "SELECT id, surface, suggested_canonical, context, entry_date, source "
+            "FROM vocab_candidates WHERE status = 'pending' ORDER BY source = 'heuristic', created_at"
+        )
+        terms = await conn.fetch(
+            "SELECT id, canonical, variants, category FROM vocab_terms ORDER BY canonical"
+        )
+        unscanned = await conn.fetchval(
+            "SELECT COUNT(*) FROM transcripts WHERE raw_text IS NOT NULL AND vocab_scanned_at IS NULL"
+        )
+    return JSONResponse({
+        "pending": [
+            {
+                "id": str(c["id"]),
+                "surface": c["surface"],
+                "suggestion": c["suggested_canonical"],
+                "context": c["context"],
+                "entry_date": c["entry_date"].isoformat() if c["entry_date"] else None,
+                "source": c["source"],
+            }
+            for c in pending
+        ],
+        "terms": [
+            {"id": str(x["id"]), "canonical": x["canonical"],
+             "variants": list(x["variants"] or []), "category": x["category"]}
+            for x in terms
+        ],
+        "unscanned": unscanned,
+    }, headers=_NO_STORE)
+
+
+@router.post("/journal/vocab/scan", include_in_schema=False)
+async def vocab_scan(t: str = ""):
+    _require_vocab_token(t)
+    async with _pool().acquire() as conn:
+        result = await vocab_service.scan_unscanned(conn)
+    return JSONResponse(result, headers=_NO_STORE)
+
+
+@router.post("/journal/vocab/grade", include_in_schema=False)
+async def vocab_grade(payload: dict, t: str = ""):
+    _require_vocab_token(t)
+    cand_id = uuid.UUID(str(payload.get("id")))
+    action = payload.get("action")
+    async with _pool().acquire() as conn:
+        if action == "accept":
+            canonical = (payload.get("canonical") or "").strip()
+            if not canonical:
+                raise HTTPException(status_code=400, detail="canonical required")
+            await vocab_service.accept_candidate(
+                conn, cand_id, canonical,
+                [v for v in (payload.get("variants") or [])],
+                payload.get("category") or None,
+            )
+        elif action == "reject":
+            await conn.execute(
+                "UPDATE vocab_candidates SET status = 'rejected' WHERE id = $1", cand_id
+            )
+        else:
+            raise HTTPException(status_code=400, detail="unknown action")
+    return JSONResponse({"ok": True}, headers=_NO_STORE)
+
+
+@router.post("/journal/vocab/terms", include_in_schema=False)
+async def vocab_terms_edit(payload: dict, t: str = ""):
+    _require_vocab_token(t)
+    action = payload.get("action")
+    async with _pool().acquire() as conn:
+        if action == "add":
+            canonical = (payload.get("canonical") or "").strip()
+            if not canonical:
+                raise HTTPException(status_code=400, detail="canonical required")
+            await conn.execute(
+                "INSERT INTO vocab_terms (canonical, variants, category) VALUES ($1, $2, $3) "
+                "ON CONFLICT (canonical) DO UPDATE SET variants = EXCLUDED.variants, updated_at = NOW()",
+                canonical, [v.strip() for v in (payload.get("variants") or []) if v.strip()],
+                payload.get("category") or None,
+            )
+        elif action == "update":
+            await conn.execute(
+                "UPDATE vocab_terms SET canonical = $2, variants = $3, updated_at = NOW() WHERE id = $1",
+                uuid.UUID(str(payload.get("id"))),
+                (payload.get("canonical") or "").strip(),
+                [v.strip() for v in (payload.get("variants") or []) if v.strip()],
+            )
+        elif action == "delete":
+            await conn.execute("DELETE FROM vocab_terms WHERE id = $1", uuid.UUID(str(payload.get("id"))))
+        else:
+            raise HTTPException(status_code=400, detail="unknown action")
+    return JSONResponse({"ok": True}, headers=_NO_STORE)
 
 
 @router.get("/journal/{token}", response_class=HTMLResponse, include_in_schema=False)
@@ -853,3 +1037,161 @@ flush();
 def _esc(s: str) -> str:
     from html import escape
     return escape(s)
+
+
+def _vocab_grading_page(token: str) -> str:
+    """Vocab grading UI. All data arrives via the /journal/vocab/state JSON
+    endpoint and is DOM-injected as text (no HTML interpolation of transcripts)."""
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>Journal · Vocab</title>
+<style>{_BASE_CSS}
+  .scanbar{{display:flex;align-items:center;gap:10px;margin-bottom:20px}}
+  .scanbar button{{background:#2563eb;color:#fff;font-size:14px;padding:10px 14px}}
+  .scanbar button:disabled{{background:#374151;color:#9ca3af}}
+  .cand{{background:#18181b;border:1px solid #27272a;border-radius:12px;padding:14px;margin-bottom:12px}}
+  .cand .surface{{font-size:17px;font-weight:600}}
+  .cand .ctx{{color:#a1a1aa;font-size:13px;font-style:italic;margin:6px 0 10px;line-height:1.45}}
+  .cand .meta{{color:#71717a;font-size:12px;margin-left:8px}}
+  .badge{{font-size:11px;border-radius:6px;padding:2px 6px;margin-left:8px;vertical-align:middle}}
+  .badge.llm{{background:#312e81;color:#c7d2fe}}
+  .badge.heuristic{{background:#374151;color:#d1d5db}}
+  .badge.audit{{background:#78350f;color:#fde68a}}
+  .row{{display:flex;gap:8px;flex-wrap:wrap;align-items:center}}
+  input,select{{font:inherit;background:#0b0b0f;color:#f5f5f7;border:1px solid #3f3f46;
+    border-radius:8px;padding:8px 10px}}
+  input.canon{{width:170px}} input.vars{{flex:1;min-width:140px}}
+  .accept{{background:#16a34a;color:#fff;padding:8px 14px;font-size:14px}}
+  .reject{{background:transparent;color:#f87171;border:1px solid #7f1d1d;padding:8px 14px;font-size:14px}}
+  h2{{font-size:16px;margin:28px 0 10px;color:#a1a1aa}}
+  .term{{display:flex;gap:8px;align-items:center;background:#18181b;border:1px solid #27272a;
+    border-radius:10px;padding:8px 10px;margin-bottom:8px;flex-wrap:wrap}}
+  .term .canonical{{font-weight:600;min-width:120px}}
+  .term .variants{{color:#a1a1aa;font-size:13px;flex:1}}
+  .term .x{{background:transparent;color:#f87171;padding:4px 8px;font-size:13px}}
+  .empty{{color:#71717a;font-size:14px}}
+</style></head>
+<body>
+<h1>Vocab grading</h1>
+<p class="sub">Accept a name once and every future transcription and weave knows it.</p>
+<div class="scanbar">
+  <button id="scan">Scan transcripts</button>
+  <span id="scanmsg" class="muted"></span>
+</div>
+<div id="cands"></div>
+<p id="candempty" class="empty" style="display:none">No candidates waiting. 🎉</p>
+<h2>Known vocab</h2>
+<div class="row" style="margin-bottom:12px">
+  <input id="newcanon" class="canon" placeholder="New name">
+  <input id="newvars" class="vars" placeholder="mishearings, comma-separated">
+  <button class="accept" id="addterm">Add</button>
+</div>
+<div id="terms"></div>
+<script>
+const T = {json.dumps(token)};
+const q = "?t=" + encodeURIComponent(T);
+const candsEl = document.getElementById('cands');
+const termsEl = document.getElementById('terms');
+const scanBtn = document.getElementById('scan');
+const scanMsg = document.getElementById('scanmsg');
+
+async function jget(p) {{ const r = await fetch(p + q); if (!r.ok) throw new Error(r.status); return r.json(); }}
+async function jpost(p, body) {{
+  const r = await fetch(p + q, {{method:'POST', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify(body||{{}})}});
+  if (!r.ok) throw new Error(r.status); return r.json();
+}}
+function el(tag, cls, text) {{
+  const e = document.createElement(tag); if (cls) e.className = cls;
+  if (text != null) e.textContent = text; return e;
+}}
+
+function candCard(c) {{
+  const card = el('div', 'cand');
+  const head = el('div');
+  head.appendChild(el('span', 'surface', c.surface));
+  head.appendChild(el('span', 'badge ' + c.source, c.source));
+  if (c.entry_date) head.appendChild(el('span', 'meta', c.entry_date));
+  card.appendChild(head);
+  if (c.context) card.appendChild(el('div', 'ctx', '"…' + c.context.replace(/^…|…$/g,'') + '…"'));
+  const row = el('div', 'row');
+  const canon = el('input', 'canon'); canon.value = c.suggestion || c.surface;
+  const vars = el('input', 'vars');
+  vars.placeholder = 'mishearings, comma-separated';
+  if (c.suggestion && c.suggestion.toLowerCase() !== c.surface.toLowerCase()) vars.value = c.surface;
+  const cat = el('select');
+  ['person','place','other'].forEach(v => {{ const o = el('option', null, v); o.value = v; cat.appendChild(o); }});
+  const ok = el('button', 'accept', 'Accept');
+  const no = el('button', 'reject', 'Reject');
+  ok.onclick = async () => {{
+    ok.disabled = no.disabled = true;
+    await jpost('/journal/vocab/grade', {{id: c.id, action: 'accept', canonical: canon.value,
+      variants: vars.value.split(',').map(s => s.trim()).filter(Boolean), category: cat.value}});
+    card.remove(); refreshTermsOnly();
+  }};
+  no.onclick = async () => {{
+    ok.disabled = no.disabled = true;
+    await jpost('/journal/vocab/grade', {{id: c.id, action: 'reject'}});
+    card.remove();
+  }};
+  [canon, vars, cat, ok, no].forEach(x => row.appendChild(x));
+  card.appendChild(row);
+  return card;
+}}
+
+function termRow(x) {{
+  const row = el('div', 'term');
+  row.appendChild(el('span', 'canonical', x.canonical));
+  row.appendChild(el('span', 'variants', (x.variants||[]).join(', ') || '—'));
+  const del = el('button', 'x', 'remove');
+  del.onclick = async () => {{
+    if (!confirm('Remove "' + x.canonical + '" from the vocab?')) return;
+    await jpost('/journal/vocab/terms', {{action: 'delete', id: x.id}});
+    row.remove();
+  }};
+  row.appendChild(del);
+  return row;
+}}
+
+async function refreshTermsOnly() {{
+  const s = await jget('/journal/vocab/state');
+  termsEl.innerHTML = '';
+  s.terms.forEach(x => termsEl.appendChild(termRow(x)));
+}}
+
+async function refresh() {{
+  const s = await jget('/journal/vocab/state');
+  candsEl.innerHTML = '';
+  s.pending.forEach(c => candsEl.appendChild(candCard(c)));
+  document.getElementById('candempty').style.display = s.pending.length ? 'none' : 'block';
+  termsEl.innerHTML = '';
+  s.terms.forEach(x => termsEl.appendChild(termRow(x)));
+  return s;
+}}
+
+async function scan() {{
+  scanBtn.disabled = true;
+  scanMsg.textContent = 'Scanning… (loads the 3B model, ~10s per new transcript)';
+  try {{
+    const r = await jpost('/journal/vocab/scan');
+    scanMsg.textContent = r.scanned ? ('Scanned ' + r.scanned + ' transcript(s), ' + r.new_candidates + ' new candidate(s).')
+                                    : 'Nothing new to scan.';
+  }} catch (e) {{ scanMsg.textContent = 'Scan failed: ' + e.message; }}
+  scanBtn.disabled = false;
+  refresh();
+}}
+scanBtn.onclick = scan;
+
+document.getElementById('addterm').onclick = async () => {{
+  const canonical = document.getElementById('newcanon').value.trim();
+  if (!canonical) return;
+  await jpost('/journal/vocab/terms', {{action: 'add', canonical,
+    variants: document.getElementById('newvars').value.split(',').map(s => s.trim()).filter(Boolean)}});
+  document.getElementById('newcanon').value = ''; document.getElementById('newvars').value = '';
+  refreshTermsOnly();
+}};
+
+// On open: show what's already queued immediately, then auto-scan anything new
+// (this is the "inference only while grading" trigger).
+refresh().then(s => {{ if (s.unscanned > 0) scan(); }});
+</script>
+</body></html>"""

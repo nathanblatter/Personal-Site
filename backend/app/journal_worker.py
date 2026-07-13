@@ -25,7 +25,7 @@ import asyncpg
 import httpx
 import redis.asyncio as aioredis
 
-from app import journal_vocab, prompt_service, weave_service
+from app import journal_vocab, prompt_service, vocab_service, weave_service
 from app.routers.journal import journal_dsn, SUBMIT_STREAM
 from app.routers.storage import get_s3_client, MINIO_BUCKET
 
@@ -51,16 +51,31 @@ WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
 WHISPER_COMPUTE = os.getenv("WHISPER_COMPUTE", "int8")
 # Recurring proper nouns fed as `hotwords` (a stronger bias than initial_prompt) on
 # the CPU path, and as `initial_prompt` to the MLX service (which has no hotwords).
-WHISPER_PROMPT = os.getenv("WHISPER_PROMPT") or journal_vocab.whisper_prompt()
+# The env override wins outright; otherwise the vocab is read from the DB per entry
+# (names accepted in the /journal/vocab grading UI apply the same night), with the
+# static journal_vocab file as the offline fallback.
+WHISPER_PROMPT_OVERRIDE = os.getenv("WHISPER_PROMPT")
 
 _model = None
 
 
-def _transcribe_mlx(audio_bytes: bytes, suffix: str) -> str:
+async def _entry_vocab(pool: asyncpg.Pool) -> tuple[str, str]:
+    """(whisper prompt, weave glossary) from the DB-backed vocab, static fallback."""
+    try:
+        async with pool.acquire() as conn:
+            vocab = await vocab_service.fetch_vocab(conn)
+    except Exception as exc:
+        log.warning("vocab fetch failed, using static file: %s", exc)
+        vocab = dict(journal_vocab.CANONICAL)
+    prompt = WHISPER_PROMPT_OVERRIDE or journal_vocab.whisper_prompt_from(vocab)
+    return prompt, journal_vocab.weave_glossary_from(vocab)
+
+
+def _transcribe_mlx(audio_bytes: bytes, suffix: str, prompt: str) -> str:
     """Transcribe via the native MLX GPU service on the host. Raises on any failure
     so the caller can fall back to local CPU whisper."""
     files = {"file": (f"audio{suffix}", audio_bytes)}
-    data = {"prompt": WHISPER_PROMPT}
+    data = {"prompt": prompt}
     # A cold model load + long entry can take a while on first call; generous timeout.
     resp = httpx.post(MLX_TRANSCRIBE_URL, files=files, data=data, timeout=600.0)
     resp.raise_for_status()
@@ -77,26 +92,26 @@ def _get_model():
     return _model
 
 
-def _transcribe_cpu(audio_bytes: bytes, suffix: str) -> str:
+def _transcribe_cpu(audio_bytes: bytes, suffix: str, prompt: str) -> str:
     model = _get_model()
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as f:
         f.write(audio_bytes)
         f.flush()
         # hotwords only take effect when initial_prompt is None (faster-whisper).
-        segments, _info = model.transcribe(f.name, hotwords=WHISPER_PROMPT)
+        segments, _info = model.transcribe(f.name, hotwords=prompt)
         return " ".join(seg.text.strip() for seg in segments).strip()
 
 
-def _transcribe(audio_bytes: bytes, suffix: str) -> str:
+def _transcribe(audio_bytes: bytes, suffix: str, prompt: str) -> str:
     """Prefer the native MLX GPU service on the host; fall back to local CPU whisper
     if it's unreachable, so a nightly entry is never blocked by the host service
     being down. Both paths use the same vocab bias."""
     if MLX_TRANSCRIBE_URL:
         try:
-            return _transcribe_mlx(audio_bytes, suffix)
+            return _transcribe_mlx(audio_bytes, suffix, prompt)
         except Exception as exc:
             log.warning("MLX transcribe failed (%s); falling back to local CPU whisper", exc)
-    return _transcribe_cpu(audio_bytes, suffix)
+    return _transcribe_cpu(audio_bytes, suffix, prompt)
 
 
 async def _process_entry(pool: asyncpg.Pool, entry_id_str: str) -> None:
@@ -111,6 +126,7 @@ async def _process_entry(pool: asyncpg.Pool, entry_id_str: str) -> None:
         return
 
     s3 = get_s3_client()
+    whisper_prompt, weave_glossary = await _entry_vocab(pool)
     raw_texts: list[str] = []
     for rec in recs:
         # Transcribe only if not already done (idempotent on retry).
@@ -125,7 +141,7 @@ async def _process_entry(pool: asyncpg.Pool, entry_id_str: str) -> None:
         obj = s3.get_object(Bucket=MINIO_BUCKET, Key=rec["audio_ref"])
         audio = obj["Body"].read()
         suffix = os.path.splitext(rec["audio_ref"])[1] or ".webm"
-        text = await asyncio.to_thread(_transcribe, audio, suffix)
+        text = await asyncio.to_thread(_transcribe, audio, suffix, whisper_prompt)
 
         async with pool.acquire() as conn:
             await conn.execute(
@@ -136,7 +152,7 @@ async def _process_entry(pool: asyncpg.Pool, entry_id_str: str) -> None:
         raw_texts.append(text)
         log.info("transcribed recording %s (%d chars)", rec["id"], len(text))
 
-    woven = await weave_service.weave_day(raw_texts)
+    woven = await weave_service.weave_day(raw_texts, glossary=weave_glossary)
     async with pool.acquire() as conn:
         entry_date = await conn.fetchval(
             "UPDATE entries SET narrative = $2, "

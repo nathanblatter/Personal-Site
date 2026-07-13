@@ -34,17 +34,28 @@ CANONICAL: dict[str, list[str]] = {
 }
 
 
-def whisper_prompt() -> str:
+def whisper_prompt_from(vocab: dict[str, list[str]]) -> str:
     """Comma-joined canonical names to bias Whisper's recognition."""
-    return ", ".join(CANONICAL.keys()) + "."
+    return ", ".join(vocab.keys()) + "."
 
 
-def weave_glossary() -> str:
+def weave_glossary_from(vocab: dict[str, list[str]]) -> str:
     """Glossary lines for the weave prompt: canonical name + its common mis-hearings."""
     lines = []
-    for canonical, variants in CANONICAL.items():
+    for canonical, variants in vocab.items():
         if variants:
             lines.append(f"- {canonical} (may be transcribed as: {', '.join(variants)})")
         else:
             lines.append(f"- {canonical}")
     return "\n".join(lines)
+
+
+# Static-file forms, used as the fallback when the DB-backed vocab (vocab_terms,
+# grown via the /journal/vocab grading UI) is unavailable.
+
+def whisper_prompt() -> str:
+    return whisper_prompt_from(CANONICAL)
+
+
+def weave_glossary() -> str:
+    return weave_glossary_from(CANONICAL)
