@@ -229,6 +229,7 @@ export default function BlogSection({ showToast, showError, blogs, setBlogs }: B
                     <TagEditor
                       tags={blogDraft.tags ?? []}
                       onChange={tags => updateBlogDraft('tags', tags)}
+                      suggestions={blogs.flatMap(b => b.tags)}
                     />
 
                     {/* Content with preview toggle */}

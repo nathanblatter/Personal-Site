@@ -1,8 +1,8 @@
-"""Public service-health aggregator backing the /status page.
+"""Service-health aggregator backing the /status page.
 
-Only user-facing infrastructure is reported here. Internal-only services (e.g.
-Flightdeck) are intentionally excluded so this public endpoint doesn't disclose
-the internal stack — monitor those behind auth if needed.
+This reports infrastructure names and reachability, so it is admin-only — the
+/status page is not public. Requiring auth here keeps the internal stack from
+being disclosed to anonymous visitors.
 """
 import time
 
@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import require_auth
 from app.database import get_db
 from app.utils import get_redis
 
@@ -27,7 +28,7 @@ async def _timed(coro) -> tuple[bool, int]:
 
 
 @router.get("/services")
-async def service_health(db: AsyncSession = Depends(get_db)):
+async def service_health(db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
     services = []
 
     # API itself — if this handler runs, the API is up.

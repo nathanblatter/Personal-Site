@@ -30,13 +30,27 @@ export default function Blog() {
     return () => clearTimeout(debounceRef.current)
   }, [query, retryKey])
 
+  // Tags are free-text per post, so case/whitespace variants of the same tag
+  // ("Claude" vs "claude ") must collapse into one filter. Normalize to a key,
+  // keep the first display spelling seen, and match against the key everywhere.
+  const tagKey = (t: string) => t.trim().toLowerCase()
+  const postHasTag = (p: (typeof posts)[number], key: string) => p.tags.some(t => tagKey(t) === key)
+
   // Drop a tag filter that no longer exists in the current result set.
   useEffect(() => {
-    if (activeTag && !posts.some(p => p.tags.includes(activeTag))) setActiveTag(null)
+    if (activeTag && !posts.some(p => postHasTag(p, tagKey(activeTag)))) setActiveTag(null)
   }, [posts, activeTag])
 
-  const allTags = Array.from(new Set(posts.flatMap(p => p.tags))).sort((a, b) => a.localeCompare(b))
-  const displayedPosts = activeTag ? posts.filter(p => p.tags.includes(activeTag)) : posts
+  const allTags = Array.from(
+    posts.reduce((acc, p) => {
+      for (const t of p.tags) {
+        const key = tagKey(t)
+        if (key && !acc.has(key)) acc.set(key, t.trim())
+      }
+      return acc
+    }, new Map<string, string>()).values(),
+  ).sort((a, b) => a.localeCompare(b))
+  const displayedPosts = activeTag ? posts.filter(p => postHasTag(p, tagKey(activeTag))) : posts
 
   return (
     <div className="max-w-[1100px] w-full mx-auto px-6 py-20">

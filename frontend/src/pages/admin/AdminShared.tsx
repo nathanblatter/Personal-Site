@@ -66,12 +66,21 @@ export function AdminSelect({ label, value, onChange, options }: {
   )
 }
 
-export function TagEditor({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+export function TagEditor({ tags, onChange, suggestions = [] }: { tags: string[]; onChange: (tags: string[]) => void; suggestions?: string[] }) {
   const [input, setInput] = useState('')
   const add = () => {
-    const t = input.trim()
-    if (t && !tags.includes(t)) { onChange([...tags, t]); setInput('') }
+    // Collapse whitespace and dedupe case-insensitively so "Claude", "claude ",
+    // and "Claude " don't become three separate tags that fail to aggregate.
+    const t = input.trim().replace(/\s+/g, ' ')
+    if (!t) return
+    const existing = tags.find(x => x.toLowerCase() === t.toLowerCase())
+    if (!existing) onChange([...tags, t])
+    setInput('')
   }
+  // Suggest existing tags across content the admin hasn't already applied here.
+  const options = Array.from(new Set(suggestions.map(s => s.trim()).filter(Boolean)))
+    .filter(s => !tags.some(t => t.toLowerCase() === s.toLowerCase()))
+    .sort((a, b) => a.localeCompare(b))
   return (
     <div>
       <label className="block font-mono text-[11px] text-steel mb-1.5 tracking-wider uppercase">Tags</label>
@@ -87,12 +96,18 @@ export function TagEditor({ tags, onChange }: { tags: string[]; onChange: (tags:
       </div>
       <div className="flex gap-2">
         <input
+          list="tag-editor-suggestions"
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), add())}
           placeholder="Add tag…"
           className="flex-1 px-3 py-2 bg-white border border-mist rounded-lg text-sm text-ink placeholder-silver focus:outline-none focus:border-blue/50 focus:ring-2 focus:ring-blue/10 transition-all font-mono text-xs"
         />
+        {options.length > 0 && (
+          <datalist id="tag-editor-suggestions">
+            {options.map(o => <option key={o} value={o} />)}
+          </datalist>
+        )}
         <button onClick={add} className="px-3 py-2 bg-cloud text-steel rounded-lg hover:bg-blue-wash hover:text-blue transition-all text-xs font-mono">
           Add
         </button>

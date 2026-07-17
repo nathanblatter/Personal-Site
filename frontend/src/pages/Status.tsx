@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { CheckCircle2, AlertTriangle, XCircle, RefreshCw } from 'lucide-react'
 import { api, type ServiceHealthResponse, type ServiceStatus } from '../lib/api'
@@ -11,6 +12,7 @@ const STATUS_META: Record<ServiceStatus, { label: string; color: string; dot: st
 }
 
 export default function Status() {
+  const navigate = useNavigate()
   const [data, setData] = useState<ServiceHealthResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -20,9 +22,14 @@ export default function Status() {
     setError(false)
     api.health.services()
       .then(res => { setData(res); setUpdatedAt(new Date()) })
-      .catch(() => setError(true))
+      .catch((err: Error) => {
+        // Status is admin-only; bounce anonymous visitors to login rather than
+        // showing a broken page.
+        if (err.message.includes('401')) { navigate('/admin/login'); return }
+        setError(true)
+      })
       .finally(() => setLoading(false))
-  }, [])
+  }, [navigate])
 
   useEffect(() => {
     load()

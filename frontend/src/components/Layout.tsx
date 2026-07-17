@@ -225,12 +225,6 @@ export default function Layout() {
               </Link>
             ))}
             <Link
-              to="/status"
-              className="font-mono text-xs text-steel hover:text-blue transition-colors"
-            >
-              Status
-            </Link>
-            <Link
               to="/privacy"
               className="font-mono text-xs text-steel hover:text-blue transition-colors"
             >
