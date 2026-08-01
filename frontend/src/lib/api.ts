@@ -435,6 +435,7 @@ export interface GitHubRepo {
   homepage: string | null
   updated_at: string
   fork: boolean
+  owner?: string
 }
 
 export interface GitHubContributions {
@@ -442,6 +443,9 @@ export interface GitHubContributions {
   streak: number
   days: { date: string; level: number }[]
   activity: Record<string, { name: string; url: string }[]>
+  stats?: { commits: number; prs: number; issues: number; reviews: number; private: number }
+  owners?: { owner: string; commits: number; prs: number }[]
+  source?: string
 }
 
 // ── Booking Types ─────────────────────────────────────────────────────────

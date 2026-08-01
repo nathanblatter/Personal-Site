@@ -67,6 +67,16 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
           <span className="text-ink font-semibold text-sm">{data.total.toLocaleString()}</span>{' '}
           contributions in the last year
         </div>
+        {data.stats && data.stats.commits > 0 && (
+          <div className="font-mono text-xs text-steel">
+            <span className="text-ink font-semibold text-sm">{data.stats.commits.toLocaleString()}</span> commits
+          </div>
+        )}
+        {data.stats && data.stats.prs > 0 && (
+          <div className="font-mono text-xs text-steel">
+            <span className="text-ink font-semibold text-sm">{data.stats.prs.toLocaleString()}</span> PRs
+          </div>
+        )}
         {data.streak > 0 && (
           <div className="font-mono text-xs text-steel">
             <span className="text-ink font-semibold text-sm">{data.streak}</span> day streak
