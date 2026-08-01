@@ -18,7 +18,7 @@ router = APIRouter(prefix="/claude", tags=["claude"])
 _dirs_env = os.getenv("CLAUDE_DATA_DIRS") or os.getenv("CLAUDE_DATA_DIR", "/claude_data")
 CLAUDE_DATA_DIRS = [Path(p.strip()) for p in _dirs_env.split(",") if p.strip()]
 
-CACHE_TTL = 600  # 10 minutes
+CACHE_TTL = 3600  # 1 hour
 LOCAL_TZ = ZoneInfo(os.getenv("TZ", "America/Denver"))
 
 PRICING = {
@@ -44,6 +44,12 @@ def _project_name(jsonl_path: Path) -> str:
     if not meaningful:
         return dir_name
     return "-".join(meaningful[-2:]) if len(meaningful) >= 2 else meaningful[-1]
+
+
+def _week_key(day_str: str) -> str:
+    """ISO year-week bucket for a YYYY-MM-DD date string, e.g. '2026-W31'."""
+    iso = datetime.fromisoformat(day_str).isocalendar()
+    return f"{iso[0]}-W{iso[1]:02d}"
 
 
 def _scan_jsonl() -> dict:
@@ -114,14 +120,25 @@ def _scan_jsonl() -> dict:
                             days[day_str]["sessions"].add(session_id)
 
                         if model not in models_agg:
-                            models_agg[model] = {"tokens": 0, "cost_cents": 0.0}
+                            models_agg[model] = {"tokens": 0, "cost_cents": 0.0, "sessions": set(), "last_active": None}
                         models_agg[model]["tokens"] += total_tokens
                         models_agg[model]["cost_cents"] += cost_cents
+                        if session_id:
+                            models_agg[model]["sessions"].add(session_id)
+                        if models_agg[model]["last_active"] is None or day_str > models_agg[model]["last_active"]:
+                            models_agg[model]["last_active"] = day_str
 
                         if project not in projects:
-                            projects[project] = {"tokens": 0, "cost_cents": 0.0}
+                            projects[project] = {"tokens": 0, "cost_cents": 0.0, "sessions": set(), "days": {}}
                         projects[project]["tokens"] += total_tokens
                         projects[project]["cost_cents"] += cost_cents
+                        if session_id:
+                            projects[project]["sessions"].add(session_id)
+                        p_days = projects[project]["days"]
+                        if day_str not in p_days:
+                            p_days[day_str] = {"tokens": 0, "cost_cents": 0.0}
+                        p_days[day_str]["tokens"] += total_tokens
+                        p_days[day_str]["cost_cents"] += cost_cents
 
             except (OSError, PermissionError):
                 continue
@@ -143,13 +160,29 @@ def _build_result(days: dict, models_agg: dict, projects: dict) -> dict:
     ]
 
     local_today = datetime.now(LOCAL_TZ).date()
+    all_active = {d for d, v in days.items() if v["tokens"] > 0}
+
     streak = 0
     if days:
-        all_active = {d for d, v in days.items() if v["tokens"] > 0}
         current = local_today
         while current.isoformat() in all_active:
             streak += 1
             current = current - timedelta(days=1)
+
+    # Longest historical run of consecutive active days (may differ from the
+    # current running streak above).
+    longest_streak = 0
+    if all_active:
+        run = 0
+        prev_date = None
+        for d in sorted(all_active):
+            cur_date = datetime.fromisoformat(d).date()
+            if prev_date is not None and cur_date == prev_date + timedelta(days=1):
+                run += 1
+            else:
+                run = 1
+            longest_streak = max(longest_streak, run)
+            prev_date = cur_date
 
     total_tokens = sum(v["tokens"] for v in days.values())
     total_cost_cents = round(sum(v["cost_cents"] for v in days.values()))
@@ -158,18 +191,97 @@ def _build_result(days: dict, models_agg: dict, projects: dict) -> dict:
         for v in days.values()
     )
     active_days = sum(1 for v in days.values() if v["tokens"] > 0)
+    first_active_day = min(all_active) if all_active else None
+    last_active_day = max(all_active) if all_active else None
+
+    # Last-30-days vs all-time split (based on the days table, which already
+    # includes DB-restored historical rows merged in by the caller).
+    cutoff_30 = (local_today - timedelta(days=29)).isoformat()
+    last_30_tokens = 0
+    last_30_cost_cents = 0.0
+    last_30_sessions = 0
+    last_30_active_days = 0
+    for d, v in days.items():
+        if d < cutoff_30:
+            continue
+        last_30_tokens += v["tokens"]
+        last_30_cost_cents += v["cost_cents"]
+        last_30_sessions += len(v["sessions"]) if isinstance(v["sessions"], set) else v["sessions"]
+        if v["tokens"] > 0:
+            last_30_active_days += 1
 
     models_list = sorted(
-        [{"name": k, "tokens": v["tokens"], "cost_cents": round(v["cost_cents"])} for k, v in models_agg.items()],
+        [
+            {
+                "name": k,
+                "tokens": v["tokens"],
+                "cost_cents": round(v["cost_cents"]),
+                "sessions": len(v["sessions"]),
+                "last_active": v["last_active"],
+            }
+            for k, v in models_agg.items()
+        ],
         key=lambda x: x["cost_cents"],
         reverse=True,
     )
 
-    projects_list = sorted(
-        [{"name": k, "tokens": v["tokens"], "cost_cents": round(v["cost_cents"])} for k, v in projects.items()],
-        key=lambda x: x["cost_cents"],
-        reverse=True,
-    )[:6]
+    # Weekly buckets covering the trailing ~12 weeks, used to build a per-
+    # project sparkline without shipping a full daily series for every project.
+    cutoff_84 = local_today - timedelta(days=83)
+    week_order: list[str] = []
+    seen_weeks: set[str] = set()
+    d = cutoff_84
+    while d <= local_today:
+        wk = _week_key(d.isoformat())
+        if wk not in seen_weeks:
+            seen_weeks.add(wk)
+            week_order.append(wk)
+        d += timedelta(days=1)
+    cutoff_84_str = cutoff_84.isoformat()
+
+    projects_full = []
+    for k, v in projects.items():
+        p_days = v["days"]
+        active_day_count = sum(1 for pd in p_days.values() if pd["tokens"] > 0)
+        last_active = max(p_days.keys()) if p_days else None
+
+        p_last_30_tokens = 0
+        p_last_30_cost_cents = 0.0
+        weekly: dict[str, dict] = {}
+        for day_str, day_v in p_days.items():
+            if day_str >= cutoff_30:
+                p_last_30_tokens += day_v["tokens"]
+                p_last_30_cost_cents += day_v["cost_cents"]
+            if day_str >= cutoff_84_str:
+                wk = _week_key(day_str)
+                if wk not in weekly:
+                    weekly[wk] = {"tokens": 0, "cost_cents": 0.0}
+                weekly[wk]["tokens"] += day_v["tokens"]
+                weekly[wk]["cost_cents"] += day_v["cost_cents"]
+
+        sparkline = [
+            {
+                "week": wk,
+                "tokens": weekly.get(wk, {}).get("tokens", 0),
+                "cost_cents": round(weekly.get(wk, {}).get("cost_cents", 0)),
+            }
+            for wk in week_order
+        ]
+
+        projects_full.append({
+            "name": k,
+            "tokens": v["tokens"],
+            "cost_cents": round(v["cost_cents"]),
+            "sessions": len(v["sessions"]),
+            "active_days": active_day_count,
+            "last_active": last_active,
+            "last_30d_tokens": p_last_30_tokens,
+            "last_30d_cost_cents": round(p_last_30_cost_cents),
+            "sparkline": sparkline,
+        })
+
+    projects_list = sorted(projects_full, key=lambda x: x["cost_cents"], reverse=True)[:6]
+    most_active_project = projects_list[0]["name"] if projects_list else None
 
     return {
         "days": days_list,
@@ -181,6 +293,16 @@ def _build_result(days: dict, models_agg: dict, projects: dict) -> dict:
             "total_sessions": total_sessions,
             "active_days": active_days,
             "streak": streak,
+            "longest_streak": longest_streak,
+            "first_active_day": first_active_day,
+            "last_active_day": last_active_day,
+            "most_active_project": most_active_project,
+            "last_30_days": {
+                "tokens": last_30_tokens,
+                "cost_cents": round(last_30_cost_cents),
+                "sessions": last_30_sessions,
+                "active_days": last_30_active_days,
+            },
         },
     }
 

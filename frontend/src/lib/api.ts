@@ -331,13 +331,35 @@ export interface TestimonialRequestResponse {
 // ── Claude Usage Types ────────────────────────────────────────────────────
 
 export interface ClaudeDay { date: string; tokens: number; cost_cents: number; sessions: number }
-export interface ClaudeModel { name: string; tokens: number; cost_cents: number }
-export interface ClaudeProject { name: string; tokens: number; cost_cents: number }
+export interface ClaudeModel { name: string; tokens: number; cost_cents: number; sessions?: number; last_active?: string | null }
+export interface ClaudeProjectWeek { week: string; tokens: number; cost_cents: number }
+export interface ClaudeProject {
+  name: string
+  tokens: number
+  cost_cents: number
+  sessions?: number
+  active_days?: number
+  last_active?: string | null
+  last_30d_tokens?: number
+  last_30d_cost_cents?: number
+  sparkline?: ClaudeProjectWeek[]
+}
 export interface ClaudeUsage {
   days: ClaudeDay[]
   models: ClaudeModel[]
   projects: ClaudeProject[]
-  summary: { total_tokens: number; total_cost_cents: number; total_sessions: number; active_days: number; streak: number }
+  summary: {
+    total_tokens: number
+    total_cost_cents: number
+    total_sessions: number
+    active_days: number
+    streak: number
+    longest_streak?: number
+    first_active_day?: string | null
+    last_active_day?: string | null
+    most_active_project?: string | null
+    last_30_days?: { tokens: number; cost_cents: number; sessions: number; active_days: number }
+  }
 }
 
 // ── Home Types ────────────────────────────────────────────────────────────────
@@ -377,6 +399,52 @@ export interface ResumeDataResponse {
   projects: ProjectResponse[]
   coursework: CourseworkResponse[]
   variants: ResumeVariantResponse[]
+}
+
+// ── Services ("Work With Me") Types ────────────────────────────────────────────
+
+export interface ServicesMetaResponse {
+  id: number
+  heading: string
+  subheading: string
+  intro: string
+  cta_heading: string
+  cta_text: string
+  cta_button_label: string
+}
+
+export interface ServiceOfferingResponse {
+  id: number
+  icon: string
+  title: string
+  description: string
+  sort_order: number
+}
+
+export interface ServiceProcessStepResponse {
+  id: number
+  title: string
+  description: string
+  sort_order: number
+}
+
+export interface EngagementTierResponse {
+  id: number
+  name: string
+  price_label: string
+  description: string
+  features: string[]
+  cta_label: string
+  highlighted: boolean
+  sort_order: number
+}
+
+export interface ServicesPageResponse {
+  meta: ServicesMetaResponse | null
+  offerings: ServiceOfferingResponse[]
+  process: ServiceProcessStepResponse[]
+  tiers: EngagementTierResponse[]
+  testimonials: TestimonialResponse[]
 }
 
 // ── About Page Types ──────────────────────────────────────────────────────────
@@ -929,6 +997,39 @@ export const api = {
 
   aboutPage: {
     get: () => request<AboutPageResponse>('GET', '/about-page'),
+  },
+
+  services: {
+    page: () => request<ServicesPageResponse>('GET', '/services/page'),
+    meta: {
+      get: () => request<ServicesMetaResponse>('GET', '/services/meta'),
+      update: (data: Partial<Omit<ServicesMetaResponse, 'id'>>) =>
+        request<ServicesMetaResponse>('PUT', '/services/meta', data),
+    },
+    offerings: {
+      list: () => request<ServiceOfferingResponse[]>('GET', '/services/offerings'),
+      create: (data: Omit<ServiceOfferingResponse, 'id'>) =>
+        request<ServiceOfferingResponse>('POST', '/services/offerings', data),
+      update: (id: number, data: Partial<Omit<ServiceOfferingResponse, 'id'>>) =>
+        request<ServiceOfferingResponse>('PUT', `/services/offerings/${id}`, data),
+      delete: (id: number) => request<void>('DELETE', `/services/offerings/${id}`),
+    },
+    process: {
+      list: () => request<ServiceProcessStepResponse[]>('GET', '/services/process'),
+      create: (data: Omit<ServiceProcessStepResponse, 'id'>) =>
+        request<ServiceProcessStepResponse>('POST', '/services/process', data),
+      update: (id: number, data: Partial<Omit<ServiceProcessStepResponse, 'id'>>) =>
+        request<ServiceProcessStepResponse>('PUT', `/services/process/${id}`, data),
+      delete: (id: number) => request<void>('DELETE', `/services/process/${id}`),
+    },
+    tiers: {
+      list: () => request<EngagementTierResponse[]>('GET', '/services/tiers'),
+      create: (data: Omit<EngagementTierResponse, 'id'>) =>
+        request<EngagementTierResponse>('POST', '/services/tiers', data),
+      update: (id: number, data: Partial<Omit<EngagementTierResponse, 'id'>>) =>
+        request<EngagementTierResponse>('PUT', `/services/tiers/${id}`, data),
+      delete: (id: number) => request<void>('DELETE', `/services/tiers/${id}`),
+    },
   },
 
   contactPage: {

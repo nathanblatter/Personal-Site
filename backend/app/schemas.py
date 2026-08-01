@@ -387,6 +387,112 @@ class CertificationResponse(CertificationBase):
     model_config = {"from_attributes": True}
 
 
+# ── Services ("Work With Me") ───────────────────────────────────────────────────
+
+class ServicesMetaBase(BaseModel):
+    heading: str
+    subheading: str
+    intro: str = ""
+    cta_heading: str = ""
+    cta_text: str = ""
+    cta_button_label: str = "Book a Call"
+
+
+class ServicesMetaUpdate(BaseModel):
+    heading: Optional[str] = None
+    subheading: Optional[str] = None
+    intro: Optional[str] = None
+    cta_heading: Optional[str] = None
+    cta_text: Optional[str] = None
+    cta_button_label: Optional[str] = None
+
+
+class ServicesMetaResponse(ServicesMetaBase):
+    id: int
+    model_config = {"from_attributes": True}
+
+
+class ServiceOfferingBase(BaseModel):
+    icon: str = "Code2"
+    title: str
+    description: str
+    sort_order: int = 0
+
+
+class ServiceOfferingCreate(ServiceOfferingBase):
+    pass
+
+
+class ServiceOfferingUpdate(BaseModel):
+    icon: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class ServiceOfferingResponse(ServiceOfferingBase):
+    id: int
+    model_config = {"from_attributes": True}
+
+
+class ServiceProcessStepBase(BaseModel):
+    title: str
+    description: str
+    sort_order: int = 0
+
+
+class ServiceProcessStepCreate(ServiceProcessStepBase):
+    pass
+
+
+class ServiceProcessStepUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class ServiceProcessStepResponse(ServiceProcessStepBase):
+    id: int
+    model_config = {"from_attributes": True}
+
+
+class EngagementTierBase(BaseModel):
+    name: str
+    price_label: str
+    description: str = ""
+    features: List[str] = []
+    cta_label: str = "Get Started"
+    highlighted: bool = False
+    sort_order: int = 0
+
+
+class EngagementTierCreate(EngagementTierBase):
+    pass
+
+
+class EngagementTierUpdate(BaseModel):
+    name: Optional[str] = None
+    price_label: Optional[str] = None
+    description: Optional[str] = None
+    features: Optional[List[str]] = None
+    cta_label: Optional[str] = None
+    highlighted: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+class EngagementTierResponse(EngagementTierBase):
+    id: int
+    model_config = {"from_attributes": True}
+
+
+class ServicesPageResponse(BaseModel):
+    meta: Optional[ServicesMetaResponse] = None
+    offerings: List[ServiceOfferingResponse] = []
+    process: List[ServiceProcessStepResponse] = []
+    tiers: List[EngagementTierResponse] = []
+    testimonials: List[TestimonialResponse] = []
+
+
 # ── Résumé variants ───────────────────────────────────────────────────────────
 
 class ResumeVariantBase(BaseModel):

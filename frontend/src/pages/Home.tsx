@@ -9,7 +9,8 @@ import TimelineItem from '../components/TimelineItem'
 import GitHubSection from '../components/GitHubSection'
 import Skeleton from '../components/Skeleton'
 import ProjectCardSkeleton from '../components/ProjectCardSkeleton'
-import { api, type ProjectResponse, type SkillResponse, type ExperienceResponse, type AboutResponse } from '../lib/api'
+import TestimonialStrip from '../components/TestimonialStrip'
+import { api, type ProjectResponse, type SkillResponse, type ExperienceResponse, type AboutResponse, type TestimonialResponse } from '../lib/api'
 import { usePortfolioCtx } from '../lib/usePortfolioCtx'
 
 const LiveStatus = lazy(() => import('../components/LiveStatus'))
@@ -19,6 +20,7 @@ export default function Home() {
   const [skills, setSkills] = useState<SkillResponse[]>([])
   const [experience, setExperience] = useState<ExperienceResponse[]>([])
   const [about, setAbout] = useState<AboutResponse | null>(null)
+  const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
   const [loading, setLoading] = useState(true)
   const portfolioCtx = usePortfolioCtx()
 
@@ -27,6 +29,14 @@ export default function Home() {
       setProjects(p); setSkills(s); setExperience(e); setAbout(a)
     }).finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    api.testimonials.list().then(setTestimonials).catch(() => {})
+  }, [])
+
+  const visibleTestimonials = portfolioCtx
+    ? testimonials.filter(t => (portfolioCtx.testimonials?.[String(t.id)]?.visibility ?? 'show') !== 'hide')
+    : testimonials
 
   const visibleProjects = portfolioCtx
     ? projects.filter(p => (portfolioCtx.projects?.[p.project_id]?.visibility ?? 'show') !== 'hide')
@@ -260,6 +270,22 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ═══ TESTIMONIALS ═══ */}
+      {visibleTestimonials.length > 0 && (
+        <section className="py-16 md:py-28">
+          <div className="max-w-[1100px] w-full mx-auto px-6 mb-8">
+            <SectionHeader
+              code="// 05"
+              title="Kind Words"
+              subtitle="From clients, professors, managers, and teammates."
+            />
+          </div>
+          <div className="max-w-[1280px] mx-auto">
+            <TestimonialStrip testimonials={visibleTestimonials} />
+          </div>
+        </section>
+      )}
 
       {/* ═══ CTA BANNER ═══ */}
       <section className="py-16 md:py-28 relative overflow-hidden">

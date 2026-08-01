@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
-import { api, type ClaudeUsage, type ClaudeDay } from '../lib/api'
+import { Flame, Trophy, CalendarDays } from 'lucide-react'
+import { api, type ClaudeUsage, type ClaudeDay, type ClaudeProject } from '../lib/api'
 import HeatmapGrid from './HeatmapGrid'
+import Skeleton from './Skeleton'
 
 /* ─── Token level helpers ──────────────────────────────────────────── */
 
@@ -109,6 +111,63 @@ function fmtTokens(n: number) {
   return `${n}`
 }
 
+function fmtWeek(week: string) {
+  // "2026-W31" -> "W31"
+  const idx = week.indexOf('W')
+  return idx >= 0 ? week.slice(idx) : week
+}
+
+/* ─── Project sparkline (weekly token trend) ──────────────────────────── */
+
+function ProjectSparkline({ project }: { project: ClaudeProject }) {
+  const weeks = project.sparkline
+  if (!weeks || weeks.length === 0) return null
+  const max = Math.max(...weeks.map(w => w.tokens), 1)
+
+  return (
+    <div className="flex items-end gap-[3px] h-6 mt-1.5" title="Weekly activity (last ~12 weeks)">
+      {weeks.map(w => (
+        <div
+          key={w.week}
+          className="flex-1 rounded-[1px] bg-violet/50 min-h-[2px]"
+          style={{ height: `${Math.max((w.tokens / max) * 100, w.tokens > 0 ? 8 : 0)}%` }}
+          title={`${fmtWeek(w.week)}: ${fmtTokens(w.tokens)} tokens · $${(w.cost_cents / 100).toFixed(2)}`}
+        />
+      ))}
+    </div>
+  )
+}
+
+/* ─── Skeleton ─────────────────────────────────────────────────────────── */
+
+function ClaudeSectionSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap gap-6 p-5 bg-snow border border-mist rounded-xl">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="space-y-1.5">
+            <Skeleton className="h-2.5 w-16" />
+            <Skeleton className="h-5 w-14" />
+          </div>
+        ))}
+      </div>
+      <div className="p-5 bg-snow border border-mist rounded-xl">
+        <Skeleton className="h-24 w-full" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="p-5 bg-snow border border-mist rounded-xl space-y-2.5">
+            <Skeleton className="h-2.5 w-20 mb-2" />
+            {Array.from({ length: 3 }).map((_, j) => (
+              <Skeleton key={j} className="h-4 w-full" />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function ClaudeSection() {
   const [usage, setUsage] = useState<ClaudeUsage | null>(null)
 
@@ -116,7 +175,7 @@ export default function ClaudeSection() {
     api.claude.usage().then(setUsage).catch(() => {})
   }, [])
 
-  if (!usage) return null
+  if (!usage) return <ClaudeSectionSkeleton />
 
   const { summary, days, models, projects } = usage
 
@@ -154,10 +213,37 @@ export default function ClaudeSection() {
         {summary.streak > 0 && (
           <div>
             <p className="font-mono text-[11px] text-steel uppercase tracking-wide mb-0.5">Streak</p>
-            <p className="font-mono text-lg font-semibold text-ink">{summary.streak}d</p>
+            <p className="font-mono text-lg font-semibold text-ink flex items-center gap-1">
+              <Flame size={14} className="text-violet" />
+              {summary.streak}d
+            </p>
+          </div>
+        )}
+        {!!summary.longest_streak && summary.longest_streak > summary.streak && (
+          <div>
+            <p className="font-mono text-[11px] text-steel uppercase tracking-wide mb-0.5">Best Streak</p>
+            <p className="font-mono text-lg font-semibold text-ink flex items-center gap-1">
+              <Trophy size={14} className="text-violet" />
+              {summary.longest_streak}d
+            </p>
           </div>
         )}
       </div>
+
+      {/* Last 30 days vs all-time */}
+      {summary.last_30_days && (
+        <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-steel">
+          <CalendarDays size={13} className="text-steel" />
+          <span>
+            Last 30 days:{' '}
+            <span className="text-ink font-semibold">
+              ${(summary.last_30_days.cost_cents / 100).toFixed(2)}
+            </span>{' '}
+            · {fmtTokens(summary.last_30_days.tokens)} tokens · {summary.last_30_days.sessions} sessions ·{' '}
+            {summary.last_30_days.active_days} active days
+          </span>
+        </div>
+      )}
 
       {/* Heatmap */}
       <div className="p-5 bg-snow border border-mist rounded-xl">
@@ -177,6 +263,9 @@ export default function ClaudeSection() {
                     <span className="font-mono text-xs text-ink truncate">{m.name}</span>
                     <span className="font-mono text-[11px] text-steel ml-2 shrink-0">
                       ${(m.cost_cents / 100).toFixed(2)}
+                      {typeof m.sessions === 'number' && m.sessions > 0 && (
+                        <span className="text-silver"> · {m.sessions} sess</span>
+                      )}
                     </span>
                   </div>
                   <div className="h-1.5 rounded-full bg-mist overflow-hidden">
@@ -194,8 +283,15 @@ export default function ClaudeSection() {
         {/* Projects */}
         {projects.length > 0 && (
           <div className="p-5 bg-snow border border-mist rounded-xl">
-            <p className="font-mono text-[11px] text-steel uppercase tracking-wide mb-3">By Project</p>
-            <div className="space-y-2.5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-mono text-[11px] text-steel uppercase tracking-wide">By Project</p>
+              {summary.most_active_project && (
+                <p className="font-mono text-[11px] text-silver truncate ml-2">
+                  Most active: <span className="text-steel">{summary.most_active_project}</span>
+                </p>
+              )}
+            </div>
+            <div className="space-y-3.5">
               {projects.map(p => (
                 <div key={p.name}>
                   <div className="flex items-center justify-between mb-1">
@@ -210,6 +306,15 @@ export default function ClaudeSection() {
                       style={{ width: `${(p.tokens / maxProjectTokens) * 100}%` }}
                     />
                   </div>
+                  <div className="flex items-center justify-between mt-1">
+                    {typeof p.active_days === 'number' && (
+                      <span className="font-mono text-[10px] text-silver">
+                        {p.active_days} active day{p.active_days === 1 ? '' : 's'}
+                        {typeof p.sessions === 'number' && p.sessions > 0 ? ` · ${p.sessions} sessions` : ''}
+                      </span>
+                    )}
+                  </div>
+                  <ProjectSparkline project={p} />
                 </div>
               ))}
             </div>

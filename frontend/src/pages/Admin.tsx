@@ -58,6 +58,7 @@ import BookingsSection from './admin/BookingsSection'
 import BioSection from './admin/BioSection'
 import InternshipsSection from './admin/InternshipsSection'
 import ConsultingSection from './admin/ConsultingSection'
+import ServicesSection from './admin/ServicesSection'
 import PagesSection from './admin/PagesSection'
 import ResumeVariantsSection from './admin/ResumeVariantsSection'
 
@@ -73,6 +74,7 @@ const sections = [
   { id: 'about', label: 'About', icon: User },
   { id: 'coursework', label: 'Coursework', icon: BookOpen },
   { id: 'contact', label: 'Contact', icon: AtSign },
+  { id: 'services', label: 'Services', icon: Handshake },
   { id: 'blog', label: 'Blog', icon: FileText },
   { id: 'resume', label: 'Résumé Variants', icon: ScrollText },
   { id: 'pages', label: 'Pages', icon: FileStack },
@@ -216,6 +218,7 @@ export default function Admin() {
     ),
     coursework: () => <CourseworkSection showToast={showToast} showError={showError} coursework={coursework} setCoursework={setCoursework} />,
     contact: () => <ContactSection showToast={showToast} showError={showError} socials={socials} setSocials={setSocials} contactMeta={contactMeta} setContactMeta={setContactMeta} />,
+    services: () => <ServicesSection showToast={showToast} showError={showError} />,
     blog: () => <BlogSection showToast={showToast} showError={showError} blogs={blogs} setBlogs={setBlogs} />,
     resume: () => <ResumeVariantsSection showToast={showToast} showError={showError} />,
     pages: () => <PagesSection showToast={showToast} showError={showError} />,

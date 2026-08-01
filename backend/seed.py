@@ -573,6 +573,151 @@ async def ensure_resume_variants(db) -> None:
     print("Seeded résumé variants.")
 
 
+SERVICES_META = {
+    "id": 1,
+    "heading": "Work With Me",
+    "subheading": "Full-stack engineering, AI systems, and data work — shipped end to end.",
+    "intro": (
+        "I partner with founders, research teams, and small businesses to turn ideas into "
+        "production software. From a scoped MVP to an embedded engagement, I own the work from "
+        "data model to deployed UI — pragmatic, well-tested, and built to hand off cleanly."
+    ),
+    "cta_heading": "Have a project in mind?",
+    "cta_text": (
+        "Book a free intro call and we'll talk through your goals, scope, and timeline. "
+        "No pressure — just an honest read on whether I can help."
+    ),
+    "cta_button_label": "Book an Intro Call",
+}
+
+SERVICE_OFFERINGS = [
+    {
+        "icon": "Code2",
+        "title": "Full-Stack Web Applications",
+        "description": (
+            "React + TypeScript front ends on FastAPI/Node back ends with PostgreSQL. "
+            "Auth, admin tooling, payments, and clean APIs — deployed and documented."
+        ),
+        "sort_order": 0,
+    },
+    {
+        "icon": "Brain",
+        "title": "AI & LLM Features",
+        "description": (
+            "Agents, RAG pipelines, and LLM-powered features wired into real products — "
+            "including a voice-enabled AI platform deployed for clinical research."
+        ),
+        "sort_order": 1,
+    },
+    {
+        "icon": "BarChart3",
+        "title": "Data & Analytics",
+        "description": (
+            "Data models, ETL/analytics pipelines, and dashboards (SQL, Python, BI tools) "
+            "that turn messy data into decisions you can act on."
+        ),
+        "sort_order": 2,
+    },
+    {
+        "icon": "Server",
+        "title": "Systems & Integrations",
+        "description": (
+            "Legacy refactors, API integrations, and cloud infra (AWS, Docker) — modernizing "
+            "what you have without a risky big-bang rewrite."
+        ),
+        "sort_order": 3,
+    },
+]
+
+SERVICE_PROCESS = [
+    {
+        "title": "Intro call",
+        "description": "A free 30-minute call to understand your goals, constraints, and timeline.",
+        "sort_order": 0,
+    },
+    {
+        "title": "Scope & proposal",
+        "description": "I write up a clear scope, milestones, and a fixed or hourly estimate — no surprises.",
+        "sort_order": 1,
+    },
+    {
+        "title": "Build in the open",
+        "description": "Weekly check-ins and working demos. You see progress early and steer as we go.",
+        "sort_order": 2,
+    },
+    {
+        "title": "Ship & hand off",
+        "description": "Deployed, documented, and handed off cleanly — with optional ongoing support.",
+        "sort_order": 3,
+    },
+]
+
+ENGAGEMENT_TIERS = [
+    {
+        "name": "Advisory",
+        "price_label": "$150/hr",
+        "description": "Hourly help for teams that just need an extra senior engineer.",
+        "features": [
+            "Architecture & code reviews",
+            "Pair programming and unblocking",
+            "AI/data strategy sessions",
+            "Flexible, no minimum commitment",
+        ],
+        "cta_label": "Book a Call",
+        "highlighted": False,
+        "sort_order": 0,
+    },
+    {
+        "name": "Project MVP",
+        "price_label": "From $2,500",
+        "description": "A scoped, fixed-price build to get a working product in your hands.",
+        "features": [
+            "Fixed scope & timeline",
+            "Full-stack app or AI feature",
+            "Weekly demos & check-ins",
+            "Deployed + documented handoff",
+        ],
+        "cta_label": "Start a Project",
+        "highlighted": True,
+        "sort_order": 1,
+    },
+    {
+        "name": "Embedded Partner",
+        "price_label": "Let's talk",
+        "description": "Ongoing, part-time engineering embedded with your team.",
+        "features": [
+            "Dedicated weekly hours",
+            "Roadmap & feature delivery",
+            "Direct Slack access",
+            "Monthly retainer",
+        ],
+        "cta_label": "Get in Touch",
+        "highlighted": False,
+        "sort_order": 2,
+    },
+]
+
+
+async def ensure_services_content(db) -> None:
+    """Backfill starter /services content once. No-op if offerings already exist,
+    so it never fights admin edits. Runs independent of the main seed guard."""
+    existing = await db.execute(select(models.ServiceOffering))
+    if existing.scalars().first():
+        return
+
+    meta_exists = (await db.execute(select(models.ServicesMeta))).scalars().first()
+    if not meta_exists:
+        db.add(models.ServicesMeta(**SERVICES_META))
+    for data in SERVICE_OFFERINGS:
+        db.add(models.ServiceOffering(**data))
+    for data in SERVICE_PROCESS:
+        db.add(models.ServiceProcessStep(**data))
+    for data in ENGAGEMENT_TIERS:
+        db.add(models.EngagementTier(**data))
+    await db.commit()
+    print("Seeded services content.")
+
+
 async def ensure_normalized_blog_tags(db) -> None:
     """One-time idempotent backfill: normalize existing blog_post.tags arrays.
 
@@ -624,6 +769,7 @@ async def seed() -> None:
         await ensure_site_content(db)
         await ensure_certifications(db)
         await ensure_resume_variants(db)
+        await ensure_services_content(db)
         await ensure_normalized_blog_tags(db)
 
         # Skip if already seeded

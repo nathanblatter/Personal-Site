@@ -147,6 +147,56 @@ class Certification(Base):
     tracked_link = relationship("TrackedLink", lazy="joined")
 
 
+# ── Services ("Work With Me") ───────────────────────────────────────────────────
+
+class ServicesMeta(Base):
+    """Singleton (id=1) — editorial copy for the public /services page."""
+    __tablename__ = "services_meta"
+
+    id = Column(Integer, primary_key=True, default=1)
+    heading = Column(String, nullable=False)
+    subheading = Column(String, nullable=False)
+    intro = Column(Text, nullable=False, default="")
+    cta_heading = Column(String, nullable=False, default="")
+    cta_text = Column(Text, nullable=False, default="")
+    cta_button_label = Column(String, nullable=False, default="Book a Call")
+
+
+class ServiceOffering(Base):
+    """A single service/offering card (what Nathan does for clients)."""
+    __tablename__ = "service_offerings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    icon = Column(String, nullable=False, default="Code2")   # lucide icon name
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+
+
+class ServiceProcessStep(Base):
+    """A step in the engagement process (how we'll work together)."""
+    __tablename__ = "service_process_steps"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+
+
+class EngagementTier(Base):
+    """A pricing/engagement tier with rough pricing and a feature list."""
+    __tablename__ = "engagement_tiers"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False)
+    price_label = Column(String, nullable=False)             # e.g. "From $2,500" / "$150/hr"
+    description = Column(Text, nullable=False, default="")
+    features = Column(JSON, nullable=False, default=list)    # list[str]
+    cta_label = Column(String, nullable=False, default="Get Started")
+    highlighted = Column(Boolean, nullable=False, default=False, server_default="false")
+    sort_order = Column(Integer, nullable=False, default=0)
+
+
 class ResumeVariant(Base):
     """A tailored résumé flavor (e.g. SWE / Data / AI) — overrides the summary
     headline + paragraph and surfaces projects matching its emphasis tags."""

@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from app.auth import assert_secure_secrets, require_auth
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report, newsletter, site_content, health, search, journal
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report, newsletter, site_content, health, search, journal, services, privacy
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
 from app.database import AsyncSessionLocal
 from app import models
@@ -71,6 +71,11 @@ _STATIC_OG: dict[str, dict[str, str]] = {
         "title": "Contact — Nathan Blatter",
         "description": "Open to internships, collaborations, and interesting projects.",
         "url": f"{DOMAIN}/contact",
+    },
+    "services": {
+        "title": "Work With Me — Nathan Blatter",
+        "description": "Full-stack, AI, and data consulting — offerings, process, and engagement tiers.",
+        "url": f"{DOMAIN}/services",
     },
     "resume": {
         "title": "Résumé — Nathan Blatter",
@@ -347,6 +352,8 @@ app.include_router(newsletter.router, prefix=API_PREFIX)
 app.include_router(site_content.router, prefix=API_PREFIX)
 app.include_router(health.router, prefix=API_PREFIX)
 app.include_router(search.router, prefix=API_PREFIX)
+app.include_router(services.router, prefix=API_PREFIX)
+app.include_router(privacy.router, prefix=API_PREFIX)
 
 
 _SECURITY_TXT = """\

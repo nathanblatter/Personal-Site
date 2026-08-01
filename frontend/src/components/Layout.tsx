@@ -12,15 +12,17 @@ const navLinks = [
   { to: '/', label: 'Home', code: '00' },
   { to: '/about', label: 'About', code: '01' },
   { to: '/projects', label: 'Projects', code: '02' },
-  { to: '/blog', label: 'Blog', code: '03' },
-  { to: '/now', label: 'Now', code: '04' },
-  { to: '/uses', label: 'Uses', code: '05' },
-  { to: '/contact', label: 'Contact', code: '06' },
+  { to: '/services', label: 'Services', code: '03' },
+  { to: '/blog', label: 'Blog', code: '04' },
+  { to: '/now', label: 'Now', code: '05' },
+  { to: '/uses', label: 'Uses', code: '06' },
+  { to: '/contact', label: 'Contact', code: '07' },
 ]
 
 const chunkMap: Record<string, () => Promise<unknown>> = {
   '/about': () => import('../pages/About'),
   '/projects': () => import('../pages/Projects'),
+  '/services': () => import('../pages/Services'),
   '/blog': () => import('../pages/Blog'),
   '/now': () => import('../pages/Now'),
   '/uses': () => import('../pages/Uses'),
