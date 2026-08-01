@@ -33,8 +33,18 @@ router = APIRouter(prefix="/kpi", tags=["kpi"])
 _KPI_POOL: asyncpg.Pool | None = None
 
 _ALLOWED_FIELDS = frozenset({
-    "resting_hr", "hrv_morning", "sleep_hrs", "sleep_bedtime",
-    "steps", "active_cal", "workout_type", "workout_duration_min",
+    # --- HealthKit-mined metrics (phone Shortcut) ---
+    "resting_hr", "hrv_morning", "avg_heart_rate", "max_heart_rate",
+    "min_heart_rate", "walking_hr_avg", "cardio_recovery",
+    "sleep_hrs", "sleep_bedtime", "sleep_deep_hrs", "sleep_rem_hrs",
+    "sleep_core_hrs", "sleep_awake_hrs",
+    "steps", "active_cal", "resting_energy_cal", "walking_distance_mi",
+    "flights_climbed", "exercise_minutes", "stand_hours",
+    "workout_type", "workout_duration_min",
+    "respiratory_rate", "blood_oxygen", "vo2_max",
+    "body_fat_pct", "lean_body_mass_lbs", "wrist_temp_c",
+    "mindful_minutes", "time_in_daylight_min", "headphone_audio_db",
+    # --- behavioural / self-report / scraped ---
     "energy_am", "prayer_am", "prayer_pm", "scripture", "church",
     "temple", "meaningful_convos", "new_people", "deep_work_hrs",
     "ideas_count", "lc_solved", "github_commits", "github_prs",
@@ -52,6 +62,29 @@ CREATE TABLE IF NOT EXISTS kpi_daily_log (
     active_cal          INTEGER,
     workout_type        TEXT,
     workout_duration_min INTEGER,
+    sleep_deep_hrs      NUMERIC,
+    sleep_rem_hrs       NUMERIC,
+    sleep_core_hrs      NUMERIC,
+    sleep_awake_hrs     NUMERIC,
+    respiratory_rate    NUMERIC,
+    blood_oxygen        NUMERIC,
+    vo2_max             NUMERIC,
+    resting_energy_cal  INTEGER,
+    walking_distance_mi NUMERIC,
+    flights_climbed     INTEGER,
+    exercise_minutes    INTEGER,
+    stand_hours         INTEGER,
+    avg_heart_rate      NUMERIC,
+    max_heart_rate      NUMERIC,
+    min_heart_rate      NUMERIC,
+    walking_hr_avg      NUMERIC,
+    cardio_recovery     NUMERIC,
+    mindful_minutes     INTEGER,
+    body_fat_pct        NUMERIC,
+    lean_body_mass_lbs  NUMERIC,
+    wrist_temp_c        NUMERIC,
+    time_in_daylight_min INTEGER,
+    headphone_audio_db  NUMERIC,
     energy_am           SMALLINT CHECK (energy_am BETWEEN 1 AND 10),
     prayer_am           BOOLEAN,
     prayer_pm           BOOLEAN,
@@ -124,6 +157,27 @@ async def init_kpi_db() -> None:
         await conn.execute("ALTER TABLE kpi_daily_log ADD COLUMN IF NOT EXISTS bmi NUMERIC")
         await conn.execute("ALTER TABLE kpi_daily_log ADD COLUMN IF NOT EXISTS weight_due_at TIMESTAMPTZ")
         await conn.execute("ALTER TABLE kpi_daily_log ADD COLUMN IF NOT EXISTS weight_reminded_at TIMESTAMPTZ")
+        # Expanded HealthKit-mined metrics (phone Shortcut posts these to /health-ingest).
+        # Additive + idempotent; matches the columns in _ALLOWED_FIELDS / HealthIngestRequest.
+        for _col, _type in (
+            ("sleep_hrs", "NUMERIC"), ("sleep_bedtime", "TIME"),
+            ("sleep_deep_hrs", "NUMERIC"), ("sleep_rem_hrs", "NUMERIC"),
+            ("sleep_core_hrs", "NUMERIC"), ("sleep_awake_hrs", "NUMERIC"),
+            ("workout_duration_min", "INTEGER"),
+            ("respiratory_rate", "NUMERIC"), ("blood_oxygen", "NUMERIC"),
+            ("vo2_max", "NUMERIC"), ("resting_energy_cal", "INTEGER"),
+            ("walking_distance_mi", "NUMERIC"), ("flights_climbed", "INTEGER"),
+            ("exercise_minutes", "INTEGER"), ("stand_hours", "INTEGER"),
+            ("avg_heart_rate", "NUMERIC"), ("max_heart_rate", "NUMERIC"),
+            ("min_heart_rate", "NUMERIC"), ("walking_hr_avg", "NUMERIC"),
+            ("cardio_recovery", "NUMERIC"), ("mindful_minutes", "INTEGER"),
+            ("body_fat_pct", "NUMERIC"), ("lean_body_mass_lbs", "NUMERIC"),
+            ("wrist_temp_c", "NUMERIC"), ("time_in_daylight_min", "INTEGER"),
+            ("headphone_audio_db", "NUMERIC"),
+        ):
+            await conn.execute(
+                f"ALTER TABLE kpi_daily_log ADD COLUMN IF NOT EXISTS {_col} {_type}"
+            )
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS location_log (
                 id        BIGSERIAL PRIMARY KEY,
@@ -166,12 +220,35 @@ class HealthIngestRequest(BaseModel):
     date: Optional[date_type] = None
     resting_hr: Optional[float] = None
     hrv_morning: Optional[float] = None
+    avg_heart_rate: Optional[float] = None
+    max_heart_rate: Optional[float] = None
+    min_heart_rate: Optional[float] = None
+    walking_hr_avg: Optional[float] = None
+    cardio_recovery: Optional[float] = None
     sleep_hrs: Optional[float] = None
     sleep_bedtime: Optional[time_type] = None
+    sleep_deep_hrs: Optional[float] = None
+    sleep_rem_hrs: Optional[float] = None
+    sleep_core_hrs: Optional[float] = None
+    sleep_awake_hrs: Optional[float] = None
     steps: Optional[int] = None
     active_cal: Optional[int] = None
+    resting_energy_cal: Optional[int] = None
+    walking_distance_mi: Optional[float] = None
+    flights_climbed: Optional[int] = None
+    exercise_minutes: Optional[int] = None
+    stand_hours: Optional[int] = None
     workout_type: Optional[str] = None
     workout_duration_min: Optional[int] = None
+    respiratory_rate: Optional[float] = None
+    blood_oxygen: Optional[float] = None
+    vo2_max: Optional[float] = None
+    body_fat_pct: Optional[float] = None
+    lean_body_mass_lbs: Optional[float] = None
+    wrist_temp_c: Optional[float] = None
+    mindful_minutes: Optional[int] = None
+    time_in_daylight_min: Optional[int] = None
+    headphone_audio_db: Optional[float] = None
     energy_am: Optional[int] = None
     prayer_am: Optional[bool] = None
     prayer_pm: Optional[bool] = None
@@ -424,6 +501,9 @@ async def workout_completion(
               SET workout_type = CASE
                     WHEN kpi_daily_log.workout_type IS NULL OR kpi_daily_log.workout_type = ''
                     THEN EXCLUDED.workout_type
+                    -- Don't re-append a type that's already logged today (no "gym, gym, gym…").
+                    WHEN EXCLUDED.workout_type = ANY (string_to_array(kpi_daily_log.workout_type, ', '))
+                    THEN kpi_daily_log.workout_type
                     ELSE kpi_daily_log.workout_type || ', ' || EXCLUDED.workout_type
                 END,
                 notes = CASE
