@@ -12,6 +12,7 @@
   "dependencies": {
     "katex": "^0.16.45",
     "lucide-react": "^0.577.0",
+    "mermaid": "^11.16.0",
     "motion": "^12.36.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.4",

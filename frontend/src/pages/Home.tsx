@@ -78,8 +78,8 @@ export default function Home() {
             className="text-6xl sm:text-8xl md:text-[120px] font-serif italic text-ink leading-[0.9] mb-6 md:mb-8 animate-fade-up"
             style={{ animationDelay: '0.4s' }}
           >
-            Nathan<br />
-            <span className="text-gradient-blue">Blatter</span>
+            <span className="text-gradient-blue">Nathan</span><br />
+            Blatter
           </h1>
 
           <p

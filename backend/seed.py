@@ -573,6 +573,47 @@ async def ensure_resume_variants(db) -> None:
     print("Seeded résumé variants.")
 
 
+async def ensure_normalized_blog_tags(db) -> None:
+    """One-time idempotent backfill: normalize existing blog_post.tags arrays.
+
+    For each post's tags: trim + collapse internal whitespace on each tag,
+    dedupe case-insensitively while keeping the first-seen casing, and only
+    write back if the array actually changed. Runs independent of the main
+    seed guard so it applies to already-seeded prod data, and never touches
+    posts whose tags are already normalized (so it never fights admin edits
+    beyond this normalization pass)."""
+    import re
+    from sqlalchemy.orm.attributes import flag_modified
+
+    result = await db.execute(select(models.BlogPost))
+    posts = result.scalars().all()
+
+    changed_count = 0
+    for post in posts:
+        original = post.tags or []
+        seen_lower = set()
+        normalized = []
+        for tag in original:
+            if not isinstance(tag, str):
+                normalized.append(tag)
+                continue
+            cleaned = re.sub(r"\s+", " ", tag.strip())
+            key = cleaned.lower()
+            if key in seen_lower:
+                continue
+            seen_lower.add(key)
+            normalized.append(cleaned)
+
+        if normalized != original:
+            post.tags = normalized
+            flag_modified(post, "tags")
+            changed_count += 1
+
+    if changed_count:
+        await db.commit()
+        print(f"Normalized tags on {changed_count} blog post(s).")
+
+
 async def seed() -> None:
     # Ensure tables exist (safe to call even after alembic migrations)
     async with engine.begin() as conn:
@@ -583,6 +624,7 @@ async def seed() -> None:
         await ensure_site_content(db)
         await ensure_certifications(db)
         await ensure_resume_variants(db)
+        await ensure_normalized_blog_tags(db)
 
         # Skip if already seeded
         result = await db.execute(select(models.Project))

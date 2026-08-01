@@ -13,6 +13,8 @@ MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY") or os.getenv("MINIO_ROOT_USER", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY") or os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
 MINIO_BUCKET = os.getenv("MINIO_BUCKET", "portfolio")
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", "20971520"))  # 20MB default
+CHUNK_SIZE = 1024 * 1024  # 1MB chunks
 
 
 def get_s3_client():
@@ -43,7 +45,20 @@ async def upload_file(
     ext = os.path.splitext(file.filename or "")[1]
     key = f"{prefix}/{uuid.uuid4().hex}{ext}"
 
-    contents = await file.read()
+    # Read file in chunks and collect into buffer
+    contents = bytearray()
+    while True:
+        chunk = await file.read(CHUNK_SIZE)
+        if not chunk:
+            break
+        contents.extend(chunk)
+        if len(contents) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds maximum size of {MAX_UPLOAD_BYTES} bytes",
+            )
+
+    contents = bytes(contents)
     client.put_object(
         Bucket=MINIO_BUCKET,
         Key=key,

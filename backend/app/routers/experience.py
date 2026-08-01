@@ -6,6 +6,7 @@ from app.database import get_db
 from app import models, schemas
 from app.auth import require_auth
 from app.cache import cache
+from app.utils import sort_experience
 
 router = APIRouter(prefix="/experience", tags=["experience"])
 
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/experience", tags=["experience"])
 @router.get("", response_model=List[schemas.ExperienceResponse])
 async def list_experience(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.Experience).order_by(models.Experience.sort_order))
-    return result.scalars().all()
+    return sort_experience(result.scalars().all())
 
 
 @router.get("/{experience_id}", response_model=schemas.ExperienceResponse)

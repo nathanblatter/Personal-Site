@@ -5,6 +5,7 @@ from app.database import get_db
 from app import models, schemas
 from app.cache import cache
 from app.routers.about import _cert_response
+from app.utils import sort_experience
 
 router = APIRouter(prefix="/about-page", tags=["about-page"])
 
@@ -31,7 +32,7 @@ async def get_about_page_data(db: AsyncSession = Depends(get_db)):
         "about": schemas.AboutResponse.model_validate(about_r.scalar_one_or_none()).model_dump(),
         "interests": [schemas.InterestResponse.model_validate(i).model_dump() for i in interests_r.scalars().all()],
         "coursework": [schemas.CourseworkResponse.model_validate(c).model_dump() for c in coursework_r.scalars().all()],
-        "experience": [schemas.ExperienceResponse.model_validate(e).model_dump() for e in experience_r.scalars().all()],
+        "experience": [schemas.ExperienceResponse.model_validate(e).model_dump() for e in sort_experience(experience_r.scalars().all())],
         "testimonials": [schemas.TestimonialResponse.model_validate(t).model_dump() for t in testimonials_r.scalars().all()],
         "certifications": [_cert_response(c).model_dump() for c in certs_r.scalars().unique().all()],
     }

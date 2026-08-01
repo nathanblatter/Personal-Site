@@ -29,6 +29,7 @@ const sanitizeSchema = {
 }
 import { api, type BlogPostResponse } from '../lib/api'
 import { readTime, formatDate } from '../lib/blogUtils'
+import Mermaid from '../components/Mermaid'
 
 function textContent(node: unknown): string {
   const n = node as { type?: string; value?: string; children?: unknown[] }
@@ -315,6 +316,9 @@ export default function BlogPost() {
               const cls = codeNode?.properties?.className ?? []
               const language = (cls.find(c => c.startsWith('language-')) ?? '').replace('language-', '')
               const raw = textContent(node)
+              if (language === 'mermaid') {
+                return <Mermaid code={raw} />
+              }
               return <CodeBlock language={language} raw={raw}>{children}</CodeBlock>
             },
             code: ({ className, children, ...props }) => {
