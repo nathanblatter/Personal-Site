@@ -1,0 +1,28 @@
+name: Monthly /now + /uses Refresh Link
+
+# On the 1st of each month, mint a magic link to the token-gated quick-update
+# form (purpose=monthly_update) and text it to Nathan over iMessage, so he can
+# refresh his /now and /uses content without logging in. The generate endpoint
+# sends the iMessage itself (send=true), so this is a single curl.
+# Failure-tolerant: a non-2xx just logs; next month self-heals.
+
+on:
+  schedule:
+    - cron: '0 15 1 * *'   # 15:00 UTC, first of every month
+  workflow_dispatch:
+
+jobs:
+  send-link:
+    runs-on: self-hosted
+    steps:
+      - name: Generate + text monthly update link
+        run: |
+          SITE_URL="${{ secrets.SITE_URL }}"
+          SITE_URL="${SITE_URL:-https://nathanblatter.com}"
+          echo "Requesting monthly quick-update link at ${SITE_URL}/api/v1/quick-update/generate"
+          curl -fsS -m 30 -X POST "${SITE_URL%/}/api/v1/quick-update/generate" \
+            -H "X-Quick-Update-Token: ${{ secrets.QUICK_UPDATE_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"purpose":"monthly_update","send":true}' \
+            && echo "Sent." \
+            || echo "Generate call failed (non-fatal); will retry next month."

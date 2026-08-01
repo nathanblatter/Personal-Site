@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from app.auth import assert_secure_secrets, require_auth
 
-from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report, newsletter, site_content, health, search, journal, services, privacy
+from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report, newsletter, site_content, health, search, journal, services, privacy, quick_update
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
 from app.database import AsyncSessionLocal
 from app import models
@@ -99,7 +99,7 @@ _STATIC_OG: dict[str, dict[str, str]] = {
     },
 }
 
-_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude", "/status", "/solar", "/testimonial", "/bookings", "/bio", "/newsletter", "/site-content", "/health"})
+_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude", "/status", "/solar", "/testimonial", "/bookings", "/bio", "/newsletter", "/site-content", "/health", "/privacy", "/quick-update"})
 
 # Known bot user-agent patterns for OG tag injection
 BOT_PATTERN = re.compile(
@@ -354,6 +354,7 @@ app.include_router(health.router, prefix=API_PREFIX)
 app.include_router(search.router, prefix=API_PREFIX)
 app.include_router(services.router, prefix=API_PREFIX)
 app.include_router(privacy.router, prefix=API_PREFIX)
+app.include_router(quick_update.router, prefix=API_PREFIX)
 
 
 _SECURITY_TXT = """\

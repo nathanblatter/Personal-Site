@@ -156,10 +156,56 @@ export interface UsesItem { name: string; note: string }
 export interface UsesCategory { icon: string; title: string; items: UsesItem[] }
 export interface UsesContent { categories: UsesCategory[] }
 
+// ── Quick-update magic-link forms (/now + /uses, booking availability) ───────
+
+export interface QuickAvailabilityWindow {
+  day_of_week: number
+  start_time: string
+  end_time: string
+  allowed_durations: number[]
+  enabled: boolean
+}
+
+export interface QuickUpdateContext {
+  purpose: 'monthly_update' | 'availability'
+  expires_at: string
+  now?: NowContent
+  uses?: UsesContent
+  timezone?: string
+  booking_enabled?: boolean
+  windows?: QuickAvailabilityWindow[]
+}
+
+export interface QuickUpdateSave {
+  now?: NowContent
+  uses?: UsesContent
+  windows?: QuickAvailabilityWindow[]
+  booking_enabled?: boolean
+}
+
 export interface SiteContentResponse<T = unknown> {
   key: string
   data: T
   updated_at?: string
+}
+
+export interface PrivacySection {
+  id: string
+  heading: string
+  paragraphs?: string[]
+  bullets?: string[]
+  footnote?: string
+  table?: { columns: string[]; rows: string[][] }
+  links?: { name: string; url: string; note?: string }[]
+}
+export interface PrivacyResponse {
+  title: string
+  effective_date: string
+  owner: string
+  site: string
+  contact_url: string
+  overview: string
+  sections: PrivacySection[]
 }
 
 export type ServiceStatus = 'operational' | 'degraded' | 'down'
@@ -984,6 +1030,13 @@ export const api = {
       request<SiteContentResponse<T>>('PUT', `/site-content/${key}`, { data }),
   },
 
+  quickUpdate: {
+    get: (token: string) =>
+      request<QuickUpdateContext>('GET', `/quick-update/${token}`),
+    save: (token: string, payload: QuickUpdateSave) =>
+      request<{ ok: boolean }>('POST', `/quick-update/${token}/save`, payload),
+  },
+
   health: {
     services: () => request<ServiceHealthResponse>('GET', '/health/services'),
   },
@@ -1058,6 +1111,10 @@ export const api = {
 
   home: {
     get: () => request<HomeResponse>('GET', '/home'),
+  },
+
+  privacy: {
+    get: () => request<PrivacyResponse>('GET', '/privacy'),
   },
 
   search: (q: string) =>

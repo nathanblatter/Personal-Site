@@ -1,197 +1,155 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { api, type PrivacyResponse, type PrivacySection } from '../lib/api'
+
+function SectionBlock({ section }: { section: PrivacySection }) {
+  return (
+    <section className="space-y-3">
+      <h2 className="font-sans font-semibold text-ink text-xl">{section.heading}</h2>
+      {section.paragraphs?.map((p, i) => (
+        <p key={i}>{p}</p>
+      ))}
+      {section.bullets && section.bullets.length > 0 && (
+        <ul className="list-disc list-inside space-y-1 pl-2 text-sm">
+          {section.bullets.map((b, i) => (
+            <li key={i}>{b}</li>
+          ))}
+        </ul>
+      )}
+      {section.footnote && <p>{section.footnote}</p>}
+      {section.table && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="border-b border-mist">
+                {section.table.columns.map((c, i) => (
+                  <th key={i} className="text-left py-2 pr-4 font-mono text-xs text-blue font-medium">
+                    {c}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-mist">
+              {section.table.rows.map((row, ri) => (
+                <tr key={ri}>
+                  {row.map((cell, ci) => (
+                    <td
+                      key={ci}
+                      className={`py-2.5 pr-4 text-xs ${ci === 0 ? 'font-mono text-ink' : ''}`}
+                    >
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {section.links && section.links.length > 0 && (
+        <div className="space-y-4">
+          {section.links.map((l, i) => (
+            <div key={i}>
+              <p className="text-ink font-medium text-sm mb-1">{l.name}</p>
+              <p className="text-sm">
+                {l.note}{' '}
+                <a
+                  href={l.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue hover:underline"
+                >
+                  Learn more
+                </a>
+                .
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function PrivacySkeleton() {
+  return (
+    <div className="prose-custom space-y-10 animate-pulse">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="space-y-3">
+          <div className="h-6 w-48 rounded bg-mist/60" />
+          <div className="h-4 w-full rounded bg-mist/40" />
+          <div className="h-4 w-11/12 rounded bg-mist/40" />
+          <div className="h-4 w-4/5 rounded bg-mist/40" />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function Privacy() {
+  const [data, setData] = useState<PrivacyResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    api.privacy
+      .get()
+      .then((d) => {
+        if (alive) setData(d)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
   return (
     <section className="py-16 md:py-24 min-h-screen">
       <div className="max-w-[720px] w-full mx-auto px-6">
         <div className="mb-12">
           <span className="font-mono text-xs text-blue tracking-[0.2em] uppercase">// LEGAL</span>
-          <h1 className="font-serif text-4xl md:text-5xl italic text-ink mt-3 mb-4">Privacy Policy</h1>
-          <p className="font-mono text-xs text-steel">Last updated: June 2026</p>
+          <h1 className="font-serif text-4xl md:text-5xl italic text-ink mt-3 mb-4">
+            {data?.title ?? 'Privacy Policy'}
+          </h1>
+          {loading ? (
+            <div className="h-3 w-32 rounded bg-mist/50 animate-pulse" />
+          ) : (
+            <p className="font-mono text-xs text-steel">
+              Last updated: {data?.effective_date ?? ''}
+            </p>
+          )}
         </div>
 
-        <div className="prose-custom space-y-10 text-steel leading-relaxed">
+        {loading ? (
+          <PrivacySkeleton />
+        ) : data ? (
+          <div className="prose-custom space-y-10 text-steel leading-relaxed">
+            <section className="space-y-3">
+              <h2 className="font-sans font-semibold text-ink text-xl">Overview</h2>
+              <p>{data.overview}</p>
+            </section>
 
-          <section className="space-y-3">
-            <h2 className="font-sans font-semibold text-ink text-xl">Overview</h2>
-            <p>
-              This is the personal portfolio of <span className="text-ink font-medium">Nathan Blatter</span> (nathanblatter.com).
-              This policy explains what data is collected when you visit, how it is used, and your rights.
-              The short version: very little is collected, nothing is sold, and you are never tracked across sites.
-            </p>
-          </section>
+            {data.sections.map((s) => (
+              <SectionBlock key={s.id} section={s} />
+            ))}
 
-          <section className="space-y-3">
-            <h2 className="font-sans font-semibold text-ink text-xl">Analytics</h2>
-            <p>
-              This site uses{' '}
-              <span className="text-ink font-medium">Umami Analytics</span>, a privacy-focused,
-              open-source analytics platform that is self-hosted on personal infrastructure.
-              Umami does <span className="text-ink font-medium">not</span> use cookies,
-              does not collect personally identifiable information, and does not track you
-              across websites.
-            </p>
-            <p>Each page view records only:</p>
-            <ul className="list-disc list-inside space-y-1 pl-2 text-sm">
-              <li>Page URL and referrer</li>
-              <li>Browser type and operating system (generic)</li>
-              <li>Screen size category</li>
-              <li>Country (derived from IP, which is not stored)</li>
-            </ul>
-            <p>
-              This data is used solely to understand which content is useful. It is never shared
-              with third parties.
-            </p>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="font-sans font-semibold text-ink text-xl">Cookies &amp; Local Storage</h2>
-            <p>
-              This site sets <span className="text-ink font-medium">no tracking cookies</span>.
-            </p>
-            <p>The following data is stored locally in your browser:</p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="border-b border-mist">
-                    <th className="text-left py-2 pr-4 font-mono text-xs text-blue font-medium">Key</th>
-                    <th className="text-left py-2 pr-4 font-mono text-xs text-blue font-medium">Type</th>
-                    <th className="text-left py-2 font-mono text-xs text-blue font-medium">Purpose</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-mist">
-                  <tr>
-                    <td className="py-2.5 pr-4 font-mono text-xs text-ink">theme</td>
-                    <td className="py-2.5 pr-4 text-xs">localStorage</td>
-                    <td className="py-2.5 text-xs">Remembers your light/dark mode preference</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 pr-4 font-mono text-xs text-ink">cookie-consent</td>
-                    <td className="py-2.5 pr-4 text-xs">localStorage</td>
-                    <td className="py-2.5 text-xs">Records that you dismissed this notice</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 pr-4 font-mono text-xs text-ink">auth_token</td>
-                    <td className="py-2.5 pr-4 text-xs">httpOnly cookie</td>
-                    <td className="py-2.5 text-xs">Admin session only — only set if you log into the admin panel. Not accessible to JavaScript. Never set for regular visitors.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="font-sans font-semibold text-ink text-xl">Contact Form</h2>
-            <p>
-              If you submit a message via the contact form, your name, email address, and message
-              are sent to Nathan Blatter by email and stored privately so that he can keep track of
-              and respond to your inquiry. This data is used only to correspond with you. It is never
-              sold or shared with anyone, and you can request its deletion at any time (see below).
-            </p>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="font-sans font-semibold text-ink text-xl">Scheduling a Call</h2>
-            <p>
-              If you request a call through the booking page, the name, email address, and topic
-              you provide are stored so the meeting can be scheduled and managed. Confirmation,
-              reminder, and update emails are sent to that address. To host the call, a meeting
-              link is created through <span className="text-ink font-medium">Zoom</span>; the
-              details you submit are shared with Zoom only as needed to set up that meeting. This
-              data is never sold or shared with anyone else, and you can request its deletion at
-              any time (see below).
-            </p>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="font-sans font-semibold text-ink text-xl">Bug Reports &amp; Feedback</h2>
-            <p>
-              If you use the feedback widget to report a problem, the message you write — along
-              with the page you were on and basic technical details (such as browser and screen
-              size) — is forwarded to a private issue tracker so the problem can be fixed. Only
-              include personal information if you choose to. This data is used solely to diagnose
-              and resolve issues and is never sold or shared with third parties.
-            </p>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="font-sans font-semibold text-ink text-xl">Third-Party Services</h2>
-            <div className="space-y-4">
-              <div>
-                <p className="text-ink font-medium text-sm mb-1">Google Fonts</p>
-                <p className="text-sm">
-                  This site loads fonts (JetBrains Mono, Instrument Serif, DM Sans) from Google's
-                  CDN. When your browser fetches these fonts, Google may log your IP address.
-                  See{' '}
-                  <a
-                    href="https://policies.google.com/privacy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue hover:underline"
-                  >
-                    Google's Privacy Policy
-                  </a>
-                  .
-                </p>
-              </div>
-              <div>
-                <p className="text-ink font-medium text-sm mb-1">Cloudflare</p>
-                <p className="text-sm">
-                  This site is served through Cloudflare's network. Cloudflare may process
-                  request metadata (IP address, headers) for security and performance. See{' '}
-                  <a
-                    href="https://www.cloudflare.com/privacypolicy/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue hover:underline"
-                  >
-                    Cloudflare's Privacy Policy
-                  </a>
-                  .
-                </p>
-              </div>
-              <div>
-                <p className="text-ink font-medium text-sm mb-1">Zoom</p>
-                <p className="text-sm">
-                  If you book a call, a meeting is created through Zoom. The name, email, and topic
-                  you provide are shared with Zoom solely to set up and host that meeting. See{' '}
-                  <a
-                    href="https://www.zoom.com/en/trust/privacy/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue hover:underline"
-                  >
-                    Zoom's Privacy Statement
-                  </a>
-                  .
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="font-sans font-semibold text-ink text-xl">Your Rights (GDPR)</h2>
-            <p>
-              If you are located in the European Economic Area, you have the right to access,
-              correct, or request deletion of any personal data held about you. Browsing the site
-              creates no persistent personal record. If you have contacted Nathan, booked a call,
-              or submitted feedback, you can request a copy or deletion of that information at any
-              time by getting in touch (see below).
-            </p>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="font-sans font-semibold text-ink text-xl">Contact</h2>
-            <p>
-              Questions about this policy?{' '}
-              <Link to="/contact" className="text-blue hover:underline">
-                Get in touch
-              </Link>
-              .
-            </p>
-          </section>
-
-        </div>
+            <section className="space-y-3">
+              <h2 className="font-sans font-semibold text-ink text-xl">Contact</h2>
+              <p>
+                Questions about this policy?{' '}
+                <Link to={data.contact_url || '/contact'} className="text-blue hover:underline">
+                  Get in touch
+                </Link>
+                .
+              </p>
+            </section>
+          </div>
+        ) : (
+          <p className="text-steel">Unable to load the privacy policy right now.</p>
+        )}
       </div>
     </section>
   )

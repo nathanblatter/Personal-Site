@@ -260,6 +260,24 @@ class SiteContent(Base):
     updated_at = Column(String, nullable=True)
 
 
+class MagicLink(Base):
+    """Token-gated, login-less magic links for low-friction self-service forms.
+
+    Delivered to Nathan over iMessage on a cron (monthly for /now + /uses,
+    weekly for booking availability). The token is the only credential; expiry
+    is enforced server-side. Reuse is allowed until expiry (he may revisit) —
+    ``used_at`` is stamped on first submit but does not invalidate the link.
+    """
+    __tablename__ = "magic_links"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token = Column(String, unique=True, index=True, nullable=False)
+    purpose = Column(String, nullable=False)  # "monthly_update" | "availability"
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+
+
 class Subscriber(Base):
     __tablename__ = "subscribers"
 

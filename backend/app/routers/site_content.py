@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app import models, schemas
 from app.auth import require_auth
+from app.cache import cache
 
 router = APIRouter(prefix="/site-content", tags=["site-content"])
 
@@ -40,4 +41,7 @@ async def upsert_content(
     row.updated_at = _now()
     await db.commit()
     await db.refresh(row)
+    # Aggregate pages assembled from site-content bust their cache on edit.
+    if key == "privacy":
+        await cache.delete("page:privacy")
     return row

@@ -636,6 +636,52 @@ class SiteContentUpdate(BaseModel):
     data: Dict[str, Any]
 
 
+# ── Quick-update magic-link forms (/now + /uses, booking availability) ────────
+
+class QuickUpdateGenerateRequest(BaseModel):
+    purpose: str  # "monthly_update" | "availability"
+    send: bool = True  # also text the link over iMessage
+    expires_days: Optional[int] = None
+
+
+class QuickUpdateGenerateResponse(BaseModel):
+    token: str
+    purpose: str
+    url: str
+    expires_at: str
+    sent: bool
+
+
+class QuickUpdateAvailabilityWindow(BaseModel):
+    day_of_week: int = Field(ge=0, le=6)
+    start_time: str
+    end_time: str
+    allowed_durations: List[int] = [30]
+    enabled: bool = True
+
+
+class QuickUpdateContext(BaseModel):
+    purpose: str
+    expires_at: str
+    # Present only for purpose == "monthly_update"
+    now: Optional[Dict[str, Any]] = None
+    uses: Optional[Dict[str, Any]] = None
+    # Present only for purpose == "availability"
+    timezone: Optional[str] = None
+    booking_enabled: Optional[bool] = None
+    windows: Optional[List[QuickUpdateAvailabilityWindow]] = None
+
+
+class QuickUpdateSave(BaseModel):
+    # For monthly_update: any of now/uses provided are written to SiteContent.
+    now: Optional[Dict[str, Any]] = None
+    uses: Optional[Dict[str, Any]] = None
+    # For availability: the full recurring weekday window set (replace-all),
+    # plus optional booking on/off toggle.
+    windows: Optional[List[QuickUpdateAvailabilityWindow]] = None
+    booking_enabled: Optional[bool] = None
+
+
 # ── Newsletter ────────────────────────────────────────────────────────────────
 
 class SubscribeRequest(BaseModel):

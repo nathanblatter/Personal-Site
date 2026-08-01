@@ -1,0 +1,26 @@
+name: Refresh Privacy Policy
+
+# Busts the assembled privacy-policy cache on the 1st of each month so the
+# "Last updated: <Month Year>" date flips and the enumerated data practices
+# re-render against the current deployed config. Failure-tolerant: if the
+# refresh can't reach the server it is a no-op — the endpoint's short TTL
+# already self-heals within the hour.
+
+on:
+  schedule:
+    - cron: '0 9 1 * *'   # 09:00 UTC, first of every month
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: self-hosted
+    steps:
+      - name: Bust privacy-policy cache
+        run: |
+          SITE_URL="${{ secrets.SITE_URL }}"
+          SITE_URL="${SITE_URL:-https://nathanblatter.com}"
+          echo "Refreshing privacy policy at ${SITE_URL}/api/v1/privacy/refresh"
+          curl -fsS -m 30 -X POST "${SITE_URL%/}/api/v1/privacy/refresh" \
+            -H "X-Refresh-Token: ${{ secrets.PRIVACY_REFRESH_TOKEN }}" \
+            && echo "Refreshed." \
+            || echo "Refresh call failed (non-fatal); short TTL will self-heal."

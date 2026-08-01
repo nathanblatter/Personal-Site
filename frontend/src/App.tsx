@@ -22,6 +22,7 @@ const Login = lazy(() => import('./pages/Login'))
 const TestimonialForm = lazy(() => import('./pages/TestimonialForm'))
 const LinkInBio = lazy(() => import('./pages/LinkInBio'))
 const InvoiceView = lazy(() => import('./pages/InvoiceView'))
+const QuickUpdate = lazy(() => import('./pages/QuickUpdate'))
 const ContractView = lazy(() => import('./pages/ContractView'))
 
 function ScrollToTop() {
@@ -65,6 +66,7 @@ function App() {
         <Route path="/testimonial/:slug" element={<Suspense fallback={null}><TestimonialForm /></Suspense>} />
         <Route path="/linkinbio" element={<Suspense fallback={null}><LinkInBio /></Suspense>} />
         <Route path="/invoice/:token" element={<Suspense fallback={null}><InvoiceView /></Suspense>} />
+        <Route path="/quick-update/:token" element={<Suspense fallback={null}><QuickUpdate /></Suspense>} />
         <Route path="/contract/:token" element={<Suspense fallback={null}><ContractView /></Suspense>} />
       </Routes>
     </div>
