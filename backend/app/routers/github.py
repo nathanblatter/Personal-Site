@@ -208,13 +208,13 @@ query($login: String!) {
         }
       }
       commitContributionsByRepository(maxRepositories: 100) {
-        repository { name url owner { login } }
+        repository { name url isPrivate owner { login } }
         contributions(first: 100) {
           nodes { occurredAt commitCount }
         }
       }
       pullRequestContributionsByRepository(maxRepositories: 100) {
-        repository { name url owner { login } }
+        repository { name url isPrivate owner { login } }
         contributions(first: 100) {
           nodes { occurredAt }
         }
@@ -245,12 +245,16 @@ async def _contributions_graphql() -> dict:
             break
 
     # Per-day repo activity, aggregated across ALL orgs/repos the token sees.
+    # Private repos count toward totals/owners but their names/URLs are never
+    # exposed in the public per-day activity payload.
     activity: dict[str, list[dict]] = {}
 
-    def _add_activity(date: str, name: str, url: str):
+    def _add_activity(date: str, repo: dict):
+        if repo["isPrivate"]:
+            return
         bucket = activity.setdefault(date, [])
-        if not any(r["name"] == name for r in bucket):
-            bucket.append({"name": name, "url": url})
+        if not any(r["name"] == repo["name"] for r in bucket):
+            bucket.append({"name": repo["name"], "url": repo["url"]})
 
     owners: dict[str, dict] = {}
 
@@ -261,7 +265,7 @@ async def _contributions_graphql() -> dict:
         for node in repo_group["contributions"]["nodes"]:
             date = node["occurredAt"][:10]
             o["commits"] += node["commitCount"]
-            _add_activity(date, repo["name"], repo["url"])
+            _add_activity(date, repo)
 
     for repo_group in c["pullRequestContributionsByRepository"]:
         repo = repo_group["repository"]
@@ -270,7 +274,7 @@ async def _contributions_graphql() -> dict:
         for node in repo_group["contributions"]["nodes"]:
             date = node["occurredAt"][:10]
             o["prs"] += 1
-            _add_activity(date, repo["name"], repo["url"])
+            _add_activity(date, repo)
 
     owners_list = sorted(
         owners.values(), key=lambda x: x["commits"] + x["prs"], reverse=True
