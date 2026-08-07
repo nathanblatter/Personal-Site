@@ -31,6 +31,12 @@ jobs:
           # Journal transcription/weave worker image (separate: faster-whisper is heavy)
           DOCKER_BUILDKIT=0 docker build --pull=false -f backend/Dockerfile.worker -t backend-worker:latest .
 
+          # Smoke-check the images before touching prod: a partial commit
+          # (module imported but its file never git-added) otherwise only
+          # surfaces as an unhealthy container mid-rollout (2026-08-01 incident).
+          docker run --rm backend-api:latest python -c "import app.main"
+          docker run --rm backend-worker:latest python -c "import app.journal_worker"
+
           # Get current running container ID
           cd $GITHUB_WORKSPACE/backend
           OLD_CONTAINER=$(docker compose $COMPOSE_ARGS ps -q api 2>/dev/null | head -1)

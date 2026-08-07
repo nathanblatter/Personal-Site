@@ -91,6 +91,13 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
         selectedDate={selected?.date ?? null}
         onCellClick={handleClick}
         onDeselect={() => setSelected(null)}
+        getTooltip={(day) => {
+          if (day.level === 0) return 'No contributions'
+          const repos = data.activity?.[day.date] || []
+          if (repos.length === 0) return 'Contributions (private activity)'
+          const names = repos.slice(0, 2).map(r => r.name).join(', ')
+          return repos.length > 2 ? `${names} +${repos.length - 2} more` : names
+        }}
         renderDetail={selected ? () => (
           <>
             {selected.level === 0 ? (

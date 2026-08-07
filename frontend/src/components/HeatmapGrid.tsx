@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { X } from 'lucide-react'
 
@@ -19,6 +19,8 @@ interface HeatmapGridProps<T extends { date: string }> {
   onCellClick: (day: T) => void
   onDeselect: () => void
   renderDetail?: () => React.ReactNode
+  /** Hover tooltip content for a cell; date header is added automatically. */
+  getTooltip?: (day: T) => React.ReactNode
 }
 
 export default function HeatmapGrid<T extends { date: string }>({
@@ -29,8 +31,20 @@ export default function HeatmapGrid<T extends { date: string }>({
   onCellClick,
   onDeselect,
   renderDetail,
+  getTooltip,
 }: HeatmapGridProps<T>) {
   const detailRef = useRef<HTMLDivElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [hover, setHover] = useState<{ day: T; x: number; y: number } | null>(null)
+
+  const handleCellEnter = (day: T, e: React.MouseEvent<HTMLDivElement>) => {
+    if (!getTooltip || !wrapRef.current) return
+    const wrap = wrapRef.current.getBoundingClientRect()
+    const cell = e.currentTarget.getBoundingClientRect()
+    // Center over the cell, clamped so the tooltip stays inside the section.
+    const x = Math.min(Math.max(cell.left - wrap.left + CELL / 2, 90), wrap.width - 90)
+    setHover({ day, x, y: cell.top - wrap.top })
+  }
 
   const monthLabels: { text: string; col: number }[] = []
   let prevMonth = -1
@@ -50,8 +64,23 @@ export default function HeatmapGrid<T extends { date: string }>({
   const totalWeeks = weeks.length
 
   return (
-    <div>
-      <div className="overflow-x-auto pb-2 -mx-1 px-1">
+    <div ref={wrapRef} className="relative">
+      {hover && getTooltip && (
+        <div
+          className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full"
+          style={{ left: hover.x, top: hover.y - 6 }}
+        >
+          <div className="px-2.5 py-1.5 rounded-md bg-ink text-snow shadow-lg whitespace-nowrap">
+            <p className="font-mono text-[10px] opacity-70 leading-tight">
+              {formatHeatmapDate(hover.day.date)}
+            </p>
+            <div className="font-mono text-[11px] font-medium leading-snug">
+              {getTooltip(hover.day)}
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="overflow-x-auto pb-2 -mx-1 px-1" onScroll={() => setHover(null)}>
         <div
           style={{
             display: 'grid',
@@ -112,6 +141,8 @@ export default function HeatmapGrid<T extends { date: string }>({
                     onCellClick(day)
                     setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 200)
                   }}
+                  onMouseEnter={(e) => handleCellEnter(day, e)}
+                  onMouseLeave={() => setHover(null)}
                 />
               )
             }),

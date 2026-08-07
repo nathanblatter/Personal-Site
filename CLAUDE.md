@@ -32,6 +32,7 @@ These are the conventions already established across the site. New features shou
 - **Org:** github.com/nathanblatter
 - **Runner:** Native macOS GitHub Actions runner on Mac Mini (launchd service at ~/actions-runner)
 - **Deploy trigger:** Push to `main` branch
-- **Deploy workflow:** `.github/workflows/deploy.yml` — pulls latest code in `/Users/nathanblatter/Desktop/Personal-Site/backend`, builds Docker image, starts prod compose, runs seed
+- **Deploy workflow:** `.github/workflows/deploy.yml` — checks out the pushed SHA into the runner workspace, builds frontend + Docker images from that clean checkout (never from this working tree), smoke-checks imports, then zero-downtime compose rollout + seed. `--project-directory` still points at `~/Desktop/Personal-Site/backend` only to resolve `.env.prod`.
+- **Commit completeness matters:** the 2026-08-01 failed deploy was a partial commit (main.py imported `routers/privacy.py` which was never `git add`ed). The import smoke-check in deploy.yml now catches this before rollout — but always `git status` before pushing.
 - **Secrets:** `backend/.env.prod` file on host (gitignored)
 - **Infrastructure:** Docker Compose (FastAPI backend), shared Postgres from docker-services, frontend served separately

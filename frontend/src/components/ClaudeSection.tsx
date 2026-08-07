@@ -75,6 +75,16 @@ function TokenHeatmap({ days }: { days: ClaudeDay[] }) {
       selectedDate={selected?.date ?? null}
       onCellClick={handleClick}
       onDeselect={() => setSelected(null)}
+      getTooltip={(day) => {
+        if (day.tokens === 0) return 'No Claude activity'
+        const full = byDate.get(day.date)
+        return (
+          <>
+            {fmtTokens(day.tokens)} tokens · ${((full?.cost_cents ?? 0) / 100).toFixed(2)}
+            {(full?.sessions ?? 0) > 0 && <> · {full!.sessions} session{full!.sessions === 1 ? '' : 's'}</>}
+          </>
+        )
+      }}
       renderDetail={selected ? () => (
         <>
           {selected.tokens === 0 ? (
@@ -121,19 +131,35 @@ function fmtWeek(week: string) {
 
 function ProjectSparkline({ project }: { project: ClaudeProject }) {
   const weeks = project.sparkline
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
   if (!weeks || weeks.length === 0) return null
   const max = Math.max(...weeks.map(w => w.tokens), 1)
+  const hovered = hoverIdx !== null ? weeks[hoverIdx] : null
 
   return (
-    <div className="flex items-end gap-[3px] h-6 mt-1.5" title="Weekly activity (last ~12 weeks)">
-      {weeks.map(w => (
+    <div className="relative">
+      {hovered && (
         <div
-          key={w.week}
-          className="flex-1 rounded-[1px] bg-violet/50 min-h-[2px]"
-          style={{ height: `${Math.max((w.tokens / max) * 100, w.tokens > 0 ? 8 : 0)}%` }}
-          title={`${fmtWeek(w.week)}: ${fmtTokens(w.tokens)} tokens · $${(w.cost_cents / 100).toFixed(2)}`}
-        />
-      ))}
+          className="pointer-events-none absolute z-20 bottom-full mb-1 -translate-x-1/2 px-2 py-1 rounded-md bg-ink text-snow shadow-lg whitespace-nowrap font-mono text-[10px]"
+          style={{ left: `${((hoverIdx! + 0.5) / weeks.length) * 100}%` }}
+        >
+          {fmtWeek(hovered.week)}: {fmtTokens(hovered.tokens)} tokens · ${(hovered.cost_cents / 100).toFixed(2)}
+        </div>
+      )}
+      <div className="flex gap-[3px] h-6 mt-1.5" onMouseLeave={() => setHoverIdx(null)}>
+        {weeks.map((w, i) => (
+          <div
+            key={w.week}
+            className="flex-1 h-full flex items-end"
+            onMouseEnter={() => setHoverIdx(i)}
+          >
+            <div
+              className={`w-full rounded-[1px] min-h-[2px] ${hoverIdx === i ? 'bg-violet' : 'bg-violet/50'}`}
+              style={{ height: `${Math.max((w.tokens / max) * 100, w.tokens > 0 ? 8 : 0)}%` }}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
