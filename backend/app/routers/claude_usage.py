@@ -120,13 +120,18 @@ def _scan_jsonl() -> dict:
                             days[day_str]["sessions"].add(session_id)
 
                         if model not in models_agg:
-                            models_agg[model] = {"tokens": 0, "cost_cents": 0.0, "sessions": set(), "last_active": None}
+                            models_agg[model] = {"tokens": 0, "cost_cents": 0.0, "sessions": set(), "last_active": None, "days": {}}
                         models_agg[model]["tokens"] += total_tokens
                         models_agg[model]["cost_cents"] += cost_cents
                         if session_id:
                             models_agg[model]["sessions"].add(session_id)
                         if models_agg[model]["last_active"] is None or day_str > models_agg[model]["last_active"]:
                             models_agg[model]["last_active"] = day_str
+                        m_day = models_agg[model]["days"].setdefault(day_str, {"tokens": 0, "cost_cents": 0.0, "sessions": set()})
+                        m_day["tokens"] += total_tokens
+                        m_day["cost_cents"] += cost_cents
+                        if session_id:
+                            m_day["sessions"].add(session_id)
 
                         if project not in projects:
                             projects[project] = {"tokens": 0, "cost_cents": 0.0, "sessions": set(), "days": {}}
@@ -136,14 +141,23 @@ def _scan_jsonl() -> dict:
                             projects[project]["sessions"].add(session_id)
                         p_days = projects[project]["days"]
                         if day_str not in p_days:
-                            p_days[day_str] = {"tokens": 0, "cost_cents": 0.0}
+                            p_days[day_str] = {"tokens": 0, "cost_cents": 0.0, "sessions": set()}
                         p_days[day_str]["tokens"] += total_tokens
                         p_days[day_str]["cost_cents"] += cost_cents
+                        if session_id:
+                            p_days[day_str]["sessions"].add(session_id)
 
             except (OSError, PermissionError):
                 continue
 
     return {"days": days, "models": models_agg, "projects": projects}
+
+
+def _sess_count(v: dict) -> int:
+    """Session count for an aggregate whose live sessions are a set, plus any
+    integer count merged in from DB-restored history (extra_sessions)."""
+    s = v["sessions"]
+    return (len(s) if isinstance(s, set) else s) + v.get("extra_sessions", 0)
 
 
 def _build_result(days: dict, models_agg: dict, projects: dict) -> dict:
@@ -216,7 +230,7 @@ def _build_result(days: dict, models_agg: dict, projects: dict) -> dict:
                 "name": k,
                 "tokens": v["tokens"],
                 "cost_cents": round(v["cost_cents"]),
-                "sessions": len(v["sessions"]),
+                "sessions": _sess_count(v),
                 "last_active": v["last_active"],
             }
             for k, v in models_agg.items()
@@ -272,7 +286,7 @@ def _build_result(days: dict, models_agg: dict, projects: dict) -> dict:
             "name": k,
             "tokens": v["tokens"],
             "cost_cents": round(v["cost_cents"]),
-            "sessions": len(v["sessions"]),
+            "sessions": _sess_count(v),
             "active_days": active_day_count,
             "last_active": last_active,
             "last_30d_tokens": p_last_30_tokens,
@@ -326,6 +340,23 @@ async def _do_snapshot() -> int:
         for d, v in days.items()
     ]
 
+    # Per-project / per-model daily breakdowns (personal-site-57): summary
+    # totals already survived JSONL pruning via ClaudeUsageDay; these rows let
+    # sparklines/sessions/actives survive it too.
+    breakdown_rows = []
+    for kind, aggs in (("model", scan["models"]), ("project", scan["projects"])):
+        for name, agg in aggs.items():
+            for day_str, dv in agg.get("days", {}).items():
+                breakdown_rows.append({
+                    "date": day_str,
+                    "kind": kind,
+                    "name": name,
+                    "tokens": dv["tokens"],
+                    "cost_cents": round(dv["cost_cents"]),
+                    "sessions": len(dv["sessions"]) if isinstance(dv["sessions"], set) else dv["sessions"],
+                    "snapshotted_at": now_iso,
+                })
+
     async with AsyncSessionLocal() as session:
         stmt = pg_insert(models.ClaudeUsageDay).values(rows)
         stmt = stmt.on_conflict_do_update(
@@ -338,6 +369,18 @@ async def _do_snapshot() -> int:
             },
         )
         await session.execute(stmt)
+        if breakdown_rows:
+            bstmt = pg_insert(models.ClaudeUsageBreakdownDay).values(breakdown_rows)
+            bstmt = bstmt.on_conflict_do_update(
+                index_elements=["date", "kind", "name"],
+                set_={
+                    "tokens": bstmt.excluded.tokens,
+                    "cost_cents": bstmt.excluded.cost_cents,
+                    "sessions": bstmt.excluded.sessions,
+                    "snapshotted_at": bstmt.excluded.snapshotted_at,
+                },
+            )
+            await session.execute(bstmt)
         await session.commit()
 
     # Bust cache so next GET reflects merged data
@@ -362,6 +405,16 @@ async def claude_usage():
         result = await session.execute(select(models.ClaudeUsageDay))
         db_rows = result.scalars().all()
 
+        restored_dates = [row.date for row in db_rows if row.date not in jsonl_days]
+        breakdown_rows = []
+        if restored_dates:
+            bres = await session.execute(
+                select(models.ClaudeUsageBreakdownDay).where(
+                    models.ClaudeUsageBreakdownDay.date.in_(restored_dates)
+                )
+            )
+            breakdown_rows = bres.scalars().all()
+
     merged_days = dict(jsonl_days)  # start with live data
     for row in db_rows:
         if row.date not in merged_days:
@@ -371,6 +424,29 @@ async def claude_usage():
                 "cost_cents": row.cost_cents,
                 "sessions": row.sessions,  # int, not set
             }
+
+    # Merge restored per-model/per-project history so breakdowns (sparklines,
+    # sessions, active days, last-30d) match the restored summary totals.
+    for r in breakdown_rows:
+        if r.kind == "model":
+            m = models_agg.setdefault(
+                r.name, {"tokens": 0, "cost_cents": 0.0, "sessions": set(), "last_active": None, "days": {}}
+            )
+            m["tokens"] += r.tokens
+            m["cost_cents"] += r.cost_cents
+            m["extra_sessions"] = m.get("extra_sessions", 0) + r.sessions
+            if m["last_active"] is None or r.date > m["last_active"]:
+                m["last_active"] = r.date
+        else:
+            p = projects.setdefault(
+                r.name, {"tokens": 0, "cost_cents": 0.0, "sessions": set(), "days": {}}
+            )
+            p["tokens"] += r.tokens
+            p["cost_cents"] += r.cost_cents
+            p["extra_sessions"] = p.get("extra_sessions", 0) + r.sessions
+            pd = p["days"].setdefault(r.date, {"tokens": 0, "cost_cents": 0.0, "sessions": set()})
+            pd["tokens"] += r.tokens
+            pd["cost_cents"] += r.cost_cents
 
     result_data = _build_result(merged_days, models_agg, projects)
     await cache.set("claude:usage", result_data, ttl=CACHE_TTL)

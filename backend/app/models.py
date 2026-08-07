@@ -615,6 +615,21 @@ class ClaudeUsageDay(Base):
     snapshotted_at = Column(String, nullable=False)
 
 
+class ClaudeUsageBreakdownDay(Base):
+    """Per-project / per-model daily aggregates snapshotted alongside
+    ClaudeUsageDay, so breakdowns survive JSONL cleanup (summary totals
+    already did; sparklines/sessions undercounted without this)."""
+    __tablename__ = "claude_usage_breakdown_days"
+
+    date = Column(String, primary_key=True)   # YYYY-MM-DD
+    kind = Column(String, primary_key=True)   # "project" | "model"
+    name = Column(String, primary_key=True)
+    tokens = Column(BigInteger, nullable=False, default=0)
+    cost_cents = Column(Integer, nullable=False, default=0)
+    sessions = Column(Integer, nullable=False, default=0)
+    snapshotted_at = Column(String, nullable=False)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Consulting CRM
 # ══════════════════════════════════════════════════════════════════════════════
