@@ -22,13 +22,17 @@ export default function Home() {
   const [about, setAbout] = useState<AboutResponse | null>(null)
   const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
   const portfolioCtx = usePortfolioCtx()
 
   useEffect(() => {
+    setLoading(true)
+    setError(false)
     api.home.get().then(({ projects: p, skills: s, experience: e, about: a, testimonials: t }) => {
       setProjects(p); setSkills(s); setExperience(e); setAbout(a); setTestimonials(t ?? [])
-    }).finally(() => setLoading(false))
-  }, [])
+    }).catch(() => setError(true)).finally(() => setLoading(false))
+  }, [retryKey])
 
   const visibleTestimonials = portfolioCtx
     ? testimonials.filter(t => (portfolioCtx.testimonials?.[String(t.id)]?.visibility ?? 'show') !== 'hide')
@@ -49,6 +53,21 @@ export default function Home() {
     return (portfolioCtx.experience?.[String(e.id)]?.visibility ?? 'show') !== 'hide'
   })
 
+  if (error) {
+    return (
+      <section className="min-h-[60vh] flex items-center justify-center py-24">
+        <div className="text-center text-steel">
+          <p className="font-mono text-sm mb-2">Couldn't load this page.</p>
+          <button
+            onClick={() => setRetryKey(k => k + 1)}
+            className="font-mono text-xs text-blue hover:underline underline-offset-2 mt-1"
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <>

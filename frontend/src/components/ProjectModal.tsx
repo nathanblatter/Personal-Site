@@ -145,7 +145,9 @@ export default function ProjectModal({ project, onClose }: Props) {
                       src={images[imgIdx]}
                       alt={`${project.title} screenshot ${imgIdx + 1} of ${images.length}`}
                       loading="lazy"
+                      decoding="async"
                       className="w-full object-cover"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                     />
                     {images.length > 1 && (
                       <>

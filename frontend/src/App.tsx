@@ -2,6 +2,7 @@ import { lazy, Suspense, useRef } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import Layout from './components/Layout'
+import Skeleton from './components/Skeleton'
 import Home from './pages/Home'
 import NotFound from './pages/NotFound'
 const Privacy = lazy(() => import('./pages/Privacy'))
@@ -40,6 +41,22 @@ function ScrollToTop() {
   return null
 }
 
+// Route-level Suspense fallback: a lightweight page-shell skeleton (header +
+// paragraph blocks) so lazy chunks don't flash a blank screen while loading.
+function PageFallback() {
+  return (
+    <div className="max-w-[1100px] w-full mx-auto px-6 py-20">
+      <Skeleton className="h-3 w-24 mb-4" />
+      <Skeleton className="h-10 w-64 mb-6" />
+      <div className="max-w-xl space-y-2">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-5/6" />
+        <Skeleton className="h-4 w-2/3" />
+      </div>
+    </div>
+  )
+}
+
 function App() {
   return (
     <div>
@@ -47,27 +64,27 @@ function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
-          <Route path="/projects" element={<Suspense fallback={null}><Projects /></Suspense>} />
-          <Route path="/projects/:projectId" element={<Suspense fallback={null}><CaseStudy /></Suspense>} />
-          <Route path="/now" element={<Suspense fallback={null}><Now /></Suspense>} />
-          <Route path="/uses" element={<Suspense fallback={null}><Uses /></Suspense>} />
-          <Route path="/status" element={<Suspense fallback={null}><Status /></Suspense>} />
-          <Route path="/about" element={<Suspense fallback={null}><About /></Suspense>} />
-          <Route path="/services" element={<Suspense fallback={null}><Services /></Suspense>} />
-          <Route path="/contact" element={<Suspense fallback={null}><Contact /></Suspense>} />
-          <Route path="/resume" element={<Suspense fallback={null}><Resume /></Suspense>} />
-          <Route path="/blog" element={<Suspense fallback={null}><Blog /></Suspense>} />
-          <Route path="/blog/:slug" element={<Suspense fallback={null}><BlogPost /></Suspense>} />
-          <Route path="/privacy" element={<Suspense fallback={null}><Privacy /></Suspense>} />
+          <Route path="/projects" element={<Suspense fallback={<PageFallback />}><Projects /></Suspense>} />
+          <Route path="/projects/:projectId" element={<Suspense fallback={<PageFallback />}><CaseStudy /></Suspense>} />
+          <Route path="/now" element={<Suspense fallback={<PageFallback />}><Now /></Suspense>} />
+          <Route path="/uses" element={<Suspense fallback={<PageFallback />}><Uses /></Suspense>} />
+          <Route path="/status" element={<Suspense fallback={<PageFallback />}><Status /></Suspense>} />
+          <Route path="/about" element={<Suspense fallback={<PageFallback />}><About /></Suspense>} />
+          <Route path="/services" element={<Suspense fallback={<PageFallback />}><Services /></Suspense>} />
+          <Route path="/contact" element={<Suspense fallback={<PageFallback />}><Contact /></Suspense>} />
+          <Route path="/resume" element={<Suspense fallback={<PageFallback />}><Resume /></Suspense>} />
+          <Route path="/blog" element={<Suspense fallback={<PageFallback />}><Blog /></Suspense>} />
+          <Route path="/blog/:slug" element={<Suspense fallback={<PageFallback />}><BlogPost /></Suspense>} />
+          <Route path="/privacy" element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
           <Route path="*" element={<NotFound />} />
         </Route>
-        <Route path="/admin" element={<Suspense fallback={null}><Admin /></Suspense>} />
-        <Route path="/admin/login" element={<Suspense fallback={null}><Login /></Suspense>} />
-        <Route path="/testimonial/:slug" element={<Suspense fallback={null}><TestimonialForm /></Suspense>} />
-        <Route path="/linkinbio" element={<Suspense fallback={null}><LinkInBio /></Suspense>} />
-        <Route path="/invoice/:token" element={<Suspense fallback={null}><InvoiceView /></Suspense>} />
-        <Route path="/quick-update/:token" element={<Suspense fallback={null}><QuickUpdate /></Suspense>} />
-        <Route path="/contract/:token" element={<Suspense fallback={null}><ContractView /></Suspense>} />
+        <Route path="/admin" element={<Suspense fallback={<PageFallback />}><Admin /></Suspense>} />
+        <Route path="/admin/login" element={<Suspense fallback={<PageFallback />}><Login /></Suspense>} />
+        <Route path="/testimonial/:slug" element={<Suspense fallback={<PageFallback />}><TestimonialForm /></Suspense>} />
+        <Route path="/linkinbio" element={<Suspense fallback={<PageFallback />}><LinkInBio /></Suspense>} />
+        <Route path="/invoice/:token" element={<Suspense fallback={<PageFallback />}><InvoiceView /></Suspense>} />
+        <Route path="/quick-update/:token" element={<Suspense fallback={<PageFallback />}><QuickUpdate /></Suspense>} />
+        <Route path="/contract/:token" element={<Suspense fallback={<PageFallback />}><ContractView /></Suspense>} />
       </Routes>
     </div>
   )

@@ -24,6 +24,8 @@ export default function Services() {
   const [tiers, setTiers] = useState<EngagementTierResponse[]>([])
   const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
   const portfolioCtx = usePortfolioCtx()
 
   const visibleTestimonials = portfolioCtx
@@ -31,13 +33,31 @@ export default function Services() {
     : testimonials
 
   useEffect(() => {
+    setLoading(true)
+    setError(false)
     api.services.page()
       .then(({ meta: m, offerings: o, process: p, tiers: t, testimonials: te }) => {
         setMeta(m); setOfferings(o); setProcess(p); setTiers(t); setTestimonials(te)
       })
-      .catch(() => {})
+      .catch(() => setError(true))
       .finally(() => setLoading(false))
-  }, [])
+  }, [retryKey])
+
+  if (error) {
+    return (
+      <section className="py-24 min-h-[60vh] flex items-center justify-center">
+        <div className="text-center text-steel">
+          <p className="font-mono text-sm mb-2">Couldn't load this page.</p>
+          <button
+            onClick={() => setRetryKey(k => k + 1)}
+            className="font-mono text-xs text-blue hover:underline underline-offset-2 mt-1"
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <>

@@ -175,7 +175,9 @@ export default function LinkInBio() {
               <img
                 src={settings.avatar_url}
                 alt={settings.heading}
+                decoding="async"
                 className="w-24 h-24 md:w-28 md:h-28 rounded-full object-cover object-top border-[3px] border-white shadow-lg shadow-black/5"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
               />
             ) : (
               <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-br from-blue/20 to-violet/20 flex items-center justify-center border-[3px] border-white shadow-lg">

@@ -15,11 +15,15 @@ export default function Projects() {
   const [filter, setFilter] = useState('All')
   const [selected, setSelected] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
   const portfolioCtx = usePortfolioCtx()
 
   useEffect(() => {
-    api.projects.list().then(setAllProjects).finally(() => setLoading(false))
-  }, [])
+    setLoading(true)
+    setError(false)
+    api.projects.list().then(setAllProjects).catch(() => setError(true)).finally(() => setLoading(false))
+  }, [retryKey])
 
   const visibleProjects = portfolioCtx
     ? allProjects.filter(p => (portfolioCtx.projects?.[p.project_id]?.visibility ?? 'show') !== 'hide')
@@ -29,6 +33,22 @@ export default function Projects() {
     filter === 'All'
       ? visibleProjects
       : visibleProjects.filter((p) => p.status === filter.toLowerCase())
+
+  if (error) {
+    return (
+      <section className="py-24 min-h-screen flex items-center justify-center">
+        <div className="text-center text-steel">
+          <p className="font-mono text-sm mb-2">Couldn't load this page.</p>
+          <button
+            onClick={() => setRetryKey(k => k + 1)}
+            className="font-mono text-xs text-blue hover:underline underline-offset-2 mt-1"
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="py-16 md:py-28 min-h-screen">

@@ -18,9 +18,13 @@ export default function About() {
   const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
   const [certifications, setCertifications] = useState<CertificationResponse[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
   const portfolioCtx = usePortfolioCtx()
 
   useEffect(() => {
+    setLoading(true)
+    setError(false)
     api.aboutPage.get().then(({ about: ab, interests: intr, coursework: cw, experience: ex, testimonials: test, certifications: certs }) => {
       setAbout(ab)
       setInterests(intr)
@@ -28,8 +32,8 @@ export default function About() {
       setExperience(ex)
       setTestimonials(test)
       setCertifications(certs ?? [])
-    }).finally(() => setLoading(false))
-  }, [])
+    }).catch(() => setError(true)).finally(() => setLoading(false))
+  }, [retryKey])
 
   const displayAbout: AboutResponse | null = about ? {
     ...about,
@@ -53,6 +57,22 @@ export default function About() {
   const displayExperience = portfolioCtx
     ? experience.filter(e => (portfolioCtx.experience?.[String(e.id)]?.visibility ?? 'show') !== 'hide')
     : experience
+
+  if (error) {
+    return (
+      <section className="py-24 min-h-[60vh] flex items-center justify-center">
+        <div className="text-center text-steel">
+          <p className="font-mono text-sm mb-2">Couldn't load this page.</p>
+          <button
+            onClick={() => setRetryKey(k => k + 1)}
+            className="font-mono text-xs text-blue hover:underline underline-offset-2 mt-1"
+          >
+            Retry
+          </button>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <>
@@ -344,7 +364,9 @@ export default function About() {
                               src={cert.image_url}
                               alt={cert.name}
                               loading="lazy"
+                              decoding="async"
                               className="w-20 h-20 object-contain shrink-0 bg-[#ffffff] rounded-lg p-2 border border-mist"
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                             />
                           )}
                           <div className="min-w-0">
@@ -391,7 +413,9 @@ export default function About() {
                                 src={cert.image_url}
                                 alt={cert.name}
                                 loading="lazy"
+                                decoding="async"
                                 className="w-9 h-9 object-contain shrink-0 bg-[#ffffff] rounded p-0.5"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                               />
                             )}
                             <div className="min-w-0">

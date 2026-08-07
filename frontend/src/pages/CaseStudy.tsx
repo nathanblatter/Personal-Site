@@ -15,17 +15,22 @@ export default function CaseStudy() {
   const { projectId } = useParams<{ projectId: string }>()
   const [project, setProject] = useState<ProjectResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
+    setError(false)
     api.projects.list()
       .then(list => {
         if (cancelled) return
         setProject(list.find(p => p.project_id === projectId) ?? null)
       })
+      .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [projectId])
+  }, [projectId, retryKey])
 
   if (loading) {
     return (
@@ -45,6 +50,22 @@ export default function CaseStudy() {
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-2/3" />
           </div>
+        </div>
+      </section>
+    )
+  }
+
+  if (error) {
+    return (
+      <section className="py-24 min-h-screen flex items-center justify-center">
+        <div className="text-center text-steel">
+          <p className="font-mono text-sm mb-2">Couldn't load this page.</p>
+          <button
+            onClick={() => setRetryKey(k => k + 1)}
+            className="font-mono text-xs text-blue hover:underline underline-offset-2 mt-1"
+          >
+            Retry
+          </button>
         </div>
       </section>
     )
@@ -124,7 +145,9 @@ export default function CaseStudy() {
                 src={src}
                 alt={`${project.title} — ${i + 1}`}
                 loading="lazy"
+                decoding="async"
                 className="w-full rounded-xl border border-mist"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
               />
             ))}
           </div>
