@@ -8,15 +8,16 @@ import BugReport from './BugReport'
 import SearchPalette from './SearchPalette'
 import FailoverBanner from './FailoverBanner'
 
+// Services was deliberately pulled out of the top nav (Nathan's call: bar was
+// crowded and Services felt overweighted) — it stays reachable via the footer.
 const navLinks = [
   { to: '/', label: 'Home', code: '00' },
   { to: '/about', label: 'About', code: '01' },
   { to: '/projects', label: 'Projects', code: '02' },
-  { to: '/services', label: 'Services', code: '03' },
-  { to: '/blog', label: 'Blog', code: '04' },
-  { to: '/now', label: 'Now', code: '05' },
-  { to: '/uses', label: 'Uses', code: '06' },
-  { to: '/contact', label: 'Contact', code: '07' },
+  { to: '/blog', label: 'Blog', code: '03' },
+  { to: '/now', label: 'Now', code: '04' },
+  { to: '/uses', label: 'Uses', code: '05' },
+  { to: '/contact', label: 'Contact', code: '06' },
 ]
 
 const chunkMap: Record<string, () => Promise<unknown>> = {
@@ -226,6 +227,12 @@ export default function Layout() {
                 {link.label}
               </Link>
             ))}
+            <Link
+              to="/services"
+              className="font-mono text-xs text-steel hover:text-blue transition-colors"
+            >
+              Services
+            </Link>
             <Link
               to="/privacy"
               className="font-mono text-xs text-steel hover:text-blue transition-colors"
