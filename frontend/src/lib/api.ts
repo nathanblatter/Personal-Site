@@ -415,6 +415,7 @@ export interface HomeResponse {
   skills: SkillResponse[]
   experience: ExperienceResponse[]
   about: AboutResponse
+  testimonials?: TestimonialResponse[]
 }
 
 // ── Resume Page Types ─────────────────────────────────────────────────────────

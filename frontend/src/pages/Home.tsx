@@ -25,13 +25,9 @@ export default function Home() {
   const portfolioCtx = usePortfolioCtx()
 
   useEffect(() => {
-    api.home.get().then(({ projects: p, skills: s, experience: e, about: a }) => {
-      setProjects(p); setSkills(s); setExperience(e); setAbout(a)
+    api.home.get().then(({ projects: p, skills: s, experience: e, about: a, testimonials: t }) => {
+      setProjects(p); setSkills(s); setExperience(e); setAbout(a); setTestimonials(t ?? [])
     }).finally(() => setLoading(false))
-  }, [])
-
-  useEffect(() => {
-    api.testimonials.list().then(setTestimonials).catch(() => {})
   }, [])
 
   const visibleTestimonials = portfolioCtx

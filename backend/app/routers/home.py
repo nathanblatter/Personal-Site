@@ -21,12 +21,14 @@ async def get_home_data(db: AsyncSession = Depends(get_db)):
     skills_r = await db.execute(select(models.Skill).order_by(models.Skill.sort_order))
     experience_r = await db.execute(select(models.Experience).order_by(models.Experience.sort_order))
     about_r = await db.execute(select(models.About).where(models.About.id == 1))
+    testimonials_r = await db.execute(select(models.Testimonial).order_by(models.Testimonial.sort_order))
 
     data = {
         "projects": [schemas.ProjectResponse.model_validate(p).model_dump() for p in projects_r.scalars().all()],
         "skills": [schemas.SkillResponse.model_validate(s).model_dump() for s in skills_r.scalars().all()],
         "experience": [schemas.ExperienceResponse.model_validate(e).model_dump() for e in experience_r.scalars().all()],
         "about": schemas.AboutResponse.model_validate(about_r.scalar_one_or_none()).model_dump(),
+        "testimonials": [schemas.TestimonialResponse.model_validate(t).model_dump() for t in testimonials_r.scalars().all()],
     }
     await cache.set(CACHE_KEY, data, ttl=CACHE_TTL)
     return data

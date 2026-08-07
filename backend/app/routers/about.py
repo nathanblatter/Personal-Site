@@ -247,6 +247,7 @@ async def create_testimonial(payload: schemas.TestimonialCreate, db: AsyncSessio
     await db.commit()
     await db.refresh(t)
     await cache.delete("page:about")
+    await cache.delete("page:home")
     return t
 
 
@@ -261,6 +262,7 @@ async def update_testimonial(tid: int, payload: schemas.TestimonialUpdate, db: A
     await db.commit()
     await db.refresh(t)
     await cache.delete("page:about")
+    await cache.delete("page:home")
     return t
 
 
@@ -273,6 +275,7 @@ async def delete_testimonial(tid: int, db: AsyncSession = Depends(get_db), _: No
     await db.delete(t)
     await db.commit()
     await cache.delete("page:about")
+    await cache.delete("page:home")
 
 
 # ── Certifications ────────────────────────────────────────────────────────────
