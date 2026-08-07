@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 import { api, type PrivacyResponse, type PrivacySection } from '../lib/api'
 
 function SectionBlock({ section }: { section: PrivacySection }) {
@@ -87,6 +88,11 @@ function PrivacySkeleton() {
 }
 
 export default function Privacy() {
+  useDocumentMeta({
+    title: 'Privacy — Nathan Blatter',
+    description: 'Privacy policy for nathanblatter.com — what data is collected and how it is used.',
+    canonical: '/privacy',
+  })
   const [data, setData] = useState<PrivacyResponse | null>(null)
   const [loading, setLoading] = useState(true)
 

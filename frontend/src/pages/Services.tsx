@@ -16,8 +16,14 @@ import {
   type EngagementTierResponse,
   type TestimonialResponse,
 } from '../lib/api'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 
 export default function Services() {
+  useDocumentMeta({
+    title: 'Services — Nathan Blatter',
+    description: 'Consulting and freelance services from Nathan Blatter — full-stack web apps, AI systems, and automation.',
+    canonical: '/services',
+  })
   const [meta, setMeta] = useState<ServicesMetaResponse | null>(null)
   const [offerings, setOfferings] = useState<ServiceOfferingResponse[]>([])
   const [process, setProcess] = useState<ServiceProcessStepResponse[]>([])

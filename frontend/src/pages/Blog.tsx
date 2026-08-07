@@ -5,8 +5,14 @@ import { Calendar, Clock, Eye, ArrowRight, Search, X } from 'lucide-react'
 import { api, type BlogPostResponse } from '../lib/api'
 import { readTime, formatDate } from '../lib/blogUtils'
 import NewsletterSignup from '../components/NewsletterSignup'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 
 export default function Blog() {
+  useDocumentMeta({
+    title: 'Blog — Nathan Blatter',
+    description: "Thoughts on software, technology, and things I'm learning.",
+    canonical: '/blog',
+  })
   const [posts, setPosts] = useState<BlogPostResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)

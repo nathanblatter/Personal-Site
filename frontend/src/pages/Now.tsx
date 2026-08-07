@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { api, type NowContent } from '../lib/api'
 import { contentIcon } from '../lib/contentIcons'
 import Skeleton from '../components/Skeleton'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 
 function NowSkeleton() {
   return (
@@ -37,6 +38,11 @@ const FALLBACK: NowContent = {
 }
 
 export default function Now() {
+  useDocumentMeta({
+    title: 'Now — Nathan Blatter',
+    description: "A snapshot of what has Nathan's attention at the moment — updated every so often.",
+    canonical: '/now',
+  })
   const [content, setContent] = useState<NowContent | null>(null)
   const [loading, setLoading] = useState(true)
 

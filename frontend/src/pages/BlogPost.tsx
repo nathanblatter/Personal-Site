@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 import { motion } from 'motion/react'
 import { ArrowLeft, Calendar, Clock, Eye, Link2, Check, List, X, Copy } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
@@ -96,6 +97,13 @@ export default function BlogPost() {
   const [activeId, setActiveId] = useState<string>('')
   const [tocOpen, setTocOpen] = useState(false)
   const headingsRef = useRef<TocItem[]>([])
+
+  useDocumentMeta({
+    title: post ? `${post.title} — Nathan Blatter` : undefined,
+    description: post ? (post.excerpt || post.subtitle || undefined) : undefined,
+    canonical: slug ? `/blog/${slug}` : undefined,
+    ogImage: post?.cover_image_url || undefined,
+  })
 
   useEffect(() => {
     if (!slug) return

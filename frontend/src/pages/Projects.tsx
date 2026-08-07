@@ -7,10 +7,16 @@ import ProjectCardSkeleton from '../components/ProjectCardSkeleton'
 import { api, type ProjectResponse } from '../lib/api'
 import { usePortfolioCtx } from '../lib/usePortfolioCtx'
 import type { Project } from '../components/ProjectCard'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 
 const categories = ['All', 'Live', 'WIP', 'Archived']
 
 export default function Projects() {
+  useDocumentMeta({
+    title: 'Projects — Nathan Blatter',
+    description: 'A collection of research, professional, and personal projects by Nathan Blatter.',
+    canonical: '/projects',
+  })
   const [allProjects, setAllProjects] = useState<ProjectResponse[]>([])
   const [filter, setFilter] = useState('All')
   const [selected, setSelected] = useState<Project | null>(null)

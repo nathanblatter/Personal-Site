@@ -9,8 +9,14 @@ import { Quote, ExternalLink, Star } from 'lucide-react'
 import { api, type AboutResponse, type InterestResponse, type CourseworkResponse, type ExperienceResponse, type TestimonialResponse, type CertificationResponse } from '../lib/api'
 import { usePortfolioCtx } from '../lib/usePortfolioCtx'
 import { getIcon } from '../lib/iconMap'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 
 export default function About() {
+  useDocumentMeta({
+    title: 'About — Nathan Blatter',
+    description: 'Background, experience, coursework, and interests of Nathan Blatter — IS student at BYU building full-stack applications and AI systems.',
+    canonical: '/about',
+  })
   const [about, setAbout] = useState<AboutResponse | null>(null)
   const [interests, setInterests] = useState<InterestResponse[]>([])
   const [coursework, setCoursework] = useState<CourseworkResponse[]>([])

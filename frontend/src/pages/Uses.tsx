@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import { api, type UsesContent } from '../lib/api'
 import { contentIcon } from '../lib/contentIcons'
 import Skeleton from '../components/Skeleton'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 
 function UsesSkeleton() {
   return (
@@ -42,6 +43,11 @@ const FALLBACK: UsesContent = {
 }
 
 export default function Uses() {
+  useDocumentMeta({
+    title: 'Uses — Nathan Blatter',
+    description: 'The hardware, software, and services behind the things Nathan builds.',
+    canonical: '/uses',
+  })
   const [content, setContent] = useState<UsesContent | null>(null)
   const [loading, setLoading] = useState(true)
 

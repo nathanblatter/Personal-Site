@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 import { motion, AnimatePresence } from 'motion/react'
 import { Send, MapPin, ArrowUpRight, Calendar, Clock, ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import SectionHeader from '../components/SectionHeader'
@@ -380,6 +381,11 @@ function BookACall() {
 }
 
 export default function Contact() {
+  useDocumentMeta({
+    title: 'Contact — Nathan Blatter',
+    description: 'Get in touch with Nathan Blatter — send a message or book a time to chat.',
+    canonical: '/contact',
+  })
   const [socials, setSocials] = useState<SocialResponse[]>([])
   const [meta, setMeta] = useState<ContactMetaResponse | null>(null)
   const [formData, setFormData] = useState<ContactSubmitRequest>({ name: '', email: '', message: '', honeypot: '' })

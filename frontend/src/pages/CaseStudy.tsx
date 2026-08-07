@@ -4,6 +4,7 @@ import { motion } from 'motion/react'
 import { ArrowLeft, ArrowUpRight } from 'lucide-react'
 import { api, type ProjectResponse } from '../lib/api'
 import Skeleton from '../components/Skeleton'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 
 const statusColors: Record<string, string> = {
   live: 'bg-teal',
@@ -17,6 +18,13 @@ export default function CaseStudy() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
+
+  useDocumentMeta({
+    title: project ? `${project.title} — Nathan Blatter` : undefined,
+    description: project?.description || undefined,
+    canonical: projectId ? `/projects/${projectId}` : undefined,
+    ogImage: project?.images?.[0] || undefined,
+  })
 
   useEffect(() => {
     let cancelled = false

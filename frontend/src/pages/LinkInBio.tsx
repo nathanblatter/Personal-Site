@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 import { motion } from 'motion/react'
 import { AlertCircle, RefreshCw, User, ArrowUpRight, Star, Calendar, ArrowRight } from 'lucide-react'
 import { getIcon } from '../lib/iconMap'
@@ -106,6 +107,11 @@ function LinkButton({ link, index }: { link: BioLinkResponse; index: number }) {
 
 /* ─── Main page ─── */
 export default function LinkInBio() {
+  useDocumentMeta({
+    title: 'Links — Nathan Blatter',
+    description: "All of Nathan Blatter's links in one place.",
+    canonical: '/linkinbio',
+  })
   const [data, setData] = useState<BioData | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 

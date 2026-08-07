@@ -12,10 +12,12 @@ import ProjectCardSkeleton from '../components/ProjectCardSkeleton'
 import TestimonialStrip from '../components/TestimonialStrip'
 import { api, type ProjectResponse, type SkillResponse, type ExperienceResponse, type AboutResponse, type TestimonialResponse } from '../lib/api'
 import { usePortfolioCtx } from '../lib/usePortfolioCtx'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 
 const LiveStatus = lazy(() => import('../components/LiveStatus'))
 
 export default function Home() {
+  useDocumentMeta({ title: 'Nathan Blatter — Portfolio', canonical: '/' })
   const [projects, setProjects] = useState<ProjectResponse[]>([])
   const [skills, setSkills] = useState<SkillResponse[]>([])
   const [experience, setExperience] = useState<ExperienceResponse[]>([])
