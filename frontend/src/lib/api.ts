@@ -107,6 +107,15 @@ export interface CertificationResponse {
   verify_slug?: string
 }
 
+export interface PersonalPhotoResponse {
+  id: number
+  image_url: string
+  image_key?: string
+  caption?: string
+  context: string  // 'about' | 'now'
+  sort_order: number
+}
+
 export interface SocialResponse {
   id: number
   icon: string
@@ -513,6 +522,7 @@ export interface AboutPageResponse {
   experience: ExperienceResponse[]
   testimonials: TestimonialResponse[]
   certifications: CertificationResponse[]
+  personal_photos?: PersonalPhotoResponse[]
 }
 
 // ── Contact Page Types ───────────────────────────────────────────────────────
@@ -999,6 +1009,16 @@ export const api = {
     update: (id: number, data: Partial<Omit<CertificationResponse, 'id' | 'tracked_link_id' | 'verify_slug'>>) =>
       request<CertificationResponse>('PUT', `/about/certifications/${id}`, data),
     delete: (id: number) => request<void>('DELETE', `/about/certifications/${id}`),
+  },
+
+  personalPhotos: {
+    list: (context?: string) =>
+      request<PersonalPhotoResponse[]>('GET', `/personal-photos${context ? `?context=${encodeURIComponent(context)}` : ''}`),
+    create: (data: Partial<Omit<PersonalPhotoResponse, 'id'>>) =>
+      request<PersonalPhotoResponse>('POST', '/personal-photos', data),
+    update: (id: number, data: Partial<Omit<PersonalPhotoResponse, 'id'>>) =>
+      request<PersonalPhotoResponse>('PUT', `/personal-photos/${id}`, data),
+    delete: (id: number) => request<void>('DELETE', `/personal-photos/${id}`),
   },
 
   contact: {

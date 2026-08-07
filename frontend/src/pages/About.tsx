@@ -4,9 +4,10 @@ import SectionHeader from '../components/SectionHeader'
 import TimelineItem from '../components/TimelineItem'
 import GitHubSection from '../components/GitHubSection'
 import ClaudeSection from '../components/ClaudeSection'
+import PhotoStrip from '../components/PhotoStrip'
 import Skeleton from '../components/Skeleton'
 import { Quote, ExternalLink, Star } from 'lucide-react'
-import { api, type AboutResponse, type InterestResponse, type CourseworkResponse, type ExperienceResponse, type TestimonialResponse, type CertificationResponse } from '../lib/api'
+import { api, type AboutResponse, type InterestResponse, type CourseworkResponse, type ExperienceResponse, type TestimonialResponse, type CertificationResponse, type PersonalPhotoResponse } from '../lib/api'
 import { usePortfolioCtx } from '../lib/usePortfolioCtx'
 import { getIcon } from '../lib/iconMap'
 import { useDocumentMeta } from '../lib/useDocumentMeta'
@@ -23,6 +24,7 @@ export default function About() {
   const [experience, setExperience] = useState<ExperienceResponse[]>([])
   const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
   const [certifications, setCertifications] = useState<CertificationResponse[]>([])
+  const [personalPhotos, setPersonalPhotos] = useState<PersonalPhotoResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
@@ -31,13 +33,14 @@ export default function About() {
   useEffect(() => {
     setLoading(true)
     setError(false)
-    api.aboutPage.get().then(({ about: ab, interests: intr, coursework: cw, experience: ex, testimonials: test, certifications: certs }) => {
+    api.aboutPage.get().then(({ about: ab, interests: intr, coursework: cw, experience: ex, testimonials: test, certifications: certs, personal_photos: photos }) => {
       setAbout(ab)
       setInterests(intr)
       setCoursework(cw)
       setExperience(ex)
       setTestimonials(test)
       setCertifications(certs ?? [])
+      setPersonalPhotos(photos ?? [])
     }).catch(() => setError(true)).finally(() => setLoading(false))
   }, [retryKey])
 
@@ -540,6 +543,20 @@ export default function About() {
           </div>
         </div>
       </section>
+
+      {/* Off the clock — personal photos */}
+      {personalPhotos.length > 0 && (
+        <section className="py-16 md:py-28 bg-snow">
+          <div className="max-w-[900px] w-full mx-auto px-6">
+            <SectionHeader
+              code="// OFF THE CLOCK"
+              title="Off the clock"
+              subtitle="Life outside the terminal."
+            />
+            <PhotoStrip photos={personalPhotos} />
+          </div>
+        </section>
+      )}
     </>
   )
 }

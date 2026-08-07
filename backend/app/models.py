@@ -147,6 +147,18 @@ class Certification(Base):
     tracked_link = relationship("TrackedLink", lazy="joined")
 
 
+class PersonalPhoto(Base):
+    """A candid personal photo shown on /about ("Off the clock") or /now ("Lately")."""
+    __tablename__ = "personal_photos"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    image_url = Column(String, nullable=False)           # display URL
+    image_key = Column(String, nullable=True)            # storage key in image storage
+    caption = Column(String, nullable=True)
+    context = Column(String, nullable=False, default="about", server_default="about")  # "about" | "now"
+    sort_order = Column(Integer, nullable=False, default=0)
+
+
 # ── Services ("Work With Me") ───────────────────────────────────────────────────
 
 class ServicesMeta(Base):

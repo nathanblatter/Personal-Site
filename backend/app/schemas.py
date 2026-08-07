@@ -387,6 +387,34 @@ class CertificationResponse(CertificationBase):
     model_config = {"from_attributes": True}
 
 
+# ── Personal Photos ───────────────────────────────────────────────────────────
+
+class PersonalPhotoBase(BaseModel):
+    image_url: str
+    image_key: Optional[str] = None
+    caption: Optional[str] = None
+    context: str = "about"   # "about" | "now"
+    sort_order: int = 0
+
+
+class PersonalPhotoCreate(PersonalPhotoBase):
+    pass
+
+
+class PersonalPhotoUpdate(BaseModel):
+    image_url: Optional[str] = None
+    image_key: Optional[str] = None
+    caption: Optional[str] = None
+    context: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class PersonalPhotoResponse(PersonalPhotoBase):
+    id: int
+
+    model_config = {"from_attributes": True}
+
+
 # ── Services ("Work With Me") ───────────────────────────────────────────────────
 
 class ServicesMetaBase(BaseModel):

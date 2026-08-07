@@ -26,6 +26,7 @@ import {
   Rows2,
   Menu,
   X,
+  Images,
 } from 'lucide-react'
 import {
   api,
@@ -60,6 +61,7 @@ import InternshipsSection from './admin/InternshipsSection'
 import ConsultingSection from './admin/ConsultingSection'
 import ServicesSection from './admin/ServicesSection'
 import PagesSection from './admin/PagesSection'
+import PhotosSection from './admin/PhotosSection'
 import ResumeVariantsSection from './admin/ResumeVariantsSection'
 
 /* ═══════════════════════════════════════════════
@@ -73,6 +75,7 @@ const sections = [
   { id: 'experience', label: 'Experience', icon: Briefcase },
   { id: 'about', label: 'About', icon: User },
   { id: 'coursework', label: 'Coursework', icon: BookOpen },
+  { id: 'photos', label: 'Photos', icon: Images },
   { id: 'contact', label: 'Contact', icon: AtSign },
   { id: 'services', label: 'Services', icon: Handshake },
   { id: 'blog', label: 'Blog', icon: FileText },
@@ -217,6 +220,7 @@ export default function Admin() {
       />
     ),
     coursework: () => <CourseworkSection showToast={showToast} showError={showError} coursework={coursework} setCoursework={setCoursework} />,
+    photos: () => <PhotosSection showToast={showToast} showError={showError} />,
     contact: () => <ContactSection showToast={showToast} showError={showError} socials={socials} setSocials={setSocials} contactMeta={contactMeta} setContactMeta={setContactMeta} />,
     services: () => <ServicesSection showToast={showToast} showError={showError} />,
     blog: () => <BlogSection showToast={showToast} showError={showError} blogs={blogs} setBlogs={setBlogs} />,

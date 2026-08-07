@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Link } from 'react-router-dom'
-import { api, type NowContent } from '../lib/api'
+import { api, type NowContent, type PersonalPhotoResponse } from '../lib/api'
 import { contentIcon } from '../lib/contentIcons'
 import Skeleton from '../components/Skeleton'
+import PhotoStrip from '../components/PhotoStrip'
 import { useDocumentMeta } from '../lib/useDocumentMeta'
 
 function NowSkeleton() {
@@ -45,6 +46,7 @@ export default function Now() {
   })
   const [content, setContent] = useState<NowContent | null>(null)
   const [loading, setLoading] = useState(true)
+  const [photos, setPhotos] = useState<PersonalPhotoResponse[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -52,6 +54,9 @@ export default function Now() {
       .then(res => { if (!cancelled) setContent(res.data) })
       .catch(() => { if (!cancelled) setContent(FALLBACK) })
       .finally(() => { if (!cancelled) setLoading(false) })
+    api.personalPhotos.list('now')
+      .catch(() => [] as PersonalPhotoResponse[])
+      .then(p => { if (!cancelled) setPhotos(p) })
     return () => { cancelled = true }
   }, [])
 
@@ -109,6 +114,18 @@ export default function Now() {
               )
             })}
           </div>
+        )}
+
+        {photos.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="mt-14 space-y-3"
+          >
+            <h2 className="font-sans font-semibold text-ink text-xl">Lately</h2>
+            <PhotoStrip photos={photos} size="sm" />
+          </motion.div>
         )}
 
         <motion.p

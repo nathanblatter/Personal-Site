@@ -27,6 +27,11 @@ async def get_about_page_data(db: AsyncSession = Depends(get_db)):
     certs_r = await db.execute(
         select(models.Certification).order_by(models.Certification.sort_order, models.Certification.id)
     )
+    photos_r = await db.execute(
+        select(models.PersonalPhoto)
+        .where(models.PersonalPhoto.context == "about")
+        .order_by(models.PersonalPhoto.sort_order, models.PersonalPhoto.id)
+    )
 
     data = {
         "about": schemas.AboutResponse.model_validate(about_r.scalar_one_or_none()).model_dump(),
@@ -35,6 +40,7 @@ async def get_about_page_data(db: AsyncSession = Depends(get_db)):
         "experience": [schemas.ExperienceResponse.model_validate(e).model_dump() for e in sort_experience(experience_r.scalars().all())],
         "testimonials": [schemas.TestimonialResponse.model_validate(t).model_dump() for t in testimonials_r.scalars().all()],
         "certifications": [_cert_response(c).model_dump() for c in certs_r.scalars().unique().all()],
+        "personal_photos": [schemas.PersonalPhotoResponse.model_validate(p).model_dump() for p in photos_r.scalars().all()],
     }
     await cache.set(CACHE_KEY, data, ttl=CACHE_TTL)
     return data

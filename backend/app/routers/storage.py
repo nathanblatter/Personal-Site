@@ -1,3 +1,4 @@
+import io
 import os
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
@@ -34,6 +35,45 @@ def ensure_bucket(client):
         client.create_bucket(Bucket=MINIO_BUCKET)
 
 
+# Formats whose metadata (EXIF/GPS) we scrub before storing personal photos.
+_EXIF_STRIP_FORMATS = {"JPEG", "PNG", "WEBP", "TIFF"}
+
+
+def strip_image_metadata(data: bytes) -> bytes:
+    """Re-encode a JPEG/PNG/WebP/TIFF image without EXIF (or other) metadata.
+
+    Keeps the original format (JPEG re-saved at quality=90, ICC profile
+    preserved). Non-image or unparseable input is returned unchanged.
+    """
+    try:
+        from PIL import Image, ImageOps
+
+        img = Image.open(io.BytesIO(data))
+        fmt = (img.format or "").upper()
+        if fmt not in _EXIF_STRIP_FORMATS:
+            return data
+        img.load()
+        # Bake the EXIF orientation into the pixels BEFORE dropping metadata —
+        # otherwise phone photos render sideways once the tag is gone.
+        img = ImageOps.exif_transpose(img)
+        # copy() carries pixels but we drop the metadata dict (EXIF, XMP, …),
+        # keeping only the ICC profile so colors stay correct.
+        clean = img.copy()
+        icc = img.info.get("icc_profile")
+        clean.info = {}
+        save_kwargs = {}
+        if icc:
+            save_kwargs["icc_profile"] = icc
+        if fmt == "JPEG":
+            save_kwargs["quality"] = 90
+        out = io.BytesIO()
+        clean.save(out, format=fmt, **save_kwargs)
+        return out.getvalue()
+    except Exception:
+        # Never fail an upload over metadata stripping — store as-is.
+        return data
+
+
 @router.post("/upload", dependencies=[Depends(require_auth)])
 async def upload_file(
     file: UploadFile = File(...),
@@ -59,6 +99,11 @@ async def upload_file(
             )
 
     contents = bytes(contents)
+
+    # Personal photos: scrub EXIF/GPS metadata before the image ever hits storage.
+    if prefix.startswith("personal"):
+        contents = strip_image_metadata(contents)
+
     client.put_object(
         Bucket=MINIO_BUCKET,
         Key=key,
