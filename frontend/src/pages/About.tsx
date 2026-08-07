@@ -205,19 +205,6 @@ export default function About() {
         </div>
       </section>
 
-      {/* Off the clock — personal photos */}
-      {personalPhotos.length > 0 && (
-        <section className="py-16 md:py-28 bg-snow">
-          <div className="max-w-[900px] w-full mx-auto px-6">
-            <SectionHeader
-              code="// OFF THE CLOCK"
-              title="Off the clock"
-              subtitle="Life outside the terminal."
-            />
-            <PhotoStrip photos={personalPhotos} />
-          </div>
-        </section>
-      )}
 
       {/* What I'm Looking For */}
       {displayAbout?.looking_for && displayAbout.looking_for.length > 0 && (
@@ -325,6 +312,20 @@ export default function About() {
           </div>
         </div>
       </section>
+
+      {/* Off the clock — personal photos */}
+      {personalPhotos.length > 0 && (
+        <section className="py-16 md:py-28 bg-snow">
+          <div className="max-w-[900px] w-full mx-auto px-6">
+            <SectionHeader
+              code="// OFF THE CLOCK"
+              title="Off the clock"
+              subtitle="Life outside the terminal."
+            />
+            <PhotoStrip photos={personalPhotos} />
+          </div>
+        </section>
+      )}
 
       {/* Certifications */}
       <section className="py-16 md:py-28">
