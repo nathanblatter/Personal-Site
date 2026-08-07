@@ -7,6 +7,7 @@ import httpx
 from fastapi import APIRouter
 
 from app.cache import cache
+from app.imessage_service import send_alert
 
 router = APIRouter(prefix="/github", tags=["github"])
 
@@ -379,6 +380,20 @@ async def _contributions_fallback() -> dict:
     }
 
 
+async def _alert_graphql_degraded() -> None:
+    """One-shot iMessage when a token-backed request lands on the scrape
+    fallback (dead/revoked PAT would otherwise silently degrade the viz).
+    Redis flag debounces to one alert per 24h; a successful GraphQL request
+    clears the flag so a later re-degradation alerts again."""
+    if await cache.get("github:fallback_alerted"):
+        return
+    await cache.set("github:fallback_alerted", True, ttl=86400)
+    await send_alert(
+        "nathanblatter.com: GitHub viz fell back off GraphQL — the PAT is "
+        "likely dead/expired (contributions now on the legacy scrape path)."
+    )
+
+
 @router.get("/contributions")
 async def github_contributions():
     cached = await cache.get("github:contributions_v2")
@@ -389,6 +404,12 @@ async def github_contributions():
         result = await _contributions_graphql() if GITHUB_TOKEN else await _contributions_fallback()
     except Exception:
         result = await _contributions_fallback()
+
+    if GITHUB_TOKEN:
+        if result.get("source") == "fallback":
+            await _alert_graphql_degraded()
+        else:
+            await cache.delete("github:fallback_alerted")
 
     await cache.set("github:contributions_v2", result, ttl=CACHE_TTL)
     return result
