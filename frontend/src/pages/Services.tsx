@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Link } from 'react-router-dom'
+import { track } from '../lib/track'
 import { ArrowRight, Check, Sparkles } from 'lucide-react'
 import SectionHeader from '../components/SectionHeader'
 import Skeleton from '../components/Skeleton'
@@ -78,6 +79,7 @@ export default function Services() {
               )}
               <Link
                 to="/contact"
+                onClick={() => track('services-cta', { placement: 'hero' })}
                 className="group inline-flex items-center justify-center gap-3 px-7 py-3.5 bg-blue text-white font-mono text-sm font-semibold rounded-xl hover:bg-blue-dim transition-colors shadow-lg shadow-blue/20"
               >
                 {meta?.cta_button_label || 'Book a Call'}
@@ -220,6 +222,7 @@ export default function Services() {
                       </ul>
                       <Link
                         to="/contact"
+                        onClick={() => track('services-cta', { placement: 'tier', tier: tier.name })}
                         className={`group inline-flex items-center justify-center gap-2 px-5 py-3 font-mono text-sm font-semibold rounded-xl transition-colors ${
                           tier.highlighted
                             ? 'bg-blue text-white hover:bg-blue-dim shadow-lg shadow-blue/20'
@@ -270,6 +273,7 @@ export default function Services() {
             </p>
             <Link
               to="/contact"
+              onClick={() => track('services-cta', { placement: 'banner' })}
               className="group inline-flex items-center gap-3 px-8 py-4 bg-blue text-white font-mono text-sm font-semibold rounded-xl hover:bg-blue-dim transition-colors shadow-lg shadow-blue/20"
             >
               {meta?.cta_button_label || 'Book a Call'}
