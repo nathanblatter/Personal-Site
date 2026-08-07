@@ -1,7 +1,7 @@
 import base64
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 from redis.asyncio import Redis
@@ -37,7 +37,7 @@ async def _get_token() -> str | None:
         return cached
 
     creds = base64.b64encode(f"{ZOOM_CLIENT_ID}:{ZOOM_CLIENT_SECRET}".encode()).decode()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
             "https://zoom.us/oauth/token",
             headers={"Authorization": f"Basic {creds}"},
@@ -58,6 +58,9 @@ async def create_meeting(topic: str, start_at: datetime, duration_minutes: int) 
         log.info("Zoom not configured, skipping meeting creation")
         return None
 
+    if start_at.tzinfo is not None:
+        start_at = start_at.astimezone(timezone.utc)
+
     payload = {
         "topic": topic,
         "type": 2,  # scheduled
@@ -70,7 +73,7 @@ async def create_meeting(topic: str, start_at: datetime, duration_minutes: int) 
         },
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
             "https://api.zoom.us/v2/users/me/meetings",
             headers={"Authorization": f"Bearer {token}"},
@@ -88,7 +91,7 @@ async def delete_meeting(meeting_id: str) -> bool:
     if not token:
         return False
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.delete(
             f"https://api.zoom.us/v2/meetings/{meeting_id}",
             headers={"Authorization": f"Bearer {token}"},

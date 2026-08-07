@@ -1,3 +1,4 @@
+import logging
 import os
 import aiosmtplib
 from datetime import date
@@ -11,6 +12,8 @@ from app import models, schemas, crm_utils
 from app.auth import require_auth
 from app.cache import cache as app_cache
 from app.utils import get_client_ip, get_redis
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/contact", tags=["contact"])
 
@@ -60,7 +63,10 @@ async def submit_contact(payload: schemas.ContactSubmit, request: Request, db: A
     msg.set_content(
         f"Name: {payload.name}\nEmail: {payload.email}\n\n{payload.message}"
     )
-    await aiosmtplib.send(msg, hostname=SMTP_HOST, port=SMTP_PORT, use_tls=False, start_tls=False)
+    try:
+        await aiosmtplib.send(msg, hostname=SMTP_HOST, port=SMTP_PORT, use_tls=False, start_tls=False, timeout=10)
+    except Exception:
+        log.warning("Contact email send failed; persisting lead anyway", exc_info=True)
 
     # Persist as a CRM contact + timeline activity (de-duplicated by email).
     try:

@@ -4,6 +4,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app import models, schemas
 from app.cache import cache
+from app.utils import sort_experience
 
 router = APIRouter(prefix="/home", tags=["home"])
 
@@ -26,7 +27,7 @@ async def get_home_data(db: AsyncSession = Depends(get_db)):
     data = {
         "projects": [schemas.ProjectResponse.model_validate(p).model_dump() for p in projects_r.scalars().all()],
         "skills": [schemas.SkillResponse.model_validate(s).model_dump() for s in skills_r.scalars().all()],
-        "experience": [schemas.ExperienceResponse.model_validate(e).model_dump() for e in experience_r.scalars().all()],
+        "experience": [schemas.ExperienceResponse.model_validate(e).model_dump() for e in sort_experience(experience_r.scalars().all())],
         "about": schemas.AboutResponse.model_validate(about_r.scalar_one_or_none()).model_dump(),
         "testimonials": [schemas.TestimonialResponse.model_validate(t).model_dump() for t in testimonials_r.scalars().all()],
     }

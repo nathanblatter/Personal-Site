@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 from datetime import datetime, timedelta, timezone
@@ -323,7 +324,7 @@ def _build_result(days: dict, models_agg: dict, projects: dict) -> dict:
 
 async def _do_snapshot() -> int:
     """Read JSONL data and upsert all days into DB. Returns number of days upserted."""
-    scan = _scan_jsonl()
+    scan = await asyncio.to_thread(_scan_jsonl)
     days = scan["days"]
     if not days:
         return 0
@@ -395,7 +396,7 @@ async def claude_usage():
         return cached
 
     # Scan live JSONL files
-    scan = _scan_jsonl()
+    scan = await asyncio.to_thread(_scan_jsonl)
     jsonl_days = scan["days"]           # date -> {tokens, cost_cents, sessions: set}
     models_agg = scan["models"]
     projects = scan["projects"]

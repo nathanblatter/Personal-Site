@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import date, datetime, timedelta, time as dt_time
+from html import escape
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -65,6 +66,8 @@ async def _get_settings(db: AsyncSession) -> models.BookingSettings:
 
 
 def _action_result_html(title: str, message: str, success: bool = True) -> HTMLResponse:
+    title = escape(title)
+    message = escape(message)
     color = "#10b981" if success else "#ef4444"
     icon = "&#10003;" if success else "&#10007;"
     return HTMLResponse(f"""<!DOCTYPE html>
