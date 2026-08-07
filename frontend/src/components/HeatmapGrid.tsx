@@ -37,7 +37,10 @@ export default function HeatmapGrid<T extends { date: string }>({
   const wrapRef = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<{ day: T; x: number; y: number } | null>(null)
 
-  const handleCellEnter = (day: T, e: React.MouseEvent<HTMLDivElement>) => {
+  const handleCellEnter = (
+    day: T,
+    e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
+  ) => {
     if (!getTooltip || !wrapRef.current) return
     const wrap = wrapRef.current.getBoundingClientRect()
     const cell = e.currentTarget.getBoundingClientRect()
@@ -125,11 +128,15 @@ export default function HeatmapGrid<T extends { date: string }>({
               const level = getLevel(day)
               const isSelected = selectedDate === day.date
               return (
-                <div
+                <button
                   key={`${wi}-${di}`}
-                  className={`rounded-[2px] cursor-pointer transition-shadow ${
-                    isSelected ? 'ring-2 ring-ink shadow-sm' : 'hover:ring-1 hover:ring-ink/40'
-                  }`}
+                  type="button"
+                  aria-label={`${formatHeatmapDate(day.date)} — view activity`}
+                  className={`block p-0 border-0 appearance-none rounded-[2px] cursor-pointer transition-shadow ${
+                    isSelected
+                      ? 'ring-2 ring-ink shadow-sm'
+                      : 'hover:ring-1 hover:ring-ink/40 focus-visible:ring-2 focus-visible:ring-ink focus-visible:shadow-sm'
+                  } focus:outline-none`}
                   style={{
                     gridColumn: wi + 2,
                     gridRow: di + 2,
@@ -143,6 +150,8 @@ export default function HeatmapGrid<T extends { date: string }>({
                   }}
                   onMouseEnter={(e) => handleCellEnter(day, e)}
                   onMouseLeave={() => setHover(null)}
+                  onFocus={(e) => handleCellEnter(day, e)}
+                  onBlur={() => setHover(null)}
                 />
               )
             }),

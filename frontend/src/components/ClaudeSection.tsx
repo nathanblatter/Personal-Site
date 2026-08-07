@@ -148,16 +148,21 @@ function ProjectSparkline({ project }: { project: ClaudeProject }) {
       )}
       <div className="flex gap-[3px] h-6 mt-1.5" onMouseLeave={() => setHoverIdx(null)}>
         {weeks.map((w, i) => (
-          <div
+          <button
             key={w.week}
-            className="flex-1 h-full flex items-end"
+            type="button"
+            aria-label={`${fmtWeek(w.week)}: ${fmtTokens(w.tokens)} tokens, $${(w.cost_cents / 100).toFixed(2)}`}
+            className="flex-1 h-full flex items-end p-0 border-0 appearance-none bg-transparent cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-violet rounded-[1px]"
             onMouseEnter={() => setHoverIdx(i)}
+            onFocus={() => setHoverIdx(i)}
+            onBlur={() => setHoverIdx(null)}
+            onClick={() => setHoverIdx(i)}
           >
             <div
               className={`w-full rounded-[1px] min-h-[2px] ${hoverIdx === i ? 'bg-violet' : 'bg-violet/50'}`}
               style={{ height: `${Math.max((w.tokens / max) * 100, w.tokens > 0 ? 8 : 0)}%` }}
             />
-          </div>
+          </button>
         ))}
       </div>
     </div>
