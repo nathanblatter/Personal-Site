@@ -660,6 +660,14 @@ class QuickUpdateAvailabilityWindow(BaseModel):
     enabled: bool = True
 
 
+class QuickUpdateWeekOverride(BaseModel):
+    date: str                       # YYYY-MM-DD
+    start_time: str
+    end_time: str
+    allowed_durations: List[int] = [30]
+    closed: bool = False
+
+
 class QuickUpdateContext(BaseModel):
     purpose: str
     expires_at: str
@@ -670,6 +678,8 @@ class QuickUpdateContext(BaseModel):
     timezone: Optional[str] = None
     booking_enabled: Optional[bool] = None
     windows: Optional[List[QuickUpdateAvailabilityWindow]] = None
+    # Existing dated one-off windows for the next 7 days (personal-site-54)
+    week_overrides: Optional[List[QuickUpdateWeekOverride]] = None
 
 
 class QuickUpdateSave(BaseModel):
@@ -680,6 +690,9 @@ class QuickUpdateSave(BaseModel):
     # plus optional booking on/off toggle.
     windows: Optional[List[QuickUpdateAvailabilityWindow]] = None
     booking_enabled: Optional[bool] = None
+    # "standing" (default) edits the recurring schedule; "week" writes dated
+    # one-off windows for the next 7 days only (personal-site-54).
+    scope: Optional[str] = None
 
 
 # ── Newsletter ────────────────────────────────────────────────────────────────

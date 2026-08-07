@@ -174,6 +174,15 @@ export interface QuickUpdateContext {
   timezone?: string
   booking_enabled?: boolean
   windows?: QuickAvailabilityWindow[]
+  week_overrides?: QuickUpdateWeekOverride[]
+}
+
+export interface QuickUpdateWeekOverride {
+  date: string
+  start_time: string
+  end_time: string
+  allowed_durations: number[]
+  closed: boolean
 }
 
 export interface QuickUpdateSave {
@@ -181,6 +190,7 @@ export interface QuickUpdateSave {
   uses?: UsesContent
   windows?: QuickAvailabilityWindow[]
   booking_enabled?: boolean
+  scope?: 'standing' | 'week'
 }
 
 export interface SiteContentResponse<T = unknown> {

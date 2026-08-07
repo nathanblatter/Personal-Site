@@ -117,17 +117,26 @@ async def get_available_slots(date: date, db: AsyncSession = Depends(get_db)):
     if date < today or date > today + timedelta(days=14):
         return []
 
-    # Get availability windows for this weekday
-    day_of_week = date.weekday()  # 0=Mon
-    windows_result = await db.execute(
-        select(models.AvailabilityWindow).where(
-            and_(
-                models.AvailabilityWindow.day_of_week == day_of_week,
-                models.AvailabilityWindow.enabled == True,
+    # Dated one-off windows replace the recurring weekday schedule for this
+    # date only (personal-site-54); a closed marker row yields no slots.
+    date_windows_result = await db.execute(
+        select(models.AvailabilityDateWindow).where(models.AvailabilityDateWindow.date == date)
+    )
+    date_windows = date_windows_result.scalars().all()
+    if date_windows:
+        windows = [w for w in date_windows if not w.closed]
+    else:
+        # Get availability windows for this weekday
+        day_of_week = date.weekday()  # 0=Mon
+        windows_result = await db.execute(
+            select(models.AvailabilityWindow).where(
+                and_(
+                    models.AvailabilityWindow.day_of_week == day_of_week,
+                    models.AvailabilityWindow.enabled == True,
+                )
             )
         )
-    )
-    windows = windows_result.scalars().all()
+        windows = windows_result.scalars().all()
     if not windows:
         return []
 

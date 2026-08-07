@@ -123,6 +123,7 @@ export default function QuickUpdate() {
   // availability state
   const [days, setDays] = useState<DayEdit[]>([])
   const [bookingEnabled, setBookingEnabled] = useState(true)
+  const [scope, setScope] = useState<'standing' | 'week'>('standing')
 
   useEffect(() => {
     if (!token) return
@@ -154,7 +155,7 @@ export default function QuickUpdate() {
     const payload: QuickUpdateSave =
       ctx.purpose === 'monthly_update'
         ? { now: editToNow(nowSections, lastUpdated), uses: editToUses(usesCats) }
-        : { windows: daysToWindows(days), booking_enabled: bookingEnabled }
+        : { windows: daysToWindows(days), booking_enabled: bookingEnabled, scope }
     try {
       await api.quickUpdate.save(token, payload)
       setState('done')
@@ -291,6 +292,24 @@ export default function QuickUpdate() {
                   <input type="checkbox" checked={bookingEnabled} onChange={e => setBookingEnabled(e.target.checked)} />
                   Accepting bookings {ctx.timezone ? `(${ctx.timezone})` : ''}
                 </label>
+                <div className="flex rounded-xl border border-mist bg-white p-1 text-sm font-medium w-fit">
+                  {(['standing', 'week'] as const).map(s2 => (
+                    <button key={s2} type="button" onClick={() => setScope(s2)}
+                      className={`px-4 py-1.5 rounded-lg transition-colors ${scope === s2 ? 'bg-blue text-white' : 'text-steel hover:text-ink'}`}>
+                      {s2 === 'standing' ? 'Standing schedule' : 'Just this week'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-steel">
+                  {scope === 'week'
+                    ? 'Applies to the next 7 days only — your standing weekly schedule is untouched.'
+                    : 'Edits your recurring weekly schedule.'}
+                </p>
+                {scope === 'standing' && (ctx.week_overrides?.length ?? 0) > 0 && (
+                  <p className="text-xs text-amber-600">
+                    Heads up: this week has one-off changes that override the standing schedule until they lapse.
+                  </p>
+                )}
                 {days.map((d, i) => (
                   <div key={i} className="rounded-2xl border border-mist bg-white p-4">
                     <label className="flex items-center gap-2 mb-2 text-sm font-medium text-ink">

@@ -27,6 +27,7 @@ import logging
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import select
@@ -144,6 +145,25 @@ async def get_context(
             )
             for w in win_result.scalars().all()
         ]
+        today = datetime.now(ZoneInfo(ctx.timezone)).date()
+        ov_result = await db.execute(
+            select(models.AvailabilityDateWindow)
+            .where(
+                models.AvailabilityDateWindow.date >= today,
+                models.AvailabilityDateWindow.date < today + timedelta(days=7),
+            )
+            .order_by(models.AvailabilityDateWindow.date, models.AvailabilityDateWindow.start_time)
+        )
+        ctx.week_overrides = [
+            schemas.QuickUpdateWeekOverride(
+                date=o.date.isoformat(),
+                start_time=o.start_time,
+                end_time=o.end_time,
+                allowed_durations=list(o.allowed_durations or [30]),
+                closed=o.closed,
+            )
+            for o in ov_result.scalars().all()
+        ]
     return ctx
 
 
@@ -169,7 +189,45 @@ async def save(
         await cache.delete("page:uses")
 
     elif link.purpose == "availability":
-        if payload.windows is not None:
+        if payload.windows is not None and payload.scope == "week":
+            _validate_windows(payload.windows)
+            # "Just this week": write dated one-off windows for the next 7
+            # days and leave the standing schedule untouched. Every date in
+            # the range becomes explicit — a weekday with no submitted window
+            # gets a closed marker so it yields no slots this week even if
+            # the recurring schedule normally opens it.
+            settings_result = await db.execute(
+                select(models.BookingSettings).where(models.BookingSettings.id == 1)
+            )
+            settings = settings_result.scalar_one_or_none()
+            tz = ZoneInfo(settings.timezone if settings else "America/Denver")
+            today = datetime.now(tz).date()
+            week_dates = [today + timedelta(days=i) for i in range(7)]
+            # Replace this week's overrides; also self-prune stale past rows.
+            stale = await db.execute(
+                select(models.AvailabilityDateWindow).where(
+                    models.AvailabilityDateWindow.date < today + timedelta(days=7)
+                )
+            )
+            for row in stale.scalars().all():
+                await db.delete(row)
+            by_dow = {}
+            for w in payload.windows:
+                if w.enabled:
+                    by_dow.setdefault(w.day_of_week, []).append(w)
+            for d in week_dates:
+                wins = by_dow.get(d.weekday(), [])
+                if wins:
+                    for w in wins:
+                        db.add(models.AvailabilityDateWindow(
+                            date=d,
+                            start_time=w.start_time,
+                            end_time=w.end_time,
+                            allowed_durations=w.allowed_durations or [30],
+                        ))
+                else:
+                    db.add(models.AvailabilityDateWindow(date=d, closed=True))
+        elif payload.windows is not None:
             _validate_windows(payload.windows)
             # Replace-all: the weekly form shows the full recurring set and lets
             # him edit it wholesale, mirroring the admin availability CRUD result.

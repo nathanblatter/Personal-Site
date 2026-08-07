@@ -552,6 +552,21 @@ class DateOverride(Base):
     reason = Column(String, nullable=True)
 
 
+class AvailabilityDateWindow(Base):
+    """Dated one-off availability (personal-site-54). Any rows for a concrete
+    date REPLACE the recurring weekday windows for that date only; a single
+    closed=True row means no slots that date. The standing weekly schedule
+    (AvailabilityWindow) is never touched by these."""
+    __tablename__ = "availability_date_windows"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    date = Column(Date, nullable=False, index=True)
+    start_time = Column(String, nullable=False, default="00:00")   # "14:00"
+    end_time = Column(String, nullable=False, default="00:00")
+    allowed_durations = Column(JSON, nullable=False, default=[30])
+    closed = Column(Boolean, nullable=False, default=False)
+
+
 class Booking(Base):
     __tablename__ = "bookings"
 
