@@ -35,7 +35,9 @@ export default function PhotoStrip({ photos, size = 'md' }: {
               }}
             />
             {photo.caption && (
-              <figcaption className="font-mono text-xs text-steel mt-2 px-0.5 max-w-[240px] leading-snug">
+              // w-0 + min-w-full: the caption can never widen the card — it
+              // wraps to exactly the image's width instead.
+              <figcaption className="font-mono text-xs text-steel mt-2 px-0.5 w-0 min-w-full leading-snug">
                 {photo.caption}
               </figcaption>
             )}
