@@ -972,7 +972,7 @@ async function render() {{
   const n = serverTakes.length + pend.length;
   emptyEl.style.display = n ? 'none' : 'block';
   submitBtn.disabled = serverTakes.length === 0 || unsentCount > 0;
-  msgEl.textContent = unsentCount ? (unsentCount + ' take(s) still uploading…') : '';
+  msgEl.textContent = unsentCount ? (unsentCount + ' take(s) still uploading…') : stickyMsg;
   takesEl.querySelectorAll('.del[data-id]').forEach(b => b.onclick = () => del(b.dataset.id));
 }}
 
@@ -981,24 +981,72 @@ async function del(id) {{
   render();
 }}
 
+// Capture interruptions (phone call, Siri, screen lock, app switch) silently
+// kill the mic on iOS while the wall clock keeps running — a "281s take" once
+// held 19.8s of real audio (journal-12). Defenses: (1) record with a 1s
+// timeslice so captured audio is in `chunks`, not stuck inside a dead
+// recorder; (2) watch track mute/ended, recorder errors, and page-hide, and
+// auto-finalize the take the moment capture dies, with a visible warning;
+// (3) count duration only while the mic is actually live.
+let liveMs = 0, liveSince = 0, interruptReason = '', stickyMsg = '';
+
+function liveSeconds() {{
+  return Math.round((liveMs + (liveSince ? Date.now() - liveSince : 0)) / 1000);
+}}
+
+function stopRec(reason) {{
+  if (!recording) return;
+  recording = false;
+  if (reason) interruptReason = reason;
+  recBtn.textContent = '● Record'; recBtn.classList.remove('recording');
+  try {{ mediaRecorder.stop(); }} catch (e) {{}}
+}}
+
+document.addEventListener('visibilitychange', () => {{
+  if (document.hidden && recording) stopRec('screen locked or app switched');
+}});
+
 async function startRec() {{
   const stream = await navigator.mediaDevices.getUserMedia({{ audio: true }});
   mediaRecorder = new MediaRecorder(stream);
-  chunks = []; startedAt = Date.now();
+  chunks = []; startedAt = Date.now(); liveMs = 0; liveSince = Date.now(); interruptReason = ''; stickyMsg = '';
+  const track = stream.getAudioTracks()[0];
+  if (track) {{
+    track.onmute = () => {{
+      if (liveSince) {{ liveMs += Date.now() - liveSince; liveSince = 0; }}
+      // Grace period: a transient mute (notification ping) can recover; a
+      // call/lock stays muted. If still muted shortly after, finalize.
+      setTimeout(() => {{ if (recording && track.muted) stopRec('mic was interrupted'); }}, 1500);
+    }};
+    track.onunmute = () => {{ if (!liveSince) liveSince = Date.now(); }};
+    track.onended = () => stopRec('mic was disconnected');
+  }}
+  mediaRecorder.onerror = () => stopRec('recorder error');
   mediaRecorder.ondataavailable = e => {{ if (e.data && e.data.size) chunks.push(e.data); }};
   mediaRecorder.onstop = async () => {{
+    if (liveSince) {{ liveMs += Date.now() - liveSince; liveSince = 0; }}
     stream.getTracks().forEach(t => t.stop());
     const blob = new Blob(chunks, {{ type: mediaRecorder.mimeType || 'audio/webm' }});
-    const dur = Math.round((Date.now() - startedAt) / 1000);
+    const dur = liveSeconds();
+    if (!blob.size) {{
+      msgEl.textContent = interruptReason
+        ? 'Recording failed (' + interruptReason + ') — nothing was captured. Tap Record to try again.'
+        : 'Nothing was captured — tap Record to try again.';
+      await render(); return;
+    }}
     const ext = (blob.type.indexOf('mp4') >= 0) ? '.mp4' : '.webm';
     const rec = {{ id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
                    token: TOKEN, blob: blob, dur: dur, ext: ext, createdAt: Date.now() }};
     try {{ await idbPut(rec); }}
     catch (e) {{ msgEl.textContent = 'Could not save recording — do not close this page.'; return; }}
+    if (interruptReason) {{
+      stickyMsg = 'Recording stopped early — ' + interruptReason + '. The ' + fmt(dur) +
+        ' captured so far is saved; tap Record to continue in a new take.';
+    }}
     await render();
     flush();
   }};
-  mediaRecorder.start();
+  mediaRecorder.start(1000);
   recording = true; recBtn.textContent = '■ Stop'; recBtn.classList.add('recording');
 }}
 
@@ -1006,8 +1054,7 @@ recBtn.onclick = async () => {{
   if (!recording) {{
     try {{ await startRec(); }} catch (e) {{ msgEl.textContent = 'Mic access needed.'; }}
   }} else {{
-    recording = false; recBtn.textContent = '● Record'; recBtn.classList.remove('recording');
-    mediaRecorder.stop();
+    stopRec('');
   }}
 }};
 
