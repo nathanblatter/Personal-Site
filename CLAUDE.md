@@ -1,3 +1,9 @@
+# Vision
+
+**The sole purpose of nathanblatter.com is to help Nathan with recruiting and landing jobs and consulting opportunities.**
+
+Every public-facing feature must plausibly move a recruiter, hiring manager, or consulting lead toward contacting/hiring Nathan — kill vanity features that don't aid landing work. Exemptions: the repo also carries internal riders that serve other purposes — the KPI subsystem is explicitly protected, and the Journal subsystem is its own project (vision: Nathan's printed book this year, then productize) and will eventually be extracted into its own repo.
+
 # Best practices (follow these on every change)
 
 These are the conventions already established across the site. New features should match them.
