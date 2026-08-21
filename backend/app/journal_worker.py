@@ -114,11 +114,38 @@ def _transcribe(audio_bytes: bytes, suffix: str, prompt: str) -> str:
     return _transcribe_cpu(audio_bytes, suffix, prompt)
 
 
+def _decoded_duration_sec(audio_bytes: bytes, suffix: str) -> float | None:
+    """Real decoded duration via PyAV (ships with faster-whisper; the worker
+    image has no ffprobe binary). Container metadata first; if the header is
+    missing/lying (truncated uploads), decode and take the last frame's time.
+    None if the file is unreadable."""
+    import io
+
+    try:
+        import av
+        with av.open(io.BytesIO(audio_bytes)) as container:
+            if container.duration:
+                return container.duration / 1_000_000  # AV_TIME_BASE µs
+            last_end = 0.0
+            for frame in container.decode(audio=0):
+                if frame.time is not None:
+                    last_end = frame.time + (frame.samples / frame.sample_rate)
+            return last_end or None
+    except Exception as exc:
+        log.warning("PyAV duration check failed: %s", exc)
+        return None
+
+
+TRUNCATION_MIN_CLAIMED_SEC = 30
+TRUNCATION_RATIO = 0.6
+
+
 async def _process_entry(pool: asyncpg.Pool, entry_id_str: str) -> None:
     entry_id = uuid.UUID(entry_id_str)
     async with pool.acquire() as conn:
         recs = await conn.fetch(
-            "SELECT id, audio_ref, sequence FROM recordings WHERE entry_id = $1 ORDER BY sequence",
+            "SELECT id, audio_ref, sequence, duration_sec FROM recordings "
+            "WHERE entry_id = $1 ORDER BY sequence",
             entry_id,
         )
     if not recs:
@@ -128,6 +155,7 @@ async def _process_entry(pool: asyncpg.Pool, entry_id_str: str) -> None:
     s3 = get_s3_client()
     whisper_prompt, weave_glossary = await _entry_vocab(pool)
     raw_texts: list[str] = []
+    truncation_flags: list[dict] = []
     for rec in recs:
         # Transcribe only if not already done (idempotent on retry).
         async with pool.acquire() as conn:
@@ -141,6 +169,27 @@ async def _process_entry(pool: asyncpg.Pool, entry_id_str: str) -> None:
         obj = s3.get_object(Bucket=MINIO_BUCKET, Key=rec["audio_ref"])
         audio = obj["Body"].read()
         suffix = os.path.splitext(rec["audio_ref"])[1] or ".webm"
+
+        # Truncation guard (journal-12): a take whose decoded audio is far
+        # shorter than the client-claimed duration means capture died mid-take.
+        claimed = rec["duration_sec"] or 0
+        if claimed >= TRUNCATION_MIN_CLAIMED_SEC:
+            decoded = await asyncio.to_thread(_decoded_duration_sec, audio, suffix)
+            if decoded is not None and decoded < claimed * TRUNCATION_RATIO:
+                log.error(
+                    "recording %s looks TRUNCATED: claimed %ds, decoded %.1fs",
+                    rec["id"], claimed, decoded,
+                )
+                truncation_flags.append({
+                    "category": "audio",
+                    "note": (
+                        f"Take {rec['sequence']} audio is truncated: the recorder reported "
+                        f"{claimed}s but only {decoded:.0f}s of audio exists — the rest was "
+                        "never captured (mic interruption). Consider re-telling this part."
+                    ),
+                    "raw_span": "",
+                })
+
         text = await asyncio.to_thread(_transcribe, audio, suffix, whisper_prompt)
 
         async with pool.acquire() as conn:
@@ -153,6 +202,9 @@ async def _process_entry(pool: asyncpg.Pool, entry_id_str: str) -> None:
         log.info("transcribed recording %s (%d chars)", rec["id"], len(text))
 
     woven = await weave_service.weave_day(raw_texts, glossary=weave_glossary)
+    if truncation_flags:
+        woven["drift_flags"] = truncation_flags + (woven.get("drift_flags") or [])
+        woven["drift_score"] = max(float(woven.get("drift_score") or 0), 0.9)
     async with pool.acquire() as conn:
         entry_date = await conn.fetchval(
             "UPDATE entries SET narrative = $2, "
