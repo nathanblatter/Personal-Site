@@ -13,26 +13,30 @@
     <key>Label</key>
     <string>com.nathanblatter.journal-mlx</string>
 
+    <!-- Runs from ~/journal-mlx (the installer copies journal_mlx_server.py there).
+         Never point runtime paths at ~/Desktop/~/Documents: iCloud Drive evicts
+         files and Python dies with EDEADLK ("Resource deadlock avoided"). -->
     <key>ProgramArguments</key>
     <array>
         <string>/Users/nathanblatter/journal-mlx/venv/bin/python</string>
         <string>-m</string>
-        <string>app.journal_mlx_server</string>
+        <string>journal_mlx_server</string>
     </array>
 
-    <!-- cwd is put on sys.path[0] by `python -m`, so `app.journal_mlx_server` resolves. -->
+    <!-- cwd is put on sys.path[0] by `python -m`, so `journal_mlx_server` resolves. -->
     <key>WorkingDirectory</key>
-    <string>/Users/nathanblatter/Desktop/Personal-Site/backend</string>
+    <string>/Users/nathanblatter/journal-mlx</string>
 
     <key>EnvironmentVariables</key>
     <dict>
         <!-- /opt/homebrew/bin is required: mlx_whisper shells out to `ffmpeg` to decode audio. -->
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
-        <key>PYTHONPATH</key>
-        <string>/Users/nathanblatter/Desktop/Personal-Site/backend</string>
+        <!-- Loopback only: the LAN is a shared building segment. Docker Desktop's
+             host.docker.internal reaches loopback-bound host services, so the
+             journal-worker container is unaffected. -->
         <key>MLX_HOST</key>
-        <string>0.0.0.0</string>
+        <string>127.0.0.1</string>
         <key>MLX_PORT</key>
         <string>4310</string>
     </dict>

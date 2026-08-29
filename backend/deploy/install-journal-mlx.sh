@@ -18,6 +18,9 @@ echo "==> python venv + mlx-whisper stack at $VENV"
 "$VENV/bin/pip" install --quiet --upgrade pip
 "$VENV/bin/pip" install --quiet mlx-whisper fastapi "uvicorn[standard]" python-multipart
 
+echo "==> app code → ~/journal-mlx (outside iCloud-managed ~/Desktop; running from the repo dies with EDEADLK when iCloud evicts files)"
+cp "$REPO/backend/app/journal_mlx_server.py" "$HOME/journal-mlx/journal_mlx_server.py"
+
 echo "==> launchd service"
 cp "$PLIST_SRC" "$PLIST_DST"
 launchctl unload "$PLIST_DST" 2>/dev/null || true
