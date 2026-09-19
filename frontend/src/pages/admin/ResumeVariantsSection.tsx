@@ -8,6 +8,8 @@ export default function ResumeVariantsSection({ showToast, showError }: AdminCal
   const [variants, setVariants] = useState<ResumeVariantResponse[]>([])
   const [loaded, setLoaded] = useState(false)
   const [achievements, setAchievements] = useState('')
+  const [achievementsTitle, setAchievementsTitle] = useState('')
+  const [publications, setPublications] = useState('')
   const [achievementsDirty, setAchievementsDirty] = useState(false)
 
   useEffect(() => {
@@ -15,14 +17,22 @@ export default function ResumeVariantsSection({ showToast, showError }: AdminCal
       .then(r => { setVariants(r); setLoaded(true) })
       .catch(e => showError((e as Error).message))
     api.siteContent.get<ResumeExtras>('resume')
-      .then(r => setAchievements((r.data.achievements ?? []).join('\n')))
+      .then(r => {
+        setAchievements((r.data.achievements ?? []).join('\n'))
+        setAchievementsTitle(r.data.achievements_title ?? '')
+        setPublications((r.data.publications ?? []).join('\n'))
+      })
       .catch(() => setAchievements(''))
   }, [showError])
 
   const saveAchievements = async () => {
     try {
-      const list = achievements.split('\n').map(l => l.replace(/^[•-]\s*/, '').trim()).filter(Boolean)
-      await api.siteContent.update<ResumeExtras>('resume', { achievements: list })
+      const toList = (v: string) => v.split('\n').map(l => l.replace(/^[•-]\s*/, '').trim()).filter(Boolean)
+      await api.siteContent.update<ResumeExtras>('resume', {
+        achievements: toList(achievements),
+        achievements_title: achievementsTitle.trim() || undefined,
+        publications: toList(publications),
+      })
       setAchievementsDirty(false)
       showToast('Other Achievements saved')
     } catch (e) { showError((e as Error).message) }
@@ -82,7 +92,7 @@ export default function ResumeVariantsSection({ showToast, showError }: AdminCal
 
       <SectionCard>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-sans font-semibold text-ink">Other Achievements</h3>
+          <h3 className="font-sans font-semibold text-ink">Résumé extras</h3>
           <button
             onClick={saveAchievements}
             disabled={!achievementsDirty}
@@ -91,11 +101,22 @@ export default function ResumeVariantsSection({ showToast, showError }: AdminCal
             <Save size={12} /> Save
           </button>
         </div>
+        <div className="mb-4">
+          <AdminInput label="Section heading" value={achievementsTitle} onChange={val => { setAchievementsTitle(val); setAchievementsDirty(true) }} placeholder="Other Achievements" />
+        </div>
+        <div className="mb-4">
+          <AdminTextarea
+            label="One bullet per line — rendered at the bottom of /resume and every PDF variant"
+            value={achievements}
+            onChange={val => { setAchievements(val); setAchievementsDirty(true) }}
+            rows={4}
+          />
+        </div>
         <AdminTextarea
-          label="One bullet per line — rendered at the bottom of /resume and every PDF variant"
-          value={achievements}
-          onChange={val => { setAchievements(val); setAchievementsDirty(true) }}
-          rows={4}
+          label="Publications — one per line, rendered after Education (leave empty to hide)"
+          value={publications}
+          onChange={val => { setPublications(val); setAchievementsDirty(true) }}
+          rows={3}
         />
       </SectionCard>
 

@@ -126,6 +126,15 @@ def generate_resume_pdf(about, experience, skills, projects, coursework, variant
                 cw_names = ", ".join(c["name"] for c in coursework)
                 story.append(Paragraph(f'<b>Relevant Coursework:</b> {cw_names}', s_body))
 
+    # ── PUBLICATIONS ──
+    pubs = [x for x in (about.get("publications") or []) if x]
+    if pubs:
+        story.append(Spacer(1, 2))
+        story.append(Paragraph("<b>PUBLICATIONS</b>", s_section))
+        story.append(_section_rule())
+        for line in pubs:
+            story.append(Paragraph(f"• {line}", s_bullet))
+
     # ── TECHNICAL SKILLS ──
     story.append(Spacer(1, 2))
     story.append(Paragraph("<b>TECHNICAL SKILLS</b>", s_section))
@@ -185,7 +194,7 @@ def generate_resume_pdf(about, experience, skills, projects, coursework, variant
         story.append(Spacer(1, 5))
 
     # ── OTHER ACHIEVEMENTS ──
-    story.append(Paragraph("<b>OTHER ACHIEVEMENTS</b>", s_section))
+    story.append(Paragraph(f"<b>{(about.get('achievements_title') or 'Other Achievements').upper().replace('&', '&amp;')}</b>", s_section))
     story.append(_section_rule())
     others = [a for a in (about.get("achievements") or []) if a]
     if not others and len(about.get("bio_paragraphs", [])) > 2:

@@ -255,7 +255,12 @@ async def resume_pdf(variant: str = Query(""), db: AsyncSession = Depends(get_db
 
     extras_row = (await db.execute(select(models.SiteContent).where(models.SiteContent.key == "resume"))).scalar_one_or_none()
     extras = (extras_row.data if extras_row else {}) or {}
-    about = {"bio_paragraphs": about_row.bio_paragraphs, "gpa": about_row.gpa, "achievements": extras.get("achievements") or []}
+    about = {
+        "bio_paragraphs": about_row.bio_paragraphs, "gpa": about_row.gpa,
+        "achievements": extras.get("achievements") or [],
+        "achievements_title": extras.get("achievements_title"),
+        "publications": extras.get("publications") or [],
+    }
     experience = [
         {"title": e.title, "subtitle": e.subtitle, "year": e.year, "description": e.description, "kind": e.kind}
         for e in sort_experience(exp_rows) if e.on_resume

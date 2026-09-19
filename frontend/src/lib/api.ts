@@ -479,8 +479,12 @@ export interface ResumeDataResponse {
 }
 
 export interface ResumeExtras {
-  /** "Other Achievements" bullets, one per entry */
+  /** Closing-section bullets, one per entry */
   achievements?: string[]
+  /** Heading for that section (default "Other Achievements") */
+  achievements_title?: string
+  /** Publications / submissions, one per entry (rendered after Education) */
+  publications?: string[]
 }
 
 // ── Services ("Work With Me") Types ────────────────────────────────────────────

@@ -183,6 +183,13 @@ export default function Resume() {
             </div>
           </Section>
 
+          {/* ── PUBLICATIONS ── */}
+          {(extras.publications?.length ?? 0) > 0 && (
+            <Section title="Publications">
+              <Bullets text={extras.publications!.join('\n')} />
+            </Section>
+          )}
+
           {/* ── TECHNICAL SKILLS ── */}
           <Section title="technical skills">
             {grouped.map(([label, names]) => (
@@ -232,7 +239,7 @@ export default function Resume() {
           </Section>
 
           {/* ── OTHER ── */}
-          <Section title="Other Achievements">
+          <Section title={extras.achievements_title || 'Other Achievements'}>
             <Bullets text={(extras.achievements?.length
               ? extras.achievements
               : ['Passionate about advancing mental health access through AI-powered therapy and research', about.bio_paragraphs[2] || '']

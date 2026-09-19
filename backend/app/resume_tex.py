@@ -208,6 +208,14 @@ def generate_resume_tex(about, experience, skills, projects, coursework, variant
             parts.append("  \\resumeItemListEnd\n")
     parts.append("\\resumeSubHeadingListEnd\n")
 
+    # ── PUBLICATIONS ──
+    pubs = [x for x in (about.get("publications") or []) if x]
+    if pubs:
+        parts.append("\\section{Publications}\n  \\resumeItemListStart\n")
+        for line in pubs:
+            parts.append(rf"    \resumeItem{{{_esc(line)}}}" + "\n")
+        parts.append("  \\resumeItemListEnd\n")
+
     # ── TECHNICAL SKILLS ──
     from app.resume_skills import group_skills
     parts.append(
@@ -254,7 +262,7 @@ def generate_resume_tex(about, experience, skills, projects, coursework, variant
     others = [a for a in (about.get("achievements") or []) if a]
     if not others and len(about.get("bio_paragraphs", [])) > 2:
         others.append(about["bio_paragraphs"][2])
-    parts.append("\\section{Other Achievements}\n  \\resumeItemListStart\n")
+    parts.append(f"\\section{{{_esc(about.get('achievements_title') or 'Other Achievements')}}}\n  \\resumeItemListStart\n")
     for line in others:
         if line:
             parts.append(rf"    \resumeItem{{{_esc(line)}}}" + "\n")
