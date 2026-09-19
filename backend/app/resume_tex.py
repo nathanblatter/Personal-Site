@@ -131,6 +131,7 @@ _PREAMBLE = r"""\documentclass[letterpaper,10.5pt]{article}
 \newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
 \newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.0in, label={}]}
 \newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\renewcommand\labelitemi{$\vcenter{\hbox{\tiny$\bullet$}}$}
 \renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
 \newcommand{\resumeItemListStart}{\begin{itemize}[leftmargin=0.15in]}
 \newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
@@ -253,12 +254,11 @@ def generate_resume_tex(about, experience, skills, projects, coursework, variant
     others = [a for a in (about.get("achievements") or []) if a]
     if not others and len(about.get("bio_paragraphs", [])) > 2:
         others.append(about["bio_paragraphs"][2])
-    # Nested like the other sections so the bullets match (tiny •, not the top-level one).
-    parts.append("\\section{Other Achievements}\n\\resumeSubHeadingListStart\n  \\item\\vspace{-14pt}\n  \\resumeItemListStart\n")
+    parts.append("\\section{Other Achievements}\n  \\resumeItemListStart\n")
     for line in others:
         if line:
             parts.append(rf"    \resumeItem{{{_esc(line)}}}" + "\n")
-    parts.append("  \\resumeItemListEnd\n\\resumeSubHeadingListEnd\n")
+    parts.append("  \\resumeItemListEnd\n")
 
     parts.append("\\end{document}\n")
     return "".join(parts)
