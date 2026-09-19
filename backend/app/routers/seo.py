@@ -1,4 +1,5 @@
 import io
+import logging
 import re
 import textwrap
 from datetime import datetime, timezone
@@ -11,6 +12,8 @@ from PIL import Image, ImageDraw, ImageFont
 from app.database import get_db
 from app import models
 from app.utils import sort_experience
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["seo"])
 
@@ -267,7 +270,12 @@ async def resume_pdf(variant: str = Query(""), db: AsyncSession = Depends(get_db
         emphasis = {t.lower() for t in variant_dict["emphasis_tags"]}
         projects.sort(key=lambda p: 0 if {t.lower() for t in p["tags"]} & emphasis else 1)
 
-    pdf_bytes = generate_resume_pdf(about, experience, skills, projects[:5], coursework, variant=variant_dict)
+    try:
+        from app.resume_tex import generate_resume_pdf_latex
+        pdf_bytes = generate_resume_pdf_latex(about, experience, skills, projects[:4], coursework, variant=variant_dict)
+    except Exception:
+        logger.exception("LaTeX resume generation failed; falling back to ReportLab")
+        pdf_bytes = generate_resume_pdf(about, experience, skills, projects[:4], coursework, variant=variant_dict)
 
     suffix = f"_{variant}" if variant and variant_dict else ""
     return Response(

@@ -83,7 +83,7 @@ export default function Resume() {
   const activeVariant = variants.find(v => v.key === activeKey) ?? null
   const pdfHref = activeVariant ? `/resume.pdf?variant=${activeVariant.key}` : '/resume.pdf'
 
-  // Surface projects matching the active variant's emphasis tags first, then take 5.
+  // Surface projects matching the active variant's emphasis tags first, then take 4 (one-page résumé).
   const emphasis = new Set((activeVariant?.emphasis_tags ?? []).map(t => t.toLowerCase()))
   const displayProjects = (emphasis.size === 0
     ? projects
@@ -92,7 +92,7 @@ export default function Resume() {
         const bm = b.tags.some(t => emphasis.has(t.toLowerCase())) ? 0 : 1
         return am - bm
       })
-  ).slice(0, 5)
+  ).slice(0, 4)
 
   return (
     <>
