@@ -33,12 +33,16 @@ These are the conventions already established across the site. New features shou
 ## Admin UX (already built — reuse, don't reinvent)
 - `useUnsavedWarning(dirty)` for unsaved-change guards, `useDragReorder` for sort_order DnD, `Toast` with an optional undo action for destructive ops, `⌘K` command palette, persisted theme/section/density. Match these patterns in new sections.
 
+# Repo location
+
+- **Canonical checkout: `~/dev/Personal-Site`.** `~/Desktop/Personal-Site` is only a symlink to it (moved 2026-09-19). iCloud Drive syncs ~/Desktop and evicts files, which hung `npx`/`eslint`/`vite` locally and blocked the CI runner's file opens for six hours. Never clone or build under ~/Desktop or ~/Documents.
+
 # CI/CD
 
 - **Org:** github.com/nathanblatter
 - **Runner:** Native macOS GitHub Actions runner on Mac Mini (launchd service at ~/actions-runner)
 - **Deploy trigger:** Push to `main` branch
-- **Deploy workflow:** `.github/workflows/deploy.yml` — checks out the pushed SHA into the runner workspace, builds frontend + Docker images from that clean checkout (never from this working tree), smoke-checks imports, then zero-downtime compose rollout + seed. `--project-directory` points at `~/deploy/Personal-Site/backend` only to resolve `.env.prod` — that copy lives **outside iCloud** on purpose (the runner is launchd-spawned and iCloud blocks its file opens: Aug 29 EDEADLK failure, Sep 19 six-hour hang). If you rotate a secret, update `~/deploy/Personal-Site/backend/.env.prod`; the `backend/.env.prod` in this checkout is for local use.
+- **Deploy workflow:** `.github/workflows/deploy.yml` — checks out the pushed SHA into the runner workspace, runs the gates (eslint, tsc + vite build, image import smoke-checks, pytest inside the built api image), then zero-downtime compose rollout + seed. `--project-directory` points at `~/deploy/Personal-Site/backend` only to resolve `.env.prod` — that copy lives **outside iCloud** on purpose (the runner is launchd-spawned and iCloud blocks its file opens: Aug 29 EDEADLK failure, Sep 19 six-hour hang). If you rotate a secret, update `~/deploy/Personal-Site/backend/.env.prod`; the `backend/.env.prod` in this checkout is for local use.
 - **Commit completeness matters:** the 2026-08-01 failed deploy was a partial commit (main.py imported `routers/privacy.py` which was never `git add`ed). The import smoke-check in deploy.yml now catches this before rollout — but always `git status` before pushing.
 - **Secrets:** `~/deploy/Personal-Site/backend/.env.prod` on the Mac mini (prod, non-iCloud); `backend/.env.prod` here is a gitignored local copy
 - **Infrastructure:** Docker Compose (FastAPI backend), shared Postgres from docker-services, frontend served separately
