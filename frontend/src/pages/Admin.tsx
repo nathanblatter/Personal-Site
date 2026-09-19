@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, MotionConfig, motion } from 'motion/react'
 import {
   LayoutDashboard,
   FolderKanban,
@@ -110,6 +110,23 @@ export default function Admin() {
   })
   const [isLoading, setIsLoading] = useState(true)
 
+  // Sidebar nav overflow cue (bottom fade while there's more to scroll).
+  const navRef = useRef<HTMLElement>(null)
+  const [navOverflow, setNavOverflow] = useState(false)
+  const updateNavShadow = useCallback(() => {
+    const el = navRef.current
+    if (!el) return
+    setNavOverflow(el.scrollHeight - el.scrollTop - el.clientHeight > 4)
+  }, [])
+  useEffect(() => {
+    updateNavShadow()
+    const el = navRef.current
+    if (!el) return
+    const ro = new ResizeObserver(updateNavShadow)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [updateNavShadow, isLoading])
+
   // Mobile: off-canvas drawer instead of a fixed sidebar.
   const [isMobile, setIsMobile] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -159,10 +176,15 @@ export default function Admin() {
   }, [])
   const showError = useCallback((msg: string) => showToast(`Error: ${msg}`), [showToast])
 
-  // ── Initial data load ────────────────────────────────────────────────────
+  // ── Section title ────────────────────────────────────────────────────────
   useEffect(() => {
-    api.auth.verify().catch(() => { navigate('/admin/login'); return })
+    const label = sections.find(s => s.id === activeSection)?.label ?? 'Admin'
+    const prev = document.title
+    document.title = `${label} · Admin — Nathan Blatter`
+    return () => { document.title = prev }
+  }, [activeSection])
 
+  const loadAll = useCallback(() => {
     Promise.all([
       api.projects.list(),
       api.skills.list(),
@@ -190,6 +212,30 @@ export default function Admin() {
       showError((err as Error).message)
     }).finally(() => setIsLoading(false))
   }, [navigate, showError])
+
+  // ── Auth guard + initial data load ───────────────────────────────────────
+  // Fail closed: nothing renders until /auth/verify returns 2xx. Any other
+  // outcome (401, 5xx, network error) bounces to login; 5xx / network failures
+  // carry a note so a backend outage isn't mistaken for an expired session.
+  useEffect(() => {
+    let cancelled = false
+    api.auth.verify().then(() => {
+      if (cancelled) return
+      loadAll()
+    }).catch((err: unknown) => {
+      if (cancelled) return
+      const status = Number(/→ (\d{3})/.exec((err as Error).message ?? '')?.[1])
+      const backendDown = !status || status >= 500
+      navigate('/admin/login', {
+        replace: true,
+        state: backendDown
+          ? { error: status ? `Backend unavailable (HTTP ${status}) — this isn't your session.` : 'Backend unreachable — this isn\'t your session.' }
+          : undefined,
+      })
+    })
+    return () => { cancelled = true }
+  }, [navigate, loadAll])
+
 
   if (isLoading) {
     return (
@@ -298,7 +344,8 @@ export default function Admin() {
           </button>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <div className="relative flex-1 min-h-0">
+        <nav ref={navRef} onScroll={updateNavShadow} className="h-full p-3 space-y-1 overflow-y-auto">
           {sections.map(section => {
             const isActive = activeSection === section.id
             return (
@@ -316,6 +363,12 @@ export default function Admin() {
             )
           })}
         </nav>
+        {/* Scroll cue: fades the bottom edge while more nav items sit below the fold. */}
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white to-transparent transition-opacity duration-200 ${navOverflow ? 'opacity-100' : 'opacity-0'}`}
+        />
+        </div>
 
         <div className="p-3 border-t border-mist space-y-2">
           {effectiveCollapsed ? (
@@ -362,11 +415,14 @@ export default function Admin() {
       {/* ── Main content ── */}
       <main className={`flex-1 min-w-0 ${collapsed ? 'md:ml-20' : 'md:ml-64'} p-4 sm:p-6 ${compact ? 'md:p-6' : 'md:p-10'} transition-[margin] duration-200`}>
         <div className="max-w-[960px]">
-          <AnimatePresence mode="wait">
-            <motion.div key={activeSection}>
-              {sectionRenderers[activeSection]?.()}
-            </motion.div>
-          </AnimatePresence>
+          {/* Cap default transitions so section mount fades stay snappy (≤200ms). */}
+          <MotionConfig transition={{ duration: 0.15 }}>
+            <AnimatePresence mode="wait">
+              <motion.div key={activeSection}>
+                {sectionRenderers[activeSection]?.()}
+              </motion.div>
+            </AnimatePresence>
+          </MotionConfig>
         </div>
       </main>
 

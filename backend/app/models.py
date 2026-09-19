@@ -20,7 +20,9 @@ class Project(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(String, unique=True, index=True, nullable=False)
     title = Column(String, nullable=False)
-    description = Column(Text, nullable=False)
+    description = Column(Text, nullable=False)  # long-form case-study body
+    summary = Column(Text, nullable=True)  # 1–2 sentence blurb for cards / résumé / link-in-bio
+    demo_credentials = Column(String, nullable=True)  # shown only on the case-study page
     tags = Column(JSON, nullable=False, default=list)
     year = Column(String, nullable=False)
     color = Column(String, nullable=False)
@@ -94,6 +96,7 @@ class Experience(Base):
     title = Column(String, nullable=False)
     subtitle = Column(String, nullable=False)
     description = Column(Text, nullable=False)
+    kind = Column(String, nullable=False, default="work", server_default="work")  # work | education
     active = Column(Boolean, nullable=False, default=False)
     sort_order = Column(Integer, nullable=False, default=0)
 

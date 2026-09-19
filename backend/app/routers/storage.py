@@ -115,19 +115,28 @@ async def upload_file(
 
 
 @router.get("/files", dependencies=[Depends(require_auth)])
-def list_files(prefix: str = Query("", description="Key prefix to list")):
+def list_files(
+    prefix: str = Query("", description="Key prefix to list"),
+    include_journal: bool = Query(False, description="Also list objects under journal/ (hidden from the portfolio admin by default)"),
+):
     client = get_s3_client()
     ensure_bucket(client)
 
-    response = client.list_objects_v2(Bucket=MINIO_BUCKET, Prefix=prefix)
-    files = [
-        {
-            "key": obj["Key"],
-            "size": obj["Size"],
-            "last_modified": obj["LastModified"].isoformat(),
-        }
-        for obj in response.get("Contents", [])
-    ]
+    # list_objects_v2 pages at 1000 keys; walk every page so the admin sees
+    # the whole bucket (the frontend paginates the rendering).
+    files = []
+    paginator = client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=MINIO_BUCKET, Prefix=prefix):
+        for obj in page.get("Contents", []):
+            # The journal subsystem stores its audio/exports in the same bucket
+            # under journal/ — that's a separate project, keep it out of this UI.
+            if not include_journal and obj["Key"].startswith("journal/"):
+                continue
+            files.append({
+                "key": obj["Key"],
+                "size": obj["Size"],
+                "last_modified": obj["LastModified"].isoformat(),
+            })
     return {"files": files}
 
 

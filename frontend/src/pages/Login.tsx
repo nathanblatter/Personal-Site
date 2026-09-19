@@ -1,9 +1,12 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 
 export default function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
+  // Set by the admin auth guard when /auth/verify failed with a 5xx / network error.
+  const guardNotice = (location.state as { error?: string } | null)?.error ?? null
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -36,6 +39,10 @@ export default function Login() {
               <span className="font-mono text-[10px] text-steel tracking-wider">PORTFOLIO CMS</span>
             </div>
           </div>
+
+          {guardNotice && (
+            <p className="mb-5 px-3 py-2 rounded-lg bg-ember/5 border border-ember/20 text-xs text-ember font-mono">{guardNotice}</p>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>

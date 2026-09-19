@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'motion/react'
+import { motion } from 'motion/react'
 import { Search, FileText, FolderKanban, File, CornerDownLeft, Loader2 } from 'lucide-react'
 import { api, type SearchResult } from '../lib/api'
 
@@ -27,6 +27,14 @@ export default function SearchPalette({ open, onClose }: { open: boolean; onClos
     setResults([])
     setActive(0)
   }, [open])
+
+  // Escape closes even when focus has left the input (e.g. after clicking a result row).
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
 
   useEffect(() => {
     if (!open) return
@@ -60,20 +68,24 @@ export default function SearchPalette({ open, onClose }: { open: boolean; onClos
     else if (e.key === 'Escape') { onClose() }
   }
 
+  // No AnimatePresence / exit animation here on purpose: the full-screen
+  // backdrop must leave the DOM synchronously on close. An interrupted exit
+  // (reduced-motion, rapid toggles) previously left an invisible `fixed inset-0`
+  // layer behind that swallowed every click on the page.
+  if (!open) return null
+
   return (
-    <AnimatePresence>
-      {open && (
         <motion.div
+          key="search-palette"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
           className="fixed inset-0 z-[70] flex items-start justify-center pt-[12vh] px-4 bg-ink/40 backdrop-blur-sm"
           onClick={onClose}
         >
           <motion.div
             initial={{ opacity: 0, y: -12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -12, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             role="dialog"
             aria-label="Site search"
@@ -131,7 +143,5 @@ export default function SearchPalette({ open, onClose }: { open: boolean; onClos
             </div>
           </motion.div>
         </motion.div>
-      )}
-    </AnimatePresence>
   )
 }

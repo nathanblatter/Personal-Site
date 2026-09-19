@@ -54,6 +54,16 @@ def _table_row(left_html: str, right_html: str) -> Table:
     return t
 
 
+def _desc_lines(description: str) -> list[str]:
+    """Split a free-text description into clean lines (bullets stripped)."""
+    out = []
+    for line in (description or "").split("\n"):
+        line = line.strip().lstrip("•-").strip()
+        if line:
+            out.append(line)
+    return out
+
+
 def _section_rule():
     return HRFlowable(width="100%", thickness=0.5, color=RULE_COLOR, spaceBefore=2, spaceAfter=4)
 
@@ -98,25 +108,23 @@ def generate_resume_pdf(about, experience, skills, projects, coursework, variant
     story.append(Paragraph("<b>EDUCATION</b>", s_section))
     story.append(_section_rule())
 
-    edu = None
-    jobs = []
-    for e in experience:
-        if "B.S." in e["title"] or "Bachelor" in e["title"]:
-            edu = e
-        else:
-            jobs.append(e)
+    degrees = [e for e in experience if e.get("kind") == "education"]
+    jobs = [e for e in experience if e.get("kind") != "education"]
 
-    if edu:
+    for i, edu in enumerate(degrees):
+        if i:
+            story.append(Spacer(1, 2))
         story.append(_table_row(f'<b>{edu["title"]}</b>', edu["year"]))
-        story.append(Paragraph("Data Analytics Focus, STEM-Designated Program", s_body_grey))
         story.append(Paragraph(edu["subtitle"], s_body_grey))
-        gpa = about.get("gpa", "")
-        if gpa:
-            story.append(Paragraph(f"GPA: {gpa}", s_body))
-        story.append(Paragraph("Member of the Association for Information Systems", s_body))
-        if coursework:
-            cw_names = ", ".join(c["name"] for c in coursework)
-            story.append(Paragraph(f'<b>Relevant Coursework:</b> {cw_names}', s_body))
+        for line in _desc_lines(edu.get("description", "")):
+            story.append(Paragraph(line, s_body_grey))
+        if i == 0:
+            gpa = about.get("gpa", "")
+            if gpa:
+                story.append(Paragraph(f"GPA: {gpa}", s_body))
+            if coursework:
+                cw_names = ", ".join(c["name"] for c in coursework)
+                story.append(Paragraph(f'<b>Relevant Coursework:</b> {cw_names}', s_body))
 
     # ── TECHNICAL SKILLS ──
     story.append(Spacer(1, 2))

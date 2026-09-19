@@ -117,7 +117,7 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
                   <span className="text-sm font-medium text-ink truncate">{project.title}</span>
                   <StatusBadge status={project.status} />
                 </div>
-                <p className="text-xs text-steel truncate mt-0.5">{project.description}</p>
+                <p className="text-xs text-steel truncate mt-0.5">{project.summary || project.description}</p>
               </div>
               <span className="font-mono text-xs text-silver shrink-0">{project.year}</span>
               <div className="flex items-center gap-1.5 shrink-0">
@@ -126,10 +126,10 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
                     <ExternalLink size={13} />
                   </a>
                 )}
-                <button onClick={e => { e.stopPropagation(); setEditingProject(editingProject === project.id ? null : project.id) }} className="p-1.5 text-steel hover:text-blue transition-colors">
+                <button onClick={e => { e.stopPropagation(); setEditingProject(editingProject === project.id ? null : project.id) }} className="p-1.5 text-steel hover:text-blue transition-colors" aria-label={`Edit ${project.title}`}>
                   <Pencil size={13} />
                 </button>
-                <button onClick={e => { e.stopPropagation(); deleteProject(project.id) }} className="p-1.5 text-steel hover:text-ember transition-colors">
+                <button onClick={e => { e.stopPropagation(); deleteProject(project.id) }} className="p-1.5 text-steel hover:text-ember transition-colors" aria-label={`Delete ${project.title}`}>
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -143,6 +143,7 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.25 }}
                   className="overflow-hidden"
+                  onKeyDown={e => { if (e.key === 'Escape') setEditingProject(null) }}
                 >
                   <div className="border-t border-mist p-6 bg-white space-y-5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -168,7 +169,20 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
                         />
                       </div>
                     </div>
-                    <AdminTextarea label="Description" value={project.description} onChange={v => updateProjectLocal(project.id, 'description', v)} />
+                    <AdminTextarea
+                      label="Summary (cards, résumé, link-in-bio — 1–2 sentences)"
+                      value={project.summary || ''}
+                      onChange={v => updateProjectLocal(project.id, 'summary', v || null)}
+                      rows={2}
+                    />
+                    <AdminTextarea label="Description (case-study body — paragraphs, abstract, details)" value={project.description} onChange={v => updateProjectLocal(project.id, 'description', v)} />
+                    <AdminInput
+                      label="Demo login (shown only on the case-study page)"
+                      value={project.demo_credentials || ''}
+                      onChange={v => updateProjectLocal(project.id, 'demo_credentials', v || null)}
+                      mono
+                      placeholder="Username: demo · Password: demo1234"
+                    />
 
                     {/* Screenshots */}
                     <div>
@@ -189,6 +203,7 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
                               <button
                                 onClick={() => updateProjectLocal(project.id, 'images', project.images!.filter((_, j) => j !== i))}
                                 className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-ember text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                aria-label={`Remove screenshot ${i + 1}`}
                               >
                                 <X size={10} />
                               </button>

@@ -148,12 +148,14 @@ export default function BlogSection({ showToast, showError, blogs, setBlogs }: B
                     else openBlogEditor(post)
                   }}
                   className="p-1.5 text-steel hover:text-blue transition-colors"
+                  aria-label="Edit"
                 >
                   <Pencil size={13} />
                 </button>
                 <button
                   onClick={e => { e.stopPropagation(); deleteBlog(post.id) }}
                   className="p-1.5 text-steel hover:text-ember transition-colors"
+                  aria-label="Delete"
                 >
                   <Trash2 size={13} />
                 </button>

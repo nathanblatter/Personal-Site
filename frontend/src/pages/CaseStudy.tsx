@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { ArrowLeft, ArrowUpRight } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, KeyRound } from 'lucide-react'
 import { api, type ProjectResponse } from '../lib/api'
 import Skeleton from '../components/Skeleton'
 import { useDocumentMeta } from '../lib/useDocumentMeta'
@@ -21,7 +21,7 @@ export default function CaseStudy() {
 
   useDocumentMeta({
     title: project ? `${project.title} — Nathan Blatter` : undefined,
-    description: project?.description || undefined,
+    description: project?.summary || project?.description || undefined,
     canonical: projectId ? `/projects/${projectId}` : undefined,
     ogImage: project?.images?.[0] || undefined,
   })
@@ -170,7 +170,7 @@ export default function CaseStudy() {
           ))}
         </div>
 
-        {/* Live link */}
+        {/* Live link + demo login */}
         {project.link && (
           <a
             href={project.link}
@@ -180,6 +180,15 @@ export default function CaseStudy() {
           >
             View it live <ArrowUpRight size={14} />
           </a>
+        )}
+        {project.demo_credentials && (
+          <div className="flex items-start gap-3 rounded-xl border border-mist bg-cloud px-4 py-3 mb-14 -mt-8">
+            <KeyRound size={14} className="text-steel mt-0.5 shrink-0" />
+            <div>
+              <div className="font-mono text-[10px] text-steel uppercase tracking-wider mb-0.5">Demo login</div>
+              <code className="font-mono text-xs text-ink whitespace-pre-wrap">{project.demo_credentials}</code>
+            </div>
+          </div>
         )}
 
         {/* CTA */}

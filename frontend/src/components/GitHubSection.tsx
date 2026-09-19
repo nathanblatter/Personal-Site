@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Github, Star, GitFork, ExternalLink } from 'lucide-react'
+import { cached } from '../lib/requestCache'
 import { api, type GitHubProfile, type GitHubRepo, type GitHubContributions } from '../lib/api'
 import HeatmapGrid from './HeatmapGrid'
 
@@ -175,13 +176,20 @@ function RepoCard({ repo }: { repo: GitHubRepo }) {
 
 /* ─── Main section ─────────────────────────────────────────────────── */
 
+// Shared with LiveStatus so the home page fires each GitHub call once.
+const GITHUB_TTL_MS = 5 * 60 * 1000
+
 export default function GitHubSection({ compact = false }: { compact?: boolean }) {
   const [profile, setProfile] = useState<GitHubProfile | null>(null)
   const [repos, setRepos] = useState<GitHubRepo[]>([])
   const [contributions, setContributions] = useState<GitHubContributions | null>(null)
 
   useEffect(() => {
-    Promise.all([api.github.profile(), api.github.repos(), api.github.contributions()])
+    Promise.all([
+      cached('github:profile', () => api.github.profile(), GITHUB_TTL_MS),
+      cached('github:repos', () => api.github.repos(), GITHUB_TTL_MS),
+      cached('github:contributions', () => api.github.contributions(), GITHUB_TTL_MS),
+    ])
       .then(([p, r, c]) => {
         setProfile(p)
         setRepos(r)
@@ -192,7 +200,7 @@ export default function GitHubSection({ compact = false }: { compact?: boolean }
 
   if (!profile || !contributions) return null
 
-  const topRepos = repos
+  const topRepos = [...repos]
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     .slice(0, compact ? 4 : 6)
 

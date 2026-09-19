@@ -249,9 +249,10 @@ async def resume_pdf(variant: str = Query(""), db: AsyncSession = Depends(get_db
             variant_dict = {"headline": vrow.headline, "summary": vrow.summary, "emphasis_tags": vrow.emphasis_tags or []}
 
     about = {"bio_paragraphs": about_row.bio_paragraphs, "gpa": about_row.gpa}
-    experience = [{"title": e.title, "subtitle": e.subtitle, "year": e.year, "description": e.description} for e in exp_rows]
+    experience = [{"title": e.title, "subtitle": e.subtitle, "year": e.year, "description": e.description, "kind": e.kind} for e in exp_rows]
     skills = [{"name": s.name, "category": s.category} for s in skill_rows]
-    projects = [{"title": p.title, "description": p.description, "tags": p.tags or [], "year": p.year, "link": p.link, "metrics": p.metrics or []} for p in proj_rows]
+    # Résumé lines use the short summary when one exists; the long body is for the case study.
+    projects = [{"title": p.title, "description": p.summary or p.description, "tags": p.tags or [], "year": p.year, "link": p.link, "metrics": p.metrics or []} for p in proj_rows]
     coursework = [{"name": c.name} for c in cw_rows]
 
     # Surface projects whose tags match the variant emphasis (stable: matched first).

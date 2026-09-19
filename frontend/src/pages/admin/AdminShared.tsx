@@ -88,7 +88,7 @@ export function TagEditor({ tags, onChange, suggestions = [] }: { tags: string[]
         {tags.map(tag => (
           <span key={tag} className="inline-flex items-center gap-1.5 font-mono text-[11px] px-2.5 py-1 rounded-full bg-blue-wash text-blue">
             {tag}
-            <button onClick={() => onChange(tags.filter(t => t !== tag))} className="hover:text-ember transition-colors">
+            <button onClick={() => onChange(tags.filter(t => t !== tag))} className="hover:text-ember transition-colors" aria-label="Remove">
               <X size={10} />
             </button>
           </span>
@@ -177,7 +177,7 @@ export function Toast({ message, onClose, action }: { message: string; onClose: 
           {action.label}
         </button>
       )}
-      <button onClick={onClose} className="text-steel hover:text-white transition-colors ml-1"><X size={14} /></button>
+      <button onClick={onClose} className="text-steel hover:text-white transition-colors ml-1" aria-label="Close"><X size={14} /></button>
     </motion.div>
   )
 }

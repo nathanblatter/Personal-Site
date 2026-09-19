@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Download } from 'lucide-react'
+import { useDocumentMeta } from '../lib/useDocumentMeta'
 import { api, type ExperienceResponse, type SkillResponse, type ProjectResponse, type AboutResponse, type CourseworkResponse, type ResumeVariantResponse } from '../lib/api'
 
 export default function Resume() {
@@ -11,6 +12,12 @@ export default function Resume() {
   const [coursework, setCoursework] = useState<CourseworkResponse[]>([])
   const [variants, setVariants] = useState<ResumeVariantResponse[]>([])
   const [activeKey, setActiveKey] = useState<string | null>(null)
+
+  useDocumentMeta({
+    title: 'Résumé — Nathan Blatter',
+    description: 'Résumé of Nathan Blatter — full-stack software engineer and Information Systems student at BYU.',
+    canonical: '/resume',
+  })
 
   useEffect(() => {
     api.resume.data().then(({ about: ab, experience: ex, skills: sk, projects: pr, coursework: cw, variants: vs }) => {
@@ -41,7 +48,7 @@ export default function Resume() {
         <div className="max-w-[850px] mx-auto px-6 pb-16">
           <div className="bg-white border border-mist rounded-2xl px-12 py-10 space-y-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-4 bg-cloud rounded animate-pulse" style={{ width: `${70 + Math.random() * 30}%` }} />
+              <div key={i} className="h-4 bg-cloud rounded animate-pulse" style={{ width: `${70 + ((i * 37) % 30)}%` }} />
             ))}
           </div>
         </div>
@@ -66,8 +73,8 @@ export default function Resume() {
     Front: 'Frontend', Back: 'Backend', Cloud: 'Cloud & Infrastructure',
   }
 
-  const edu = experience.find(e => e.title.includes('B.S.') || e.title.includes('Bachelor'))
-  const jobs = experience.filter(e => e !== edu)
+  const degrees = experience.filter(e => e.kind === 'education')
+  const jobs = experience.filter(e => e.kind !== 'education')
 
   const activeVariant = variants.find(v => v.key === activeKey) ?? null
   const pdfHref = activeVariant ? `/resume.pdf?variant=${activeVariant.key}` : '/resume.pdf'
@@ -129,12 +136,12 @@ export default function Resume() {
         transition={{ delay: 0.1 }}
         className="max-w-[850px] mx-auto px-6 pb-16 print:max-w-none print:px-0 print:pb-0"
       >
-        <div className="bg-white border border-mist rounded-2xl px-12 py-10 print:border-0 print:rounded-none print:px-8 print:py-4 print:shadow-none resume-body text-[11.5px] leading-[1.55] text-[#1a1a2e]">
+        <div className="bg-white border border-mist rounded-2xl px-12 py-10 print:border-0 print:rounded-none print:px-8 print:py-4 print:shadow-none resume-body text-[11.5px] leading-[1.55] text-ink print:text-[#1a1a2e]">
 
           {/* ── HEADER ── */}
           <div className="text-center mb-1">
             <h1 className="text-[20px] font-bold tracking-wide">Nathan Blatter</h1>
-            <p className="text-[10.5px] text-[#555] mt-0.5">
+            <p className="text-[10.5px] text-slate mt-0.5">
               nzb22@byu.edu | nathanblatter.com | linkedin.com/in/nathanblatter | github.com/nathanblatter
             </p>
           </div>
@@ -150,23 +157,26 @@ export default function Resume() {
 
           {/* ── EDUCATION ── */}
           <Section title="education">
-            {edu && (
-              <>
-                <Row
-                  left={<span className="font-bold">{edu.title}</span>}
-                  right={edu.year}
-                />
-                <p className="text-[10.5px] text-[#555]">Data Analytics Focus, STEM-Designated Program</p>
-                <p className="text-[10.5px] text-[#555]">{edu.subtitle}</p>
-                {about.gpa && <p className="text-[10.5px]">GPA: {about.gpa}</p>}
-                <p className="text-[10.5px]">Member of the Association for Information Systems</p>
-                {coursework.length > 0 && (
-                  <p className="text-[10.5px] mt-0.5">
-                    <span className="font-bold">Relevant Coursework:</span> {coursework.map(c => c.name).join(', ')}
-                  </p>
-                )}
-              </>
-            )}
+            <div className="space-y-1.5">
+              {degrees.map((edu, i) => (
+                <div key={edu.id}>
+                  <Row
+                    left={<span className="font-bold">{edu.title}</span>}
+                    right={edu.year}
+                  />
+                  <p className="text-[10.5px] text-slate">{edu.subtitle}</p>
+                  {descLines(edu.description).map((line, j) => (
+                    <p key={j} className="text-[10.5px] text-slate">{line}</p>
+                  ))}
+                  {i === 0 && about.gpa && <p className="text-[10.5px]">GPA: {about.gpa}</p>}
+                  {i === 0 && coursework.length > 0 && (
+                    <p className="text-[10.5px] mt-0.5">
+                      <span className="font-bold">Relevant Coursework:</span> {coursework.map(c => c.name).join(', ')}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
           </Section>
 
           {/* ── TECHNICAL SKILLS ── */}
@@ -194,7 +204,7 @@ export default function Resume() {
                         <span className="text-[10.5px]"> | <a href={project.link} target="_blank" rel="noopener noreferrer" className="text-blue hover:underline print:text-[#1a1a2e] print:no-underline">Link</a></span>
                       )}
                     </p>
-                    <Bullets text={project.description} />
+                    <Bullets text={project.summary || project.description} />
                   </div>
                 )
               })}
@@ -210,7 +220,7 @@ export default function Resume() {
                     left={<span className="font-bold">{job.title}</span>}
                     right={job.year}
                   />
-                  <p className="text-[10.5px] text-[#555] italic">{job.subtitle}</p>
+                  <p className="text-[10.5px] text-slate italic">{job.subtitle}</p>
                   <Bullets text={job.description} />
                 </div>
               ))}
@@ -235,7 +245,7 @@ export default function Resume() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mt-3 print:mt-2">
-      <h2 className="text-[12px] font-bold lowercase border-b border-[#1a1a2e]/30 pb-px mb-1.5 print:mb-1">{title}</h2>
+      <h2 className="text-[12px] font-bold lowercase border-b border-ink/30 pb-px mb-1.5 print:mb-1">{title}</h2>
       {children}
     </div>
   )
@@ -245,17 +255,21 @@ function Row({ left, right }: { left: React.ReactNode; right: string }) {
   return (
     <div className="flex justify-between items-baseline">
       <div className="text-[11.5px]">{left}</div>
-      <span className="text-[10.5px] text-[#555] shrink-0 ml-4">{right}</span>
+      <span className="text-[10.5px] text-slate shrink-0 ml-4">{right}</span>
     </div>
   )
 }
 
+function descLines(text: string): string[] {
+  return text.split('\n').map(l => l.replace(/^[•-]\s*/, '').trim()).filter(Boolean)
+}
+
 function Bullets({ text }: { text: string }) {
-  const lines = text.split('\n').map(l => l.replace(/^[•\-]\s*/, '').trim()).filter(Boolean)
+  const lines = descLines(text)
   return (
     <div className="mt-0.5">
       {lines.map((line, i) => (
-        <p key={i} className="text-[10.5px] leading-[1.55] pl-2.5 relative before:content-['•'] before:absolute before:left-0 before:text-[#555]">
+        <p key={i} className="text-[10.5px] leading-[1.55] pl-2.5 relative before:content-['•'] before:absolute before:left-0 before:text-slate">
           {line}
         </p>
       ))}

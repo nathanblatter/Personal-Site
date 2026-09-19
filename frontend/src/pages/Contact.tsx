@@ -175,7 +175,7 @@ function BookACall() {
               <div className="flex items-center gap-3">
                 <span className="font-mono text-xs text-steel tracking-wider uppercase">Select a date</span>
                 {bookingSettings?.timezone && (
-                  <span className="font-mono text-[10px] text-ink bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  <span className="font-mono text-[10px] text-steel bg-cloud px-2 py-0.5 rounded border border-mist">
                     Times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone}
                   </span>
                 )}

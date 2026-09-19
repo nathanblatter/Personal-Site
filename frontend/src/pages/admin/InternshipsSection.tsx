@@ -150,6 +150,9 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
   }
 
   const dash = intDashboard
+  // One definition everywhere (header, tile, funnel, backend offer_rate):
+  // an application counts as an offer once it's at `offer` or `accepted`.
+  const offerCount = (dash?.status_counts?.offer ?? 0) + (dash?.status_counts?.accepted ?? 0)
 
   const renderIntDashboard = () => (
     <div className="space-y-8">
@@ -157,7 +160,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
         {[
           { label: 'Total Apps', value: dash?.total_applications ?? 0, sub: `${dash?.response_rate ? (dash.response_rate * 100).toFixed(0) : 0}% response rate`, color: 'blue' },
           { label: 'Active', value: intApps.filter(a => !['rejected', 'withdrawn', 'ghosted', 'accepted', 'declined'].includes(a.current_status)).length, sub: 'in pipeline', color: 'teal' },
-          { label: 'Offers', value: dash?.status_counts?.offer ?? 0, sub: `${dash?.offer_rate ? (dash.offer_rate * 100).toFixed(0) : 0}% offer rate`, color: 'violet' },
+          { label: 'Offers', value: offerCount, sub: `${dash?.offer_rate ? (dash.offer_rate * 100).toFixed(0) : 0}% offer rate`, color: 'violet' },
           { label: 'Interviews', value: intApps.filter(a => ['technical', 'onsite', 'final_round', 'phone_screen', 'recruiter_screen', 'online_assessment'].includes(a.current_status)).length, sub: 'scheduled / done', color: 'ember' },
         ].map(card => (
           <SectionCard key={card.label}>
@@ -177,8 +180,9 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
         </h3>
         <div className="space-y-2">
           {STATUS_PIPELINE.filter(s => (dash?.status_counts?.[s.key] ?? 0) > 0 || ['wishlist', 'applied', 'technical', 'offer', 'accepted', 'rejected'].includes(s.key)).map(stage => {
-            const count = dash?.status_counts?.[stage.key] ?? 0
-            const max = Math.max(...Object.values(dash?.status_counts ?? { a: 1 }), 1)
+            // The Offer stage is cumulative: accepted applications passed through it.
+            const count = stage.key === 'offer' ? offerCount : (dash?.status_counts?.[stage.key] ?? 0)
+            const max = Math.max(...Object.values(dash?.status_counts ?? { a: 1 }), offerCount, 1)
             const pct = (count / max) * 100
             return (
               <div key={stage.key} className="flex items-center gap-3 group">
@@ -374,6 +378,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
               <button
                 onClick={e => { e.stopPropagation(); deleteApplication(app.id) }}
                 className="p-1.5 text-silver hover:text-ember transition-colors"
+                aria-label="Delete"
               >
                 <Trash2 size={13} />
               </button>
@@ -457,7 +462,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
                       {app.tags.map(t => (
                         <span key={t.id} className="inline-flex items-center gap-1 font-mono text-[10px] px-2 py-1 rounded-full" style={{ backgroundColor: (t.color || '#e4e9f0') + '20', color: t.color || '#8c95a6' }}>
                           {t.name}
-                          <button onClick={() => api.internships.applications.removeTag(app.id, t.id).then(refreshInternships)} className="hover:text-ember"><X size={9} /></button>
+                          <button onClick={() => api.internships.applications.removeTag(app.id, t.id).then(refreshInternships)} className="hover:text-ember" aria-label="Remove"><X size={9} /></button>
                         </span>
                       ))}
                     </div>

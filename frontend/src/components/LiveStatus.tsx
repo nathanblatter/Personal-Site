@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Clock, GitCommit } from 'lucide-react'
 import { api, type DevStatusResponse, type GitHubRepo } from '../lib/api'
+import { cached } from '../lib/requestCache'
+
+// Same keys/TTL as GitHubSection so the two home-page widgets share one fetch.
+const GITHUB_TTL_MS = 5 * 60 * 1000
 
 function relativeTime(dateStr: string): string {
   const diffMs = Date.now() - new Date(dateStr).getTime()
@@ -18,9 +22,10 @@ function relativeTime(dateStr: string): string {
 }
 
 function devTypeLabel(type: DevStatusResponse['dev_type']): string {
-  if (type === 'ssh') return 'SSH session active'
-  if (type === 'vnc') return 'Screen Sharing active'
-  if (type === 'both') return 'SSH + Screen Sharing'
+  // Deliberately vague: never disclose the remote-access method publicly.
+  if (type === 'ssh') return 'Working remotely'
+  if (type === 'vnc') return 'At the desk'
+  if (type === 'both') return 'Working'
   if (type === 'laptop') return 'On laptop'
   return ''
 }
@@ -36,8 +41,8 @@ export default function LiveStatus() {
     function load() {
       Promise.all([
         api.status.get().catch(() => null),
-        api.github.repos().catch(() => null),
-        api.github.contributions().catch(() => null),
+        cached('github:repos', () => api.github.repos(), GITHUB_TTL_MS).catch(() => null),
+        cached('github:contributions', () => api.github.contributions(), GITHUB_TTL_MS).catch(() => null),
       ]).then(([status, repos, contributions]) => {
         if (status) setDevStatus(status)
         if (repos && repos.length > 0) {

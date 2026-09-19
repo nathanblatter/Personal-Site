@@ -195,13 +195,13 @@ export default function ServicesSection({ showToast, showError }: AdminCallbacks
                 </div>
                 {editingOffering === o.id ? (
                   <>
-                    <button onClick={() => saveOffering(o)} className="p-1.5 text-teal hover:bg-teal/10 rounded-lg"><Save size={14} /></button>
-                    <button onClick={() => setEditingOffering(null)} className="p-1.5 text-steel hover:bg-cloud rounded-lg"><X size={14} /></button>
+                    <button onClick={() => saveOffering(o)} className="p-1.5 text-teal hover:bg-teal/10 rounded-lg" aria-label="Save"><Save size={14} /></button>
+                    <button onClick={() => setEditingOffering(null)} className="p-1.5 text-steel hover:bg-cloud rounded-lg" aria-label="Cancel editing"><X size={14} /></button>
                   </>
                 ) : (
                   <>
-                    <button onClick={() => setEditingOffering(o.id)} className="p-1.5 text-steel hover:text-blue hover:bg-blue-wash rounded-lg"><Pencil size={14} /></button>
-                    <button onClick={() => deleteOffering(o.id)} className="p-1.5 text-steel hover:text-ember hover:bg-ember/5 rounded-lg"><Trash2 size={14} /></button>
+                    <button onClick={() => setEditingOffering(o.id)} className="p-1.5 text-steel hover:text-blue hover:bg-blue-wash rounded-lg" aria-label="Edit"><Pencil size={14} /></button>
+                    <button onClick={() => deleteOffering(o.id)} className="p-1.5 text-steel hover:text-ember hover:bg-ember/5 rounded-lg" aria-label="Delete"><Trash2 size={14} /></button>
                   </>
                 )}
               </div>
@@ -236,13 +236,13 @@ export default function ServicesSection({ showToast, showError }: AdminCallbacks
                 <span className="flex-1 min-w-0 text-sm font-medium text-ink truncate">{s.title}</span>
                 {editingStep === s.id ? (
                   <>
-                    <button onClick={() => saveStep(s)} className="p-1.5 text-teal hover:bg-teal/10 rounded-lg"><Save size={14} /></button>
-                    <button onClick={() => setEditingStep(null)} className="p-1.5 text-steel hover:bg-cloud rounded-lg"><X size={14} /></button>
+                    <button onClick={() => saveStep(s)} className="p-1.5 text-teal hover:bg-teal/10 rounded-lg" aria-label="Save"><Save size={14} /></button>
+                    <button onClick={() => setEditingStep(null)} className="p-1.5 text-steel hover:bg-cloud rounded-lg" aria-label="Cancel editing"><X size={14} /></button>
                   </>
                 ) : (
                   <>
-                    <button onClick={() => setEditingStep(s.id)} className="p-1.5 text-steel hover:text-blue hover:bg-blue-wash rounded-lg"><Pencil size={14} /></button>
-                    <button onClick={() => deleteStep(s.id)} className="p-1.5 text-steel hover:text-ember hover:bg-ember/5 rounded-lg"><Trash2 size={14} /></button>
+                    <button onClick={() => setEditingStep(s.id)} className="p-1.5 text-steel hover:text-blue hover:bg-blue-wash rounded-lg" aria-label="Edit"><Pencil size={14} /></button>
+                    <button onClick={() => deleteStep(s.id)} className="p-1.5 text-steel hover:text-ember hover:bg-ember/5 rounded-lg" aria-label="Delete"><Trash2 size={14} /></button>
                   </>
                 )}
               </div>
@@ -277,13 +277,13 @@ export default function ServicesSection({ showToast, showError }: AdminCallbacks
                 </div>
                 {editingTier === t.id ? (
                   <>
-                    <button onClick={() => saveTier(t)} className="p-1.5 text-teal hover:bg-teal/10 rounded-lg"><Save size={14} /></button>
-                    <button onClick={() => setEditingTier(null)} className="p-1.5 text-steel hover:bg-cloud rounded-lg"><X size={14} /></button>
+                    <button onClick={() => saveTier(t)} className="p-1.5 text-teal hover:bg-teal/10 rounded-lg" aria-label="Save"><Save size={14} /></button>
+                    <button onClick={() => setEditingTier(null)} className="p-1.5 text-steel hover:bg-cloud rounded-lg" aria-label="Cancel editing"><X size={14} /></button>
                   </>
                 ) : (
                   <>
-                    <button onClick={() => setEditingTier(t.id)} className="p-1.5 text-steel hover:text-blue hover:bg-blue-wash rounded-lg"><Pencil size={14} /></button>
-                    <button onClick={() => deleteTier(t.id)} className="p-1.5 text-steel hover:text-ember hover:bg-ember/5 rounded-lg"><Trash2 size={14} /></button>
+                    <button onClick={() => setEditingTier(t.id)} className="p-1.5 text-steel hover:text-blue hover:bg-blue-wash rounded-lg" aria-label="Edit"><Pencil size={14} /></button>
+                    <button onClick={() => deleteTier(t.id)} className="p-1.5 text-steel hover:text-ember hover:bg-ember/5 rounded-lg" aria-label="Delete"><Trash2 size={14} /></button>
                   </>
                 )}
               </div>

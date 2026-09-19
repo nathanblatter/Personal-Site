@@ -100,10 +100,10 @@ export default function ContactSection({ showToast, showError, socials, setSocia
                 </div>
                 <span className="font-mono text-xs text-silver truncate max-w-48 shrink-0">{social.href}</span>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <button onClick={e => { e.stopPropagation(); setEditingSocial(editingSocial === social.id ? null : social.id) }} className="p-1.5 text-steel hover:text-blue transition-colors">
+                  <button onClick={e => { e.stopPropagation(); setEditingSocial(editingSocial === social.id ? null : social.id) }} className="p-1.5 text-steel hover:text-blue transition-colors" aria-label="Edit">
                     <Pencil size={13} />
                   </button>
-                  <button onClick={e => { e.stopPropagation(); deleteSocial(social.id) }} className="p-1.5 text-steel hover:text-ember transition-colors">
+                  <button onClick={e => { e.stopPropagation(); deleteSocial(social.id) }} className="p-1.5 text-steel hover:text-ember transition-colors" aria-label="Delete">
                     <Trash2 size={13} />
                   </button>
                 </div>

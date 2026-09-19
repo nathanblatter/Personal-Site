@@ -21,6 +21,8 @@ class ProjectBase(BaseModel):
     project_id: str
     title: str
     description: str
+    summary: Optional[str] = None
+    demo_credentials: Optional[str] = None
     tags: List[str]
     year: str
     color: str
@@ -39,6 +41,8 @@ class ProjectUpdate(BaseModel):
     project_id: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
+    summary: Optional[str] = None
+    demo_credentials: Optional[str] = None
     tags: Optional[List[str]] = None
     year: Optional[str] = None
     color: Optional[str] = None
@@ -230,11 +234,17 @@ class SkillResponse(SkillBase):
 
 # ── Experience ────────────────────────────────────────────────────────────────
 
+class ExperienceKind(str, Enum):
+    work = "work"
+    education = "education"
+
+
 class ExperienceBase(BaseModel):
     year: str
     title: str
     subtitle: str
     description: str
+    kind: ExperienceKind = ExperienceKind.work
     active: bool = False
     sort_order: int = 0
 
@@ -248,6 +258,7 @@ class ExperienceUpdate(BaseModel):
     title: Optional[str] = None
     subtitle: Optional[str] = None
     description: Optional[str] = None
+    kind: Optional[ExperienceKind] = None
     active: Optional[bool] = None
     sort_order: Optional[int] = None
 

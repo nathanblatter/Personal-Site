@@ -162,6 +162,7 @@ EXPERIENCE = [
     {
         "year": "2024 \u2014 Apr 2027",
         "title": "B.S. Information Systems",
+        "kind": "education",
         "subtitle": "Brigham Young University \u2014 Marriott School of Business",
         "description": (
             "Full-Stack Software Engineering emphasis. Data Analytics Focus, STEM-Designated "
@@ -759,10 +760,27 @@ async def ensure_normalized_blog_tags(db) -> None:
         print(f"Normalized tags on {changed_count} blog post(s).")
 
 
+async def ensure_columns(conn) -> None:
+    """Idempotent column adds for tables that predate the column (create_all
+    never ALTERs existing tables). Mirrors alembic/versions/020_*.py."""
+    from sqlalchemy import text
+    await conn.execute(text(
+        "ALTER TABLE experience ADD COLUMN IF NOT EXISTS kind VARCHAR NOT NULL DEFAULT 'work'"
+    ))
+    await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS summary TEXT"))
+    await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS demo_credentials VARCHAR"))
+    # One-time backfill: rows still at the default whose title looks like a degree.
+    await conn.execute(text(
+        "UPDATE experience SET kind = 'education' WHERE kind = 'work' "
+        "AND title ~* '\\m(B\\.S\\.|M\\.S\\.|B\\.A\\.|M\\.A\\.|Bachelor|Master|Ph\\.D\\.)'"
+    ))
+
+
 async def seed() -> None:
     # Ensure tables exist (safe to call even after alembic migrations)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await ensure_columns(conn)
 
     async with AsyncSessionLocal() as db:
         # Backfill editable content blocks regardless of the seed guard below.

@@ -176,10 +176,10 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                 placeholder="Short description"
               />
               <div className="flex items-center gap-1 mt-1">
-                <button onClick={() => saveInterest(item)} className="p-1.5 text-steel hover:text-blue transition-colors">
+                <button onClick={() => saveInterest(item)} className="p-1.5 text-steel hover:text-blue transition-colors" aria-label="Save">
                   <Save size={13} />
                 </button>
-                <button onClick={() => deleteInterest(item.id)} className="p-1.5 text-silver hover:text-ember transition-colors">
+                <button onClick={() => deleteInterest(item.id)} className="p-1.5 text-silver hover:text-ember transition-colors" aria-label="Delete">
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -235,6 +235,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
               <button
                 onClick={() => setAbout(prev => prev ? { ...prev, looking_for: prev.looking_for.filter((_, j) => j !== i) } : prev)}
                 className="p-1.5 text-silver hover:text-ember transition-colors mt-1"
+                aria-label="Delete"
               >
                 <Trash2 size={13} />
               </button>
@@ -304,6 +305,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                     } catch (err) { showError((err as Error).message) }
                   }}
                   className="p-1.5 text-steel hover:text-blue transition-colors"
+                  aria-label="Save"
                 >
                   <Save size={13} />
                 </button>
@@ -316,6 +318,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                     } catch (err) { showError((err as Error).message) }
                   }}
                   className="p-1.5 text-silver hover:text-ember transition-colors"
+                  aria-label="Delete"
                 >
                   <Trash2 size={13} />
                 </button>

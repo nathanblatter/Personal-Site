@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { Plus, Trash2, GripVertical, Save, Pencil } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Save, Pencil, GraduationCap, Briefcase } from 'lucide-react'
 import { api, type ExperienceResponse } from '../../lib/api'
-import { AdminInput, AdminTextarea, SectionCard, type AdminCallbacks } from './AdminShared'
+import { AdminInput, AdminTextarea, AdminSelect, SectionCard, type AdminCallbacks } from './AdminShared'
 import { useUnsavedWarning } from './useUnsavedWarning'
 
 interface ExperienceSectionProps extends AdminCallbacks {
@@ -36,6 +36,7 @@ export default function ExperienceSection({ showToast, showError, experience, se
         title: 'New Position',
         subtitle: 'Company',
         description: '',
+        kind: 'work',
         active: false,
         sort_order: experience.length,
       })
@@ -63,7 +64,9 @@ export default function ExperienceSection({ showToast, showError, experience, se
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-sans font-semibold text-ink mb-1">Experience</h2>
-          <p className="text-steel text-sm">{experience.length} entries — {experience.filter(e => e.active).length} currently active</p>
+          <p className="text-steel text-sm">
+            {experience.filter(e => e.kind !== 'education').length} roles · {experience.filter(e => e.kind === 'education').length} degrees — {experience.filter(e => e.active).length} currently active
+          </p>
         </div>
         <button onClick={addExp} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue text-white font-mono text-xs font-semibold rounded-lg hover:bg-blue-dim transition-colors shadow-sm">
           <Plus size={14} /> Add Entry
@@ -79,19 +82,23 @@ export default function ExperienceSection({ showToast, showError, experience, se
             >
               <GripVertical size={14} className="text-silver" />
               <div className={`w-3 h-3 rounded-full border-2 ${exp.active ? 'bg-blue border-blue' : 'bg-white border-silver'}`} />
+              {exp.kind === 'education'
+                ? <GraduationCap size={14} className="text-violet shrink-0" aria-label="Education" />
+                : <Briefcase size={14} className="text-steel shrink-0" aria-label="Work" />}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-medium text-ink">{exp.title}</span>
+                  {exp.kind === 'education' && <span className="font-mono text-[10px] text-violet bg-violet/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Education</span>}
                   {exp.active && <span className="font-mono text-[10px] text-teal bg-teal/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Active</span>}
                 </div>
                 <p className="text-xs text-steel mt-0.5">{exp.subtitle}</p>
               </div>
               <span className="font-mono text-xs text-silver shrink-0">{exp.year}</span>
               <div className="flex items-center gap-1.5 shrink-0">
-                <button onClick={e => { e.stopPropagation(); setEditingExp(editingExp === exp.id ? null : exp.id) }} className="p-1.5 text-steel hover:text-blue transition-colors">
+                <button onClick={e => { e.stopPropagation(); setEditingExp(editingExp === exp.id ? null : exp.id) }} className="p-1.5 text-steel hover:text-blue transition-colors" aria-label={`Edit ${exp.title}`}>
                   <Pencil size={13} />
                 </button>
-                <button onClick={e => { e.stopPropagation(); deleteExp(exp.id) }} className="p-1.5 text-steel hover:text-ember transition-colors">
+                <button onClick={e => { e.stopPropagation(); deleteExp(exp.id) }} className="p-1.5 text-steel hover:text-ember transition-colors" aria-label={`Delete ${exp.title}`}>
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -105,13 +112,25 @@ export default function ExperienceSection({ showToast, showError, experience, se
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.25 }}
                   className="overflow-hidden"
+                  onKeyDown={e => { if (e.key === 'Escape') setEditingExp(null) }}
                 >
                   <div className="border-t border-mist p-6 bg-white space-y-5">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <AdminInput label="Title" value={exp.title} onChange={v => updateExpLocal(exp.id, 'title', v)} />
                       <AdminInput label="Date Range" value={exp.year} onChange={v => updateExpLocal(exp.id, 'year', v)} mono />
                     </div>
-                    <AdminInput label="Organization" value={exp.subtitle} onChange={v => updateExpLocal(exp.id, 'subtitle', v)} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <AdminInput label={exp.kind === 'education' ? 'School' : 'Organization'} value={exp.subtitle} onChange={v => updateExpLocal(exp.id, 'subtitle', v)} />
+                      <AdminSelect
+                        label="Kind"
+                        value={exp.kind}
+                        onChange={v => updateExpLocal(exp.id, 'kind', v)}
+                        options={[
+                          { value: 'work', label: 'Work — jobs, internships, research, volunteering' },
+                          { value: 'education', label: 'Education — degrees (résumé Education section)' },
+                        ]}
+                      />
+                    </div>
                     <AdminTextarea label="Description" value={exp.description} onChange={v => updateExpLocal(exp.id, 'description', v)} />
                     <div className="flex items-center gap-3">
                       <label className="font-mono text-[11px] text-steel tracking-wider uppercase">Currently Active</label>

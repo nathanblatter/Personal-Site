@@ -500,6 +500,7 @@ export default function BookingsSection({ showToast, showError }: AdminCallbacks
                       } catch (err) { showError((err as Error).message) }
                     }}
                     className="p-1.5 text-steel hover:text-ember transition-colors ml-auto"
+                    aria-label="Delete"
                   >
                     <Trash2 size={13} />
                   </button>
@@ -624,6 +625,7 @@ export default function BookingsSection({ showToast, showError }: AdminCallbacks
                       } catch (err) { showError((err as Error).message) }
                     }}
                     className="p-1.5 text-steel hover:text-ember transition-colors"
+                    aria-label="Delete"
                   >
                     <Trash2 size={13} />
                   </button>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { QRCodeCanvas } from 'qrcode.react'
-import { Plus, Trash2, GripVertical, Save, Eye, EyeOff, Check, Pencil, ExternalLink, Download } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Save, Eye, EyeOff, Check, Pencil, ExternalLink, Download, MousePointerClick } from 'lucide-react'
 import { api, type BioLinkResponse, type BioPageSettingsResponse } from '../../lib/api'
 import { AdminInput, SectionCard, type AdminCallbacks } from './AdminShared'
 
@@ -253,7 +253,10 @@ export default function BioSection({ showToast, showError }: AdminCallbacks) {
                           />
                         </div>
                       </div>
-                      <span className="font-mono text-xs font-semibold text-ink w-10 text-right">{link.clicks}</span>
+                      <span className="inline-flex items-center gap-1 font-mono text-xs text-steel w-20 justify-end" title="Total clicks">
+                        <MousePointerClick size={11} className="shrink-0" />
+                        <span className="font-semibold text-ink">{link.clicks}</span> click{link.clicks !== 1 ? 's' : ''}
+                      </span>
                     </div>
 
                     {/* Enabled toggle */}
@@ -270,7 +273,7 @@ export default function BioSection({ showToast, showError }: AdminCallbacks) {
                     </button>
 
                     {/* Actions */}
-                    <button onClick={() => setBioEditLink({ ...link })} className="p-1.5 text-steel hover:text-blue transition-colors">
+                    <button onClick={() => setBioEditLink({ ...link })} className="p-1.5 text-steel hover:text-blue transition-colors" aria-label="Edit">
                       <Pencil size={13} />
                     </button>
                     <button
@@ -280,6 +283,7 @@ export default function BioSection({ showToast, showError }: AdminCallbacks) {
                           .catch(err => showError((err as Error).message))
                       }}
                       className="p-1.5 text-steel hover:text-ember transition-colors"
+                      aria-label="Delete"
                     >
                       <Trash2 size={13} />
                     </button>

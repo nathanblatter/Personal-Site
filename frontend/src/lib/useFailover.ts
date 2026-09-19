@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { cached as memo } from './requestCache'
 
 declare global {
   interface Window { __FAILOVER__?: boolean }
@@ -25,13 +26,15 @@ export function useFailover(): boolean {
   )
 
   useEffect(() => {
-    if (cached !== null) { setFailover(cached); return }
-    if (typeof window !== 'undefined' && window.__FAILOVER__ === true) {
-      cached = true; setFailover(true); return
-    }
+    // Initial state already reflects `cached` / window.__FAILOVER__; nothing to probe.
+    if (cached !== null) return
+    if (typeof window !== 'undefined' && window.__FAILOVER__ === true) { cached = true; return }
     let alive = true
-    fetch('/api/v1/__failover', { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : null))
+    // Shared promise: several components mount this hook on one page (banner,
+    // newsletter, contact) and must not each probe the marker.
+    memo('failover:probe', () =>
+      fetch('/api/v1/__failover', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))
+    )
       .then(j => { cached = !!(j && j.failover); if (alive) setFailover(cached) })
       .catch(() => { cached = false })
     return () => { alive = false }

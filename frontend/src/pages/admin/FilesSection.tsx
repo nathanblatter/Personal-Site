@@ -12,9 +12,15 @@ const formatFileSize = (bytes: number) => {
 
 const isImageKey = (key: string) => /\.(jpg|jpeg|png|gif|webp|svg|avif)$/i.test(key)
 
+// Render in chunks: a few hundred multi-MB thumbnails at once would stall the tab.
+const PAGE_SIZE = 40
+
 export default function FilesSection({ showToast, showError }: AdminCallbacks) {
   const [files, setFiles] = useState<StorageFile[]>([])
   const [filesPrefix, setFilesPrefix] = useState('')
+  const [visible, setVisible] = useState(PAGE_SIZE)
+
+  const selectPrefix = (p: string) => { setFilesPrefix(p); setVisible(PAGE_SIZE) }
 
   useEffect(() => {
     api.storage.list(filesPrefix)
@@ -65,7 +71,7 @@ export default function FilesSection({ showToast, showError }: AdminCallbacks) {
       {/* Folder filter */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
-          onClick={() => setFilesPrefix('')}
+          onClick={() => selectPrefix('')}
           className={`font-mono text-[11px] px-3 py-1.5 rounded-full transition-all ${!filesPrefix ? 'bg-blue-wash text-blue' : 'bg-cloud text-steel hover:text-ink'}`}
         >
           All
@@ -73,7 +79,7 @@ export default function FilesSection({ showToast, showError }: AdminCallbacks) {
         {prefixes.map(p => (
           <button
             key={p}
-            onClick={() => setFilesPrefix(p)}
+            onClick={() => selectPrefix(p)}
             className={`font-mono text-[11px] px-3 py-1.5 rounded-full transition-all ${filesPrefix === p ? 'bg-blue-wash text-blue' : 'bg-cloud text-steel hover:text-ink'}`}
           >
             {p || 'root'}
@@ -87,7 +93,7 @@ export default function FilesSection({ showToast, showError }: AdminCallbacks) {
             <p className="text-center text-steel text-sm py-8 font-mono">No files uploaded yet.</p>
           </SectionCard>
         )}
-        {files.map(file => {
+        {files.slice(0, visible).map(file => {
           const url = api.storage.downloadUrl(file.key)
           const fileName = file.key.split('/').pop() || file.key
           const folder = file.key.split('/').slice(0, -1).join('/')
@@ -96,7 +102,18 @@ export default function FilesSection({ showToast, showError }: AdminCallbacks) {
               <div className="flex items-center gap-4">
                 {/* Thumbnail or icon */}
                 {isImageKey(file.key) ? (
-                  <img src={url} alt={fileName} className="w-12 h-12 rounded-lg object-cover border border-mist shrink-0" />
+                  <div className="w-12 h-12 rounded-lg border border-mist bg-cloud overflow-hidden shrink-0">
+                    <img
+                      src={url}
+                      alt={fileName}
+                      loading="lazy"
+                      decoding="async"
+                      width={48}
+                      height={48}
+                      className="w-full h-full object-cover"
+                      onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden' }}
+                    />
+                  </div>
                 ) : (
                   <div className="w-12 h-12 rounded-lg bg-cloud border border-mist flex items-center justify-center shrink-0">
                     <File size={18} className="text-steel" />
@@ -145,6 +162,14 @@ export default function FilesSection({ showToast, showError }: AdminCallbacks) {
             </SectionCard>
           )
         })}
+        {files.length > visible && (
+          <button
+            onClick={() => setVisible(v => v + PAGE_SIZE)}
+            className="w-full py-3 rounded-xl border border-dashed border-mist font-mono text-xs text-steel hover:text-blue hover:border-blue/30 transition-colors"
+          >
+            Load more ({files.length - visible} remaining)
+          </button>
+        )}
       </div>
     </motion.div>
   )

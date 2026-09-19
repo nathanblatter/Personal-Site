@@ -108,6 +108,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                   <button
                     onClick={() => { navigator.clipboard.writeText(`https://nathanblatter.com/go/${link.slug}`); showToast('Copied') }}
                     className="p-1 text-silver hover:text-blue transition-colors"
+                    aria-label="Copy link"
                   >
                     <Copy size={10} />
                   </button>
@@ -127,10 +128,10 @@ export default function LinksSection({ showToast, showError, projects, skills, e
               >
                 <Settings size={13} />
               </button>
-              <button onClick={() => saveLink(link)} className="p-1.5 text-steel hover:text-blue transition-colors">
+              <button onClick={() => saveLink(link)} className="p-1.5 text-steel hover:text-blue transition-colors" aria-label="Save">
                 <Save size={13} />
               </button>
-              <button onClick={() => removeLink(link.id)} className="p-1.5 text-steel hover:text-ember transition-colors">
+              <button onClick={() => removeLink(link.id)} className="p-1.5 text-steel hover:text-ember transition-colors" aria-label="Delete">
                 <Trash2 size={13} />
               </button>
             </div>
@@ -317,7 +318,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                                         }} />
                                       </div>
                                       <button onClick={() => patchAbout({ looking_for: link.portfolio_ctx!.about!.looking_for!.filter((_, j) => j !== i) })}
-                                        className="pb-2 text-steel hover:text-ember transition-colors"><Trash2 size={13} /></button>
+                                        className="pb-2 text-steel hover:text-ember transition-colors" aria-label="Delete"><Trash2 size={13} /></button>
                                     </div>
                                   </div>
                                 </div>
@@ -357,7 +358,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                                     patchAbout({ info_fields: arr })
                                   }} /></div>
                                   <button onClick={() => patchAbout({ info_fields: link.portfolio_ctx!.about!.info_fields!.filter((_, j) => j !== i) })}
-                                    className="pb-2 text-steel hover:text-ember transition-colors"><Trash2 size={13} /></button>
+                                    className="pb-2 text-steel hover:text-ember transition-colors" aria-label="Delete"><Trash2 size={13} /></button>
                                 </div>
                               ))}
                               <button onClick={() => patchAbout({ info_fields: [...(link.portfolio_ctx?.about?.info_fields ?? []), { label: '', value: '' }] })}

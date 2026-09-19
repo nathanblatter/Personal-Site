@@ -1,4 +1,5 @@
 import { motion } from 'motion/react'
+import { GraduationCap } from 'lucide-react'
 
 interface TimelineItemProps {
   year: string
@@ -6,12 +7,13 @@ interface TimelineItemProps {
   subtitle: string
   description: string
   index: number
+  kind?: 'work' | 'education'
   active?: boolean
   highlighted?: boolean
   note?: string
 }
 
-export default function TimelineItem({ year, title, subtitle, description, index, active, highlighted, note }: TimelineItemProps) {
+export default function TimelineItem({ year, title, subtitle, description, index, kind, active, highlighted, note }: TimelineItemProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -36,6 +38,11 @@ export default function TimelineItem({ year, title, subtitle, description, index
 
       {/* Content */}
       <span className="font-mono text-xs text-blue tracking-wider">{year}</span>
+      {kind === 'education' && (
+        <span className="inline-flex items-center gap-1 ml-3 font-mono text-[10px] text-violet uppercase tracking-wider">
+          <GraduationCap size={11} /> Education
+        </span>
+      )}
       <h4 className={`text-xl font-sans font-semibold mt-2 ${highlighted ? 'text-blue' : 'text-ink'}`}>{title}</h4>
       <p className="text-sm text-steel mt-1">{subtitle}</p>
       <p className="text-sm text-slate mt-4 leading-relaxed max-w-lg">{description}</p>

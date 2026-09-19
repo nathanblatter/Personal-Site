@@ -122,7 +122,7 @@ export default function SkillsSection({ showToast, showError, skills, setSkills 
               <span className="font-mono text-xs text-steel w-8 text-right">{skill.level}%</span>
             </div>
             <div className="w-16 flex justify-end">
-              <button onClick={() => deleteSkill(skill.id)} className="p-1.5 text-silver hover:text-ember transition-colors">
+              <button onClick={() => deleteSkill(skill.id)} className="p-1.5 text-silver hover:text-ember transition-colors" aria-label="Delete">
                 <Trash2 size={13} />
               </button>
             </div>

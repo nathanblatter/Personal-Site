@@ -146,9 +146,11 @@ async def get_dashboard(
     past_applied = total_applications - early_stage
     response_rate = past_applied / total_applications if total_applications > 0 else 0.0
 
-    # Offer rate
-    offer_count_q = await db.execute(select(func.count(Offer.id)))
-    offer_count = offer_count_q.scalar() or 0
+    # Offer rate — one definition shared with the admin UI: an application
+    # counts as an offer once its status is `offer` or `accepted` (accepted
+    # implies an offer was made). Counting Offer rows instead drifted from the
+    # header/funnel whenever an offer was accepted without an Offer record.
+    offer_count = normalized_status.get("offer", 0) + normalized_status.get("accepted", 0)
     offer_rate = offer_count / total_applications if total_applications > 0 else 0.0
 
     return {

@@ -24,6 +24,10 @@ export interface ProjectResponse {
   project_id: string
   title: string
   description: string
+  /** 1–2 sentence blurb for cards, résumé, and link-in-bio. Falls back to description. */
+  summary?: string | null
+  /** Demo login shown only on the case-study page. */
+  demo_credentials?: string | null
   tags: string[]
   year: string
   color: string
@@ -42,12 +46,15 @@ export interface SkillResponse {
   sort_order: number
 }
 
+export type ExperienceKind = 'work' | 'education'
+
 export interface ExperienceResponse {
   id: number
   year: string
   title: string
   subtitle: string
   description: string
+  kind: ExperienceKind
   active: boolean
   sort_order: number
 }

@@ -6,6 +6,8 @@ export interface Project {
   project_id?: string
   title: string
   description: string
+  summary?: string | null
+  demo_credentials?: string | null
   tags: string[]
   year: string
   color: string
@@ -68,7 +70,7 @@ export default function ProjectCard({
 
           {/* Description */}
           <p className="text-steel text-sm leading-relaxed mb-7 line-clamp-3">
-            {project.description}
+            {project.summary || project.description}
           </p>
 
           {/* Tags */}

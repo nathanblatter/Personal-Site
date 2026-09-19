@@ -1,5 +1,6 @@
 import { useState, useEffect, useLayoutEffect } from 'react'
 import { api } from './api'
+import { cached } from './requestCache'
 
 type Theme = 'light' | 'dark'
 
@@ -15,7 +16,7 @@ function readCached(key: string): Theme | null {
     const { mode, expires } = JSON.parse(raw)
     if (Date.now() < expires && (mode === 'light' || mode === 'dark')) return mode
     localStorage.removeItem(key)
-  } catch {}
+  } catch { /* unreadable localStorage — fall through */ }
   return null
 }
 
@@ -34,10 +35,12 @@ export function useTheme() {
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [theme])
 
-  // Fetch solar only when no live manual preference
+  // Fetch solar only when no live manual preference and the 30-minute
+  // localStorage cache has lapsed; the promise is also memoized so remounts
+  // (route changes) never re-hit the endpoint within the TTL.
   useEffect(() => {
-    if (readCached(MANUAL_KEY)) return
-    api.solar.get().then(({ mode }) => {
+    if (readCached(MANUAL_KEY) || readCached(SOLAR_KEY)) return
+    cached('solar:mode', () => api.solar.get(), SOLAR_TTL).then(({ mode }) => {
       localStorage.setItem(SOLAR_KEY, JSON.stringify({ mode, expires: Date.now() + SOLAR_TTL }))
       setTheme(mode as Theme)
     }).catch(() => {})
