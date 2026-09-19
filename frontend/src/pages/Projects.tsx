@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'motion/react'
 import SectionHeader from '../components/SectionHeader'
 import ProjectCard from '../components/ProjectCard'
@@ -8,7 +8,9 @@ import { api, type ProjectResponse } from '../lib/api'
 import { usePortfolioCtx } from '../lib/usePortfolioCtx'
 import type { Project } from '../components/ProjectCard'
 import { useDocumentMeta } from '../lib/useDocumentMeta'
+import { useAsyncData } from '../lib/useAsyncData'
 
+const EMPTY: never[] = []
 const categories = ['All', 'Live', 'WIP', 'Archived']
 
 export default function Projects() {
@@ -17,19 +19,12 @@ export default function Projects() {
     description: 'A collection of research, professional, and personal projects by Nathan Blatter.',
     canonical: '/projects',
   })
-  const [allProjects, setAllProjects] = useState<ProjectResponse[]>([])
   const [filter, setFilter] = useState('All')
   const [selected, setSelected] = useState<Project | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
+  const { data, loading, error } = useAsyncData(api.projects.list, retryKey)
+  const allProjects: ProjectResponse[] = data ?? EMPTY
   const portfolioCtx = usePortfolioCtx()
-
-  useEffect(() => {
-    setLoading(true)
-    setError(false)
-    api.projects.list().then(setAllProjects).catch(() => setError(true)).finally(() => setLoading(false))
-  }, [retryKey])
 
   const visibleProjects = portfolioCtx
     ? allProjects.filter(p => (portfolioCtx.projects?.[p.project_id]?.visibility ?? 'show') !== 'hide')
@@ -68,7 +63,7 @@ export default function Projects() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ duration: 0.2 }}
           className="flex flex-wrap justify-center gap-2 md:gap-3 mb-10 md:mb-12"
         >
           {categories.map((cat) => (

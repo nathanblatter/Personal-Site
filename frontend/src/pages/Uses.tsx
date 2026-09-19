@@ -68,6 +68,7 @@ export default function Uses() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
           className="mb-12"
         >
           <span className="font-mono text-xs text-blue tracking-[0.2em] uppercase">// USES</span>
@@ -90,7 +91,7 @@ export default function Uses() {
                   key={i}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + i * 0.08 }}
+                  transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.05 }}
                   className="rounded-2xl border border-mist bg-white p-6"
                 >
                   <div className="flex items-center gap-2.5 mb-4">

@@ -113,6 +113,11 @@ class About(Base):
     gpa = Column(String, nullable=True)
     looking_for = Column(JSON, nullable=False, default=list)  # [{role, location, timeline, detail}]
     info_fields = Column(JSON, nullable=False, default=list)
+    # Home hero + <meta name="description"> — editable so the first thing a recruiter
+    # reads can't drift from the résumé (they did: "IS student" vs M.S. candidate).
+    hero_tagline = Column(String, nullable=True)       # small caps line above the name
+    hero_intro = Column(Text, nullable=True)           # paragraph under the name; **bold** spans allowed
+    meta_description = Column(String, nullable=True)   # site-wide default description / og:description
 
 
 class Interest(Base):

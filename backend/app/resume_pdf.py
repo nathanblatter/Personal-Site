@@ -83,13 +83,15 @@ def generate_resume_pdf(about, experience, skills, projects, coursework, variant
 
     # ── NAME ──
     story.append(Paragraph("Nathan Blatter", s_name))
-    story.append(Paragraph(
-        f'nzb22@byu.edu | '
-        f'{_link(DOMAIN, "nathanblatter.com")} | '
-        f'{_link(DOMAIN + "/go/linkedin", "LinkedIn")} | '
-        f'{_link(DOMAIN + "/go/github", "GitHub")}',
-        s_contact,
-    ))
+    c = about.get("contact") or {}
+    contact_parts = [
+        c.get("phone") or "",
+        c.get("email") or "nzb22@byu.edu",
+        _link(DOMAIN, c.get("site") or "nathanblatter.com"),
+        _link(DOMAIN + "/go/linkedin", "LinkedIn"),
+        _link(DOMAIN + "/go/github", "GitHub"),
+    ]
+    story.append(Paragraph(" | ".join(p for p in contact_parts if p), s_contact))
 
     # ── SUMMARY (variant-aware) ──
     if variant and variant.get("headline") and variant.get("summary"):

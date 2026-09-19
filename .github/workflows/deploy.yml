@@ -23,8 +23,11 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Build frontend
-        run: cd frontend && npm ci && npm run build
+      - name: Frontend gates (lint + typecheck + build)
+        run: |
+          cd frontend && npm ci
+          npm run lint
+          npm run build   # tsc -b && vite build
 
       - name: Deploy
         run: |
@@ -47,6 +50,10 @@ jobs:
           # surfaces as an unhealthy container mid-rollout (2026-08-01 incident).
           docker run --rm backend-api:latest python -c "import app.main"
           docker run --rm backend-worker:latest python -c "import app.journal_worker"
+
+          # Backend test gate, run inside the image we're about to ship so deps match prod.
+          docker run --rm -v "$GITHUB_WORKSPACE/backend:/src:ro" -w /src backend-api:latest \
+            sh -c "pip install -q -r requirements-dev.txt && python -m pytest -q tests"
 
           # Get current running container ID
           cd $GITHUB_WORKSPACE/backend

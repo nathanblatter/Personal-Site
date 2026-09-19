@@ -298,11 +298,17 @@ class AboutBase(BaseModel):
     gpa: Optional[str] = None
     looking_for: List[LookingForItem] = []
     info_fields: List[InfoField]
+    hero_tagline: Optional[str] = None
+    hero_intro: Optional[str] = None
+    meta_description: Optional[str] = None
 
 
 class AboutUpdate(BaseModel):
     bio_paragraphs: Optional[List[str]] = None
     facts: Optional[List[FactItem]] = None
+    hero_tagline: Optional[str] = None
+    hero_intro: Optional[str] = None
+    meta_description: Optional[str] = None
     headshot_url: Optional[str] = None
     status_text: Optional[str] = None
     gpa: Optional[str] = None

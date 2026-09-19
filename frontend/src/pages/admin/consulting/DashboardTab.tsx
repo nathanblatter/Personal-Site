@@ -1,6 +1,7 @@
 import { TrendingUp, DollarSign, Repeat, Clock, Users, Briefcase, AlertCircle } from 'lucide-react'
 import type { CrmDashboard } from '../../../lib/api'
-import { fmtCents, fmtMinutes, fmtDate, Pill } from './crmShared'
+import { fmtCents, fmtMinutes, fmtDate } from './crmShared'
+import { Pill } from './crmComponents'
 
 function Stat({ icon: Icon, label, value, hint }: { icon: typeof TrendingUp; label: string; value: string; hint?: string }) {
   return (

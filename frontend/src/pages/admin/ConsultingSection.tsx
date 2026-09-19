@@ -9,7 +9,7 @@ import {
   type CrmDashboard,
 } from '../../lib/api'
 import type { AdminCallbacks } from './AdminShared'
-import { SubTabs } from './consulting/crmShared'
+import { SubTabs } from './consulting/crmComponents'
 import DashboardTab from './consulting/DashboardTab'
 import PipelineTab from './consulting/PipelineTab'
 import ContactsTab from './consulting/ContactsTab'
@@ -54,6 +54,7 @@ export default function ConsultingSection({ showToast, showError }: AdminCallbac
   const reloadDashboard = useCallback(async () => { setDashboard(await api.crm.dashboard()) }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is set after the fetch resolves, not synchronously
     Promise.all([reloadContacts(), reloadOrgs(), reloadDeals(), reloadEngagements(), reloadDashboard()])
       .catch(e => showError((e as Error).message))
       .finally(() => setLoading(false))

@@ -23,6 +23,7 @@ export default function NotFound() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
         className="text-center max-w-md"
       >
         <div className="font-mono text-8xl font-bold text-mist mb-6">404</div>
@@ -35,7 +36,7 @@ export default function NotFound() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ duration: 0.2 }}
             className="mb-6"
           >
             <p className="text-steel text-xs font-mono mb-2">Did you mean?</p>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'motion/react'
 import SectionHeader from '../components/SectionHeader'
 import TimelineItem from '../components/TimelineItem'
@@ -11,6 +11,9 @@ import { api, type AboutResponse, type InterestResponse, type CourseworkResponse
 import { usePortfolioCtx } from '../lib/usePortfolioCtx'
 import { getIcon } from '../lib/iconMap'
 import { useDocumentMeta } from '../lib/useDocumentMeta'
+import { useAsyncData } from '../lib/useAsyncData'
+
+const EMPTY: never[] = []
 
 export default function About() {
   useDocumentMeta({
@@ -18,31 +21,16 @@ export default function About() {
     description: 'Background, experience, coursework, and interests of Nathan Blatter — IS student at BYU building full-stack applications and AI systems.',
     canonical: '/about',
   })
-  const [about, setAbout] = useState<AboutResponse | null>(null)
-  const [interests, setInterests] = useState<InterestResponse[]>([])
-  const [coursework, setCoursework] = useState<CourseworkResponse[]>([])
-  const [experience, setExperience] = useState<ExperienceResponse[]>([])
-  const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
-  const [certifications, setCertifications] = useState<CertificationResponse[]>([])
-  const [personalPhotos, setPersonalPhotos] = useState<PersonalPhotoResponse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
+  const { data, loading, error } = useAsyncData(api.aboutPage.get, retryKey)
+  const about: AboutResponse | null = data?.about ?? null
+  const interests: InterestResponse[] = data?.interests ?? EMPTY
+  const coursework: CourseworkResponse[] = data?.coursework ?? EMPTY
+  const experience: ExperienceResponse[] = data?.experience ?? EMPTY
+  const testimonials: TestimonialResponse[] = data?.testimonials ?? EMPTY
+  const certifications: CertificationResponse[] = data?.certifications ?? EMPTY
+  const personalPhotos: PersonalPhotoResponse[] = data?.personal_photos ?? EMPTY
   const portfolioCtx = usePortfolioCtx()
-
-  useEffect(() => {
-    setLoading(true)
-    setError(false)
-    api.aboutPage.get().then(({ about: ab, interests: intr, coursework: cw, experience: ex, testimonials: test, certifications: certs, personal_photos: photos }) => {
-      setAbout(ab)
-      setInterests(intr)
-      setCoursework(cw)
-      setExperience(ex)
-      setTestimonials(test)
-      setCertifications(certs ?? [])
-      setPersonalPhotos(photos ?? [])
-    }).catch(() => setError(true)).finally(() => setLoading(false))
-  }, [retryKey])
 
   const displayAbout: AboutResponse | null = about ? {
     ...about,
@@ -94,7 +82,7 @@ export default function About() {
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
+              transition={{ duration: 0.2 }}
               className="md:col-span-3 space-y-6"
             >
               {loading ? (
@@ -143,7 +131,7 @@ export default function About() {
                         key={fact.text}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.5 + i * 0.1 }}
+                        transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.05 }}
                         className="flex items-center gap-3 p-3 md:p-4 rounded-xl border border-mist bg-snow"
                       >
                         <Icon size={16} className="text-blue shrink-0" />
@@ -158,7 +146,7 @@ export default function About() {
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
+              transition={{ duration: 0.2 }}
               className="md:col-span-2"
             >
               <div className="aspect-[3/4] rounded-2xl border border-mist bg-cloud overflow-hidden relative">
@@ -221,8 +209,8 @@ export default function About() {
                   key={i}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.08 }}
+                  viewport={{ once: true, margin: '0px' }}
+                  transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.05 }}
                   className="p-5 rounded-xl border border-mist bg-white"
                 >
                   <h4 className="font-sans font-semibold text-ink mb-2">{item.role}</h4>
@@ -269,8 +257,8 @@ export default function About() {
                   key={item.id}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.08 }}
+                  viewport={{ once: true, margin: '0px' }}
+                  transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.05 }}
                   className={`group p-5 md:p-6 rounded-xl border bg-white hover:border-blue/30 hover:shadow-lg hover:shadow-blue/5 transition-all ${isHighlighted ? 'border-blue/40 ring-2 ring-blue/20' : 'border-mist'}`}
                 >
                   <Icon size={20} className="text-blue mb-4 group-hover:scale-110 transition-transform" />
@@ -302,8 +290,8 @@ export default function About() {
                 key={course.id}
                 initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.05 }}
+                viewport={{ once: true, margin: '0px' }}
+                transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.05 }}
                 className="font-mono text-xs md:text-sm px-4 md:px-5 py-2.5 md:py-3 rounded-xl border border-mist text-ink bg-snow hover:border-blue/30 hover:text-blue transition-colors cursor-default"
               >
                 {course.name}
@@ -376,8 +364,8 @@ export default function About() {
                           rel="noopener noreferrer"
                           initial={{ opacity: 0, y: 20 }}
                           whileInView={{ opacity: 1, y: 0 }}
-                          viewport={{ once: true }}
-                          transition={{ delay: i * 0.08 }}
+                          viewport={{ once: true, margin: '0px' }}
+                          transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.05 }}
                           className="group relative flex items-center gap-5 p-6 rounded-xl border border-blue/20 bg-gradient-to-br from-blue-wash to-white hover:border-blue/40 hover:shadow-lg hover:shadow-blue/5 transition-all"
                         >
                           <span className="absolute top-3 right-3 inline-flex items-center gap-1 font-mono text-[10px] text-violet">
@@ -427,8 +415,8 @@ export default function About() {
                             rel="noopener noreferrer"
                             initial={{ opacity: 0, y: 12 }}
                             whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: Math.min(i * 0.05, 0.3) }}
+                            viewport={{ once: true, margin: '0px' }}
+                            transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.05 }}
                             title={href ? `Verify ${cert.name}` : cert.name}
                             className="group flex items-center gap-3 px-3.5 py-2.5 rounded-lg border border-mist bg-white hover:border-blue/30 hover:shadow-sm transition-all"
                           >
@@ -502,8 +490,8 @@ export default function About() {
                   key={t.id}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
+                  viewport={{ once: true, margin: '0px' }}
+                  transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.05 }}
                   className={`p-6 rounded-xl border bg-white ${isHighlighted ? 'border-blue/40 ring-2 ring-blue/20' : 'border-mist'}`}
                 >
                   <Quote size={20} className="text-blue/30 mb-3" />

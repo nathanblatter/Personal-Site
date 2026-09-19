@@ -331,7 +331,8 @@ export default function QuickUpdate() {
                                 onChange={e => setDays(p => p.map((x, j) => {
                                   if (j !== i) return x
                                   const set = new Set(x.durations)
-                                  e.target.checked ? set.add(dur) : set.delete(dur)
+                                  if (e.target.checked) set.add(dur)
+                                  else set.delete(dur)
                                   return { ...x, durations: [...set] }
                                 }))} />
                               {dur}m

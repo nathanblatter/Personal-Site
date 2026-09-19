@@ -1,6 +1,29 @@
 const API_BASE = '/api/v1'
 
+/**
+ * Server-injected first-render data. main.py embeds the route's aggregate API
+ * payload as <script id="__preload" type="application/json">{"/home": {...}}</script>
+ * so the first GET for that path resolves without a network round-trip. One-shot:
+ * a key is consumed on first use so client-side navigation always refetches.
+ */
+function takePreload<T>(path: string): T | undefined {
+  try {
+    const el = document.getElementById('__preload')
+    if (!el?.textContent) return undefined
+    const w = window as unknown as { __preloadData?: Record<string, unknown> }
+    w.__preloadData ??= JSON.parse(el.textContent) as Record<string, unknown>
+    if (!(path in w.__preloadData)) return undefined
+    const v = w.__preloadData[path] as T
+    delete w.__preloadData[path]
+    return v
+  } catch { return undefined }
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  if (method === 'GET') {
+    const pre = takePreload<T>(path)
+    if (pre !== undefined) return pre
+  }
   const opts: RequestInit = { method, credentials: 'include' }
   if (body !== undefined) {
     opts.headers = { 'Content-Type': 'application/json' }
@@ -77,6 +100,12 @@ export interface AboutResponse {
   gpa?: string
   looking_for: LookingForItem[]
   info_fields: { label: string; value: string }[]
+  /** Home hero small-caps line above the name */
+  hero_tagline?: string | null
+  /** Home hero paragraph; **double-asterisk** spans render bold */
+  hero_intro?: string | null
+  /** Site-wide default <meta name="description"> */
+  meta_description?: string | null
 }
 
 export interface TestimonialResponse {
@@ -485,6 +514,8 @@ export interface ResumeExtras {
   achievements_title?: string
   /** Publications / submissions, one per entry (rendered after Education) */
   publications?: string[]
+  /** Header contact line; each falls back to the site default when empty */
+  contact?: { email?: string; site?: string; linkedin?: string; github?: string; phone?: string }
 }
 
 // ── Services ("Work With Me") Types ────────────────────────────────────────────

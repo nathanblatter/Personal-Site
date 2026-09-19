@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <!-- Prevent dark-mode flash: apply class before first paint -->
     <script>
-      (function(){var t=localStorage.getItem('theme');if(t==='dark'||(t===null&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}})();
+      (function(){function r(k){try{var v=JSON.parse(localStorage.getItem(k));if(v&&v.expires>Date.now()&&(v.mode==='dark'||v.mode==='light'))return v.mode}catch(e){}return null}var t=r('theme_manual')||r('solar_cache');if(t==='dark'||(t===null&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}})();
     </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />

@@ -10,7 +10,17 @@ interface Props {
 }
 
 export default function ProjectModal({ project, onClose }: Props) {
-  const [imgIdx, setImgIdx] = useState(0)
+  // Image index is keyed to the project it belongs to, so opening a different
+  // project derives back to 0 without a reset effect.
+  const [imgState, setImgState] = useState<{ projectId: string | number | null; idx: number }>({ projectId: null, idx: 0 })
+  const projectId = project?.id ?? null
+  const imgIdx = imgState.projectId === projectId ? imgState.idx : 0
+  const setImgIdx = useCallback((update: number | ((i: number) => number)) => {
+    setImgState(prev => {
+      const current = prev.projectId === projectId ? prev.idx : 0
+      return { projectId, idx: typeof update === 'function' ? update(current) : update }
+    })
+  }, [projectId])
   const images = project?.images ?? []
   const modalRef = useRef<HTMLDivElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
@@ -41,7 +51,6 @@ export default function ProjectModal({ project, onClose }: Props) {
 
   useEffect(() => {
     if (!project) return
-    setImgIdx(0)
     // Focus the modal
     setTimeout(() => modalRef.current?.focus(), 0)
     const onKey = (e: KeyboardEvent) => {
@@ -55,7 +64,7 @@ export default function ProjectModal({ project, onClose }: Props) {
       window.removeEventListener('keydown', onKey)
       previousFocusRef.current?.focus()
     }
-  }, [project, onClose, trapFocus])
+  }, [project, onClose, trapFocus, setImgIdx])
 
   const statusColors: Record<string, string> = {
     live: 'bg-teal',

@@ -12,6 +12,7 @@ export default function TemplatesTab({ showToast, showError }: AdminCallbacks) {
   const [creatingKind, setCreatingKind] = useState<TemplateKind | null>(null)
 
   const reload = useCallback(async () => { setTemplates(await api.crm.templates.list()) }, [])
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- state is set after the fetch resolves, not synchronously
   useEffect(() => { reload().catch(e => showError((e as Error).message)).finally(() => setLoading(false)) }, [reload, showError])
 
   const save = async (data: Partial<Template>, id?: string) => {

@@ -42,10 +42,9 @@ export default function Blog() {
   const tagKey = (t: string) => t.trim().toLowerCase()
   const postHasTag = (p: (typeof posts)[number], key: string) => p.tags.some(t => tagKey(t) === key)
 
-  // Drop a tag filter that no longer exists in the current result set.
-  useEffect(() => {
-    if (activeTag && !posts.some(p => postHasTag(p, tagKey(activeTag)))) setActiveTag(null)
-  }, [posts, activeTag])
+  // A selected tag that no longer exists in the current result set (e.g. after
+  // a search) is treated as "All" — derived, so no reset effect is needed.
+  const effectiveTag = activeTag && posts.some(p => postHasTag(p, tagKey(activeTag))) ? activeTag : null
 
   const allTags = Array.from(
     posts.reduce((acc, p) => {
@@ -56,7 +55,7 @@ export default function Blog() {
       return acc
     }, new Map<string, string>()).values(),
   ).sort((a, b) => a.localeCompare(b))
-  const displayedPosts = activeTag ? posts.filter(p => postHasTag(p, tagKey(activeTag))) : posts
+  const displayedPosts = effectiveTag ? posts.filter(p => postHasTag(p, tagKey(effectiveTag))) : posts
 
   return (
     <div className="max-w-[1100px] w-full mx-auto px-6 py-20">
@@ -64,6 +63,7 @@ export default function Blog() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
         className="mb-16"
       >
         <span className="font-mono text-xs text-blue tracking-widest uppercase">Writing</span>
@@ -96,7 +96,7 @@ export default function Blog() {
             <button
               onClick={() => setActiveTag(null)}
               className={`font-mono text-[11px] px-3 py-1 rounded-full border transition-colors ${
-                activeTag === null
+                effectiveTag === null
                   ? 'border-blue text-blue bg-blue-wash'
                   : 'border-mist text-steel hover:border-silver hover:text-ink'
               }`}
@@ -108,7 +108,7 @@ export default function Blog() {
                 key={tag}
                 onClick={() => setActiveTag(t => (t === tag ? null : tag))}
                 className={`font-mono text-[11px] px-3 py-1 rounded-full border uppercase tracking-wider transition-colors ${
-                  activeTag === tag
+                  effectiveTag === tag
                     ? 'border-blue text-blue bg-blue-wash'
                     : 'border-mist text-steel hover:border-silver hover:text-ink'
                 }`}
@@ -130,6 +130,7 @@ export default function Blog() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
+          transition={{ duration: 0.2 }}
           className="text-center py-32 text-steel"
         >
           <p className="font-mono text-sm mb-2">Failed to load posts.</p>
@@ -144,6 +145,7 @@ export default function Blog() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
+          transition={{ duration: 0.2 }}
           className="text-center py-32 text-steel"
         >
           {query ? (
@@ -167,7 +169,7 @@ export default function Blog() {
               key={post.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.07 }}
+              transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.05 }}
             >
               <Link to={`/blog/${post.slug}`} className="group block h-full">
                 <article className="h-full bg-white border border-mist rounded-xl overflow-hidden hover:border-blue/30 hover:shadow-lg hover:shadow-blue/5 transition-all duration-300">

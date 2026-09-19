@@ -79,6 +79,9 @@ function LinkButton({ link, index }: { link: BioLinkResponse; index: number }) {
       {Icon && (
         <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-colors
           ${link.featured ? 'bg-blue/10 text-blue' : 'bg-snow text-steel group-hover:text-blue group-hover:bg-blue/5'}`}>
+          {/* getIcon is a lookup in the static lucide registry (lib/iconMap), not a
+              component factory, so Icon's identity is stable across renders. */}
+          {/* eslint-disable-next-line react-hooks/static-components */}
           <Icon size={20} />
         </div>
       )}

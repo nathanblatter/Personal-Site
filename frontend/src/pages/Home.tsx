@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { motion } from 'motion/react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, ArrowUpRight, MapPin, GraduationCap } from 'lucide-react'
@@ -13,28 +13,37 @@ import TestimonialStrip from '../components/TestimonialStrip'
 import { api, type ProjectResponse, type SkillResponse, type ExperienceResponse, type AboutResponse, type TestimonialResponse } from '../lib/api'
 import { usePortfolioCtx } from '../lib/usePortfolioCtx'
 import { useDocumentMeta } from '../lib/useDocumentMeta'
+import { useAsyncData } from '../lib/useAsyncData'
 
 const LiveStatus = lazy(() => import('../components/LiveStatus'))
 
+// Stable empty array so derived lists keep identity while loading.
+const EMPTY: never[] = []
+
+// Fallbacks for the hero copy until the DB fields are seeded/edited in admin.
+const DEFAULT_HERO_TAGLINE = 'Forward Deployed Engineer | Full-Stack Developer'
+const DEFAULT_HERO_INTRO =
+  'IS student skilled in full-stack engineering, AI-driven applications, and **data analytics**. Translating **business requirements** into production-ready systems.'
+
+/** Renders `**bold**` spans from the admin-edited hero intro; everything else is plain text. */
+function renderHeroIntro(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**')
+      ? <span key={i} className="text-ink font-medium">{part.slice(2, -2)}</span>
+      : <span key={i}>{part}</span>,
+  )
+}
+
 export default function Home() {
   useDocumentMeta({ title: 'Nathan Blatter — Portfolio', canonical: '/' })
-  const [projects, setProjects] = useState<ProjectResponse[]>([])
-  const [skills, setSkills] = useState<SkillResponse[]>([])
-  const [experience, setExperience] = useState<ExperienceResponse[]>([])
-  const [about, setAbout] = useState<AboutResponse | null>(null)
-  const [testimonials, setTestimonials] = useState<TestimonialResponse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const [retryKey, setRetryKey] = useState(0)
+  const { data, loading, error } = useAsyncData(api.home.get, retryKey)
+  const projects: ProjectResponse[] = data?.projects ?? EMPTY
+  const skills: SkillResponse[] = data?.skills ?? EMPTY
+  const experience: ExperienceResponse[] = data?.experience ?? EMPTY
+  const about: AboutResponse | null = data?.about ?? null
+  const testimonials: TestimonialResponse[] = data?.testimonials ?? EMPTY
   const portfolioCtx = usePortfolioCtx()
-
-  useEffect(() => {
-    setLoading(true)
-    setError(false)
-    api.home.get().then(({ projects: p, skills: s, experience: e, about: a, testimonials: t }) => {
-      setProjects(p); setSkills(s); setExperience(e); setAbout(a); setTestimonials(t ?? [])
-    }).catch(() => setError(true)).finally(() => setLoading(false))
-  }, [retryKey])
 
   const visibleTestimonials = portfolioCtx
     ? testimonials.filter(t => (portfolioCtx.testimonials?.[String(t.id)]?.visibility ?? 'show') !== 'hide')
@@ -92,18 +101,16 @@ export default function Home() {
         <div className="relative max-w-[900px] w-full mx-auto px-6 text-center py-12 md:py-20">
           <div
             className="flex items-center justify-center gap-4 mb-6 md:mb-8 animate-fade-up"
-            style={{ animationDelay: '0.2s' }}
           >
             <div className="h-px w-8 md:w-12 bg-blue" />
             <span className="font-mono text-[10px] md:text-xs text-blue tracking-[0.3em] uppercase">
-              Forward Deployed Engineer | Full-Stack Developer
+              {about?.hero_tagline || DEFAULT_HERO_TAGLINE}
             </span>
             <div className="h-px w-8 md:w-12 bg-blue" />
           </div>
 
           <h1
             className="text-6xl sm:text-8xl md:text-[120px] font-serif italic text-ink leading-[0.9] mb-6 md:mb-8 animate-fade-up"
-            style={{ animationDelay: '0.4s' }}
           >
             <span className="text-gradient-blue">Nathan</span><br />
             Blatter
@@ -111,21 +118,14 @@ export default function Home() {
 
           <p
             className="text-base md:text-xl text-steel max-w-[560px] mx-auto leading-relaxed mb-8 md:mb-10 animate-fade-up"
-            style={{ animationDelay: '0.6s' }}
           >
-            {portfolioCtx?.tagline ? portfolioCtx.tagline : (
-              <>
-                IS student skilled in full-stack engineering, AI-driven applications, and{' '}
-                <span className="text-ink font-medium">data analytics</span>. Translating{' '}
-                <span className="text-ink font-medium">business requirements</span> into
-                production-ready systems.
-              </>
-            )}
+            {portfolioCtx?.tagline
+              ? portfolioCtx.tagline
+              : renderHeroIntro(about?.hero_intro || DEFAULT_HERO_INTRO)}
           </p>
 
           <div
             className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-5 mb-12 md:mb-16 animate-fade-up"
-            style={{ animationDelay: '0.8s' }}
           >
             <Link
               to="/projects"
@@ -145,7 +145,6 @@ export default function Home() {
 
           <div
             className="flex flex-wrap justify-center gap-6 md:gap-10 pt-8 border-t border-mist animate-fade-in"
-            style={{ animationDelay: '1.2s' }}
           >
             <div className="flex items-center gap-2">
               <MapPin size={14} className="text-blue" />
@@ -192,7 +191,8 @@ export default function Home() {
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: '0px' }}
+            transition={{ duration: 0.2 }}
             className="mt-10 md:mt-14 text-center"
           >
             <Link
@@ -268,7 +268,7 @@ export default function Home() {
                     <Skeleton className="h-3 w-5/6" />
                   </div>
                 ))
-              : visibleExperience.map((item, i) => {
+              : visibleExperience.slice(0, 3).map((item, i) => {
                   const expCtx = portfolioCtx?.experience?.[String(item.id)]
                   return (
                     <TimelineItem
@@ -285,6 +285,21 @@ export default function Home() {
                 })
             }
           </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, margin: '0px' }}
+            transition={{ duration: 0.2 }}
+            className="mt-10 md:mt-14 text-center"
+          >
+            <Link
+              to="/about"
+              className="group inline-flex items-center gap-2 font-mono text-sm text-steel hover:text-blue transition-colors"
+            >
+              Full timeline
+              <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </Link>
+          </motion.div>
         </div>
       </section>
 
@@ -311,7 +326,8 @@ export default function Home() {
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: '0px' }}
+            transition={{ duration: 0.3 }}
           >
             <h2 className="font-serif text-4xl md:text-6xl italic text-ink mb-6">
               Let's build something

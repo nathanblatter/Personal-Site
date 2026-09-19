@@ -19,9 +19,8 @@ export default function Status() {
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
 
   const load = useCallback(() => {
-    setError(false)
     api.health.services()
-      .then(res => { setData(res); setUpdatedAt(new Date()) })
+      .then(res => { setData(res); setUpdatedAt(new Date()); setError(false) })
       .catch((err: Error) => {
         // Status is admin-only; bounce anonymous visitors to login rather than
         // showing a broken page.

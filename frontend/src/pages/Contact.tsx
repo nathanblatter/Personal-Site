@@ -110,7 +110,7 @@ function BookACall() {
 
   if (settingsLoading) {
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-20">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }} className="mt-20">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-xl bg-cloud animate-pulse" />
           <div className="space-y-2">
@@ -136,7 +136,7 @@ function BookACall() {
     <motion.div
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.6 }}
+      transition={{ duration: 0.2 }}
       className="mt-20"
     >
       <div className="flex items-center gap-3 mb-8">
@@ -429,7 +429,7 @@ export default function Contact() {
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ duration: 0.2 }}
             className="space-y-8"
           >
             <div>
@@ -450,7 +450,7 @@ export default function Contact() {
                     rel="noopener noreferrer"
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 + i * 0.1 }}
+                    transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.05 }}
                     className="group flex items-center gap-4 p-4 rounded-xl border border-mist bg-snow hover:border-blue/30 hover:shadow-lg hover:shadow-blue/5 transition-all"
                   >
                     <div className="w-10 h-10 rounded-xl bg-cloud flex items-center justify-center group-hover:bg-blue-wash transition-colors">
@@ -470,7 +470,7 @@ export default function Contact() {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.8 }}
+                transition={{ duration: 0.2 }}
                 className="flex items-center gap-3 pt-2"
               >
                 <MapPin size={14} className="text-blue" />
@@ -483,7 +483,7 @@ export default function Contact() {
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ duration: 0.2 }}
           >
             {submitted ? (
               <motion.div

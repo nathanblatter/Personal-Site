@@ -68,6 +68,7 @@ export default function Now() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
           className="mb-12"
         >
           <span className="font-mono text-xs text-blue tracking-[0.2em] uppercase">// NOW</span>
@@ -93,7 +94,7 @@ export default function Now() {
                   key={i}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 + i * 0.08 }}
+                  transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.05 }}
                   className="space-y-3"
                 >
                   <div className="flex items-center gap-2.5">
@@ -120,7 +121,7 @@ export default function Now() {
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ duration: 0.2 }}
             className="mt-14 space-y-3"
           >
             <h2 className="font-sans font-semibold text-ink text-xl">Lately</h2>
@@ -131,7 +132,7 @@ export default function Now() {
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
+          transition={{ duration: 0.2 }}
           className="mt-14 pt-8 border-t border-mist text-sm text-steel"
         >
           Want to work together or just say hi?{' '}

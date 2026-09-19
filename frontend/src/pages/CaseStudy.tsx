@@ -14,29 +14,56 @@ const statusColors: Record<string, string> = {
 
 export default function CaseStudy() {
   const { projectId } = useParams<{ projectId: string }>()
-  const [project, setProject] = useState<ProjectResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  // The fetch result is tagged with the id it was loaded for, so `loading` is
+  // derived (no setState-in-effect) and a route change to another case study
+  // shows the skeleton instead of the stale project.
+  const [result, setResult] = useState<{ id: string | undefined; project: ProjectResponse | null; error: boolean } | null>(null)
   const [retryKey, setRetryKey] = useState(0)
+  const loading = !result || result.id !== projectId
+  const project = loading ? null : result.project
+  const error = !loading && result.error
 
+  const pageUrl = `https://nathanblatter.com/projects/${projectId ?? ''}`
   useDocumentMeta({
     title: project ? `${project.title} — Nathan Blatter` : undefined,
     description: project?.summary || project?.description || undefined,
     canonical: projectId ? `/projects/${projectId}` : undefined,
     ogImage: project?.images?.[0] || undefined,
+    jsonLd: project
+      ? [
+          {
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://nathanblatter.com/' },
+              { '@type': 'ListItem', position: 2, name: 'Projects', item: 'https://nathanblatter.com/projects' },
+              { '@type': 'ListItem', position: 3, name: project.title, item: pageUrl },
+            ],
+          },
+          {
+            '@context': 'https://schema.org',
+            '@type': 'CreativeWork',
+            name: project.title,
+            description: project.summary || project.description,
+            url: pageUrl,
+            ...(project.link ? { sameAs: project.link } : {}),
+            ...(project.images?.[0] ? { image: project.images[0] } : {}),
+            ...(project.tags?.length ? { keywords: project.tags.join(', ') } : {}),
+            ...(project.year ? { dateCreated: String(project.year) } : {}),
+            author: { '@type': 'Person', name: 'Nathan Blatter', url: 'https://nathanblatter.com' },
+          },
+        ]
+      : undefined,
   })
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(false)
     api.projects.list()
       .then(list => {
         if (cancelled) return
-        setProject(list.find(p => p.project_id === projectId) ?? null)
+        setResult({ id: projectId, project: list.find(p => p.project_id === projectId) ?? null, error: false })
       })
-      .catch(() => { if (!cancelled) setError(true) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .catch(() => { if (!cancelled) setResult({ id: projectId, project: null, error: true }) })
     return () => { cancelled = true }
   }, [projectId, retryKey])
 
@@ -69,7 +96,7 @@ export default function CaseStudy() {
         <div className="text-center text-steel">
           <p className="font-mono text-sm mb-2">Couldn't load this page.</p>
           <button
-            onClick={() => setRetryKey(k => k + 1)}
+            onClick={() => { setResult(null); setRetryKey(k => k + 1) }}
             className="font-mono text-xs text-blue hover:underline underline-offset-2 mt-1"
           >
             Retry

@@ -4,7 +4,8 @@ import {
   api, type EngagementDetail, type EngagementResponse, type BillingType, type ContractResponse, type Template,
 } from '../../../lib/api'
 import { AdminInput, AdminSelect, AdminTextarea } from '../AdminShared'
-import { fmtCents, dollarsToCents, centsToDollars, fmtMinutes, fmtDate, Pill } from './crmShared'
+import { fmtCents, dollarsToCents, centsToDollars, fmtMinutes, fmtDate } from './crmShared'
+import { Pill } from './crmComponents'
 import type { CrmShared } from '../ConsultingSection'
 
 type ContractFields = Pick<ContractResponse, 'title' | 'scope_md' | 'terms_md' | 'total_value_cents' | 'start_date' | 'end_date'>

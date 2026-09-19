@@ -68,7 +68,8 @@ export default function ServicesSection({ showToast, showError }: AdminCallbacks
   const saveMeta = async () => {
     if (!meta) return
     try {
-      const { id: _id, ...data } = meta
+      const { id, ...data } = meta
+      void id
       const updated = await api.services.meta.update(data)
       setMeta(updated); setMetaDirty(false)
       showToast('Page copy saved')

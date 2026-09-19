@@ -3,7 +3,8 @@ import { Plus, Search, Mail, Phone, Building2, X, Calendar, MessageSquare, Trash
 import { api, type ContactResponse, type ContactDetail } from '../../../lib/api'
 import { AdminInput } from '../AdminShared'
 import type { CrmShared } from '../ConsultingSection'
-import { fmtDate, Pill } from './crmShared'
+import { fmtDate } from './crmShared'
+import { Pill } from './crmComponents'
 
 export default function ContactsTab({ shared }: { shared: CrmShared }) {
   const { contacts, showToast, showError, reloadContacts, reloadDashboard } = shared

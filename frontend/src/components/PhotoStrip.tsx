@@ -19,8 +19,8 @@ export default function PhotoStrip({ photos, size = 'md' }: {
             key={photo.id}
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: Math.min(i * 0.06, 0.3) }}
+            viewport={{ once: true, margin: '0px' }}
+            transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.05 }}
             className={`snap-start shrink-0 p-2.5 pb-2 rounded-xl border border-mist bg-white shadow-sm hover:shadow-md ${i % 2 === 0 ? 'rotate-1' : '-rotate-1'} hover:rotate-0 transition-all duration-300`}
           >
             <img

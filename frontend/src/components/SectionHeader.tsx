@@ -11,8 +11,8 @@ export default function SectionHeader({ code, title, subtitle }: SectionHeaderPr
     <motion.div
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-100px' }}
-      transition={{ duration: 0.6 }}
+      viewport={{ once: true, margin: '0px' }}
+      transition={{ duration: 0.2 }}
       className="mb-12 md:mb-20 text-center"
     >
       <div className="flex items-center justify-center gap-4 mb-4 md:mb-5">

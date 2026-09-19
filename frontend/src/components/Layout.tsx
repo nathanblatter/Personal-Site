@@ -3,13 +3,12 @@ import { Outlet, Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { Menu, X, Sun, Moon, Search } from 'lucide-react'
 import { useTheme } from '../lib/useTheme'
-import CookieBanner from './CookieBanner'
 import BugReport from './BugReport'
 import SearchPalette from './SearchPalette'
 import FailoverBanner from './FailoverBanner'
 
-// Services was deliberately pulled out of the top nav (Nathan's call: bar was
-// crowded and Services felt overweighted) — it stays reachable via the footer.
+// Services is deliberately unlinked (nav 2026-08-06, footer 2026-09-19) until the
+// seeded placeholder pricing is replaced — the page stays reachable by URL, noindexed.
 const navLinks = [
   { to: '/', label: 'Home', code: '00' },
   { to: '/about', label: 'About', code: '01' },
@@ -228,12 +227,6 @@ export default function Layout() {
               </Link>
             ))}
             <Link
-              to="/services"
-              className="font-mono text-xs text-steel hover:text-blue transition-colors"
-            >
-              Services
-            </Link>
-            <Link
               to="/privacy"
               className="font-mono text-xs text-steel hover:text-blue transition-colors"
             >
@@ -244,7 +237,6 @@ export default function Layout() {
       </footer>
 
       <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
-      <CookieBanner />
       <BugReport />
       <FailoverBanner />
     </div>

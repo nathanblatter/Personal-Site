@@ -3,7 +3,8 @@ import { Plus, Trash2, ChevronRight } from 'lucide-react'
 import { api, DEAL_STAGES, type DealStage } from '../../../lib/api'
 import { AdminInput, AdminSelect } from '../AdminShared'
 import type { CrmShared } from '../ConsultingSection'
-import { fmtCents, dollarsToCents, Pill } from './crmShared'
+import { fmtCents, dollarsToCents } from './crmShared'
+import { Pill } from './crmComponents'
 
 const STAGE_LABELS: Record<DealStage, string> = {
   lead: 'Lead', qualified: 'Qualified', proposal: 'Proposal',

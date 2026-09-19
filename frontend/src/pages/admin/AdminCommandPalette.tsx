@@ -27,7 +27,7 @@ export default function AdminCommandPalette({
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setOpen(o => !o)
+        setOpen(o => { if (!o) { setQuery(''); setActive(0) } return !o })
       } else if (e.key === 'Escape') {
         setOpen(false)
       }
@@ -37,7 +37,7 @@ export default function AdminCommandPalette({
   }, [])
 
   useEffect(() => {
-    if (open) { setQuery(''); setActive(0); setTimeout(() => inputRef.current?.focus(), 0) }
+    if (open) setTimeout(() => inputRef.current?.focus(), 0)
   }, [open])
 
   const commands = useMemo<Command[]>(() => {
@@ -64,7 +64,6 @@ export default function AdminCommandPalette({
     return commands.filter(c => c.label.toLowerCase().includes(q) || c.group.toLowerCase().includes(q))
   }, [commands, query])
 
-  useEffect(() => { setActive(0) }, [query])
 
   if (!open) return null
 
@@ -86,7 +85,7 @@ export default function AdminCommandPalette({
           <input
             ref={inputRef}
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => { setQuery(e.target.value); setActive(0) }}
             onKeyDown={onKeyDown}
             placeholder="Search sections, actions, themes…"
             className="flex-1 py-3.5 bg-transparent text-sm text-ink placeholder-silver focus:outline-none"

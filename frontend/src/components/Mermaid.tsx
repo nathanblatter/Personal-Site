@@ -20,7 +20,9 @@ interface MermaidProps {
 export default function Mermaid({ code }: MermaidProps) {
   const reactId = useId().replace(/[^a-zA-Z0-9-]/g, '')
   const [svg, setSvg] = useState<string | null>(null)
-  const [error, setError] = useState(false)
+  // The code string that last failed to render — derived `error` needs no reset effect.
+  const [errorFor, setErrorFor] = useState<string | null>(null)
+  const error = errorFor === code
   const [dark, setDark] = useState(isDarkMode)
   const renderToken = useRef(0)
 
@@ -36,7 +38,6 @@ export default function Mermaid({ code }: MermaidProps) {
   useEffect(() => {
     let cancelled = false
     const token = ++renderToken.current
-    setError(false)
 
     loadMermaid()
       .then(async ({ default: mermaid }) => {
@@ -50,10 +51,11 @@ export default function Mermaid({ code }: MermaidProps) {
         const { svg } = await mermaid.render(id, code)
         if (cancelled || token !== renderToken.current) return
         setSvg(svg)
+        setErrorFor(null)
       })
       .catch(() => {
         if (cancelled || token !== renderToken.current) return
-        setError(true)
+        setErrorFor(code)
       })
 
     return () => {

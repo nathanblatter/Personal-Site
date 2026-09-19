@@ -3,7 +3,8 @@ import { FileText, Link as LinkIcon, Check, Trash2, DollarSign, Loader2, Bell } 
 import { api, type InvoiceResponse, type PaymentMethod } from '../../../lib/api'
 import { AdminInput, AdminSelect } from '../AdminShared'
 import type { CrmShared } from '../ConsultingSection'
-import { fmtCents, dollarsToCents, centsToDollars, fmtDate, Pill } from './crmShared'
+import { fmtCents, dollarsToCents, centsToDollars, fmtDate } from './crmShared'
+import { Pill } from './crmComponents'
 
 const METHODS = [
   { value: 'venmo', label: 'Venmo' }, { value: 'zelle', label: 'Zelle' },
@@ -19,6 +20,7 @@ export default function InvoicesTab({ shared }: { shared: CrmShared }) {
   const [pay, setPay] = useState({ amount: '', method: 'venmo' as PaymentMethod, reference: '' })
 
   const reload = useCallback(async () => { setInvoices(await api.crm.invoices.list()) }, [])
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- state is set after the fetch resolves, not synchronously
   useEffect(() => { reload().catch(e => showError((e as Error).message)).finally(() => setLoading(false)) }, [reload, showError])
 
   const send = async (inv: InvoiceResponse) => {

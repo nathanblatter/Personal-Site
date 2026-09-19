@@ -1,18 +1,15 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useDocumentMeta } from '../lib/useDocumentMeta'
 import { motion } from 'motion/react'
 import { ArrowLeft, Calendar, Clock, Eye, Link2, Check, List, X, Copy } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Options as MarkdownOptions } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkFrontmatter from 'remark-frontmatter'
 import remarkEmoji from 'remark-emoji'
-import remarkMath from 'remark-math'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import rehypeHighlight from 'rehype-highlight'
-import rehypeKatex from 'rehype-katex'
-import 'katex/dist/katex.min.css'
 import 'highlight.js/styles/atom-one-dark.css'
 
 // Sanitize runs right after rehype-raw (so raw HTML in posts is cleaned —
@@ -31,6 +28,29 @@ const sanitizeSchema = {
 import { api, type BlogPostResponse } from '../lib/api'
 import { readTime, formatDate } from '../lib/blogUtils'
 import Mermaid from '../components/Mermaid'
+
+type Plugin = NonNullable<MarkdownOptions['remarkPlugins']>[number]
+interface MathPlugins { remark: Plugin; rehype: Plugin }
+
+// KaTeX (+ its 30 KB stylesheet) and remark-math are only fetched for posts
+// that actually contain TeX — `$…$`, `$$…$$` — so plain posts never pay for them.
+// Module-level cache: one network round-trip per session.
+let mathPluginsPromise: Promise<MathPlugins> | null = null
+function loadMathPlugins(): Promise<MathPlugins> {
+  if (!mathPluginsPromise) {
+    mathPluginsPromise = Promise.all([
+      import('remark-math'),
+      import('rehype-katex'),
+      import('katex/dist/katex.min.css'),
+    ]).then(([remark, rehype]) => ({ remark: remark.default, rehype: rehype.default }))
+  }
+  return mathPluginsPromise
+}
+
+const MATH_RE = /\$\$[\s\S]+?\$\$|(?<!\\)\$(?!\s)[^$\n]+?(?<!\s)\$/
+function hasMath(content: string): boolean {
+  return MATH_RE.test(content)
+}
 
 function textContent(node: unknown): string {
   const n = node as { type?: string; value?: string; children?: unknown[] }
@@ -96,7 +116,10 @@ export default function BlogPost() {
   const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [activeId, setActiveId] = useState<string>('')
   const [tocOpen, setTocOpen] = useState(false)
-  const headingsRef = useRef<TocItem[]>([])
+  const [mathPlugins, setMathPlugins] = useState<MathPlugins | null>(null)
+
+  const toc = useMemo(() => (post ? extractHeadings(post.content) : []), [post])
+  const needsMath = post ? hasMath(post.content) : false
 
   useDocumentMeta({
     title: post ? `${post.title} — Nathan Blatter` : undefined,
@@ -115,13 +138,18 @@ export default function BlogPost() {
   }, [slug])
 
   useEffect(() => {
-    if (!post) return
-    headingsRef.current = extractHeadings(post.content)
-    if (headingsRef.current.length === 0) return
+    if (!needsMath || mathPlugins) return
+    let cancelled = false
+    loadMathPlugins().then(p => { if (!cancelled) setMathPlugins(p) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [needsMath, mathPlugins])
+
+  useEffect(() => {
+    if (toc.length === 0) return
 
     const onScroll = () => {
-      let current = headingsRef.current[0]?.id ?? ''
-      for (const { id } of headingsRef.current) {
+      let current = toc[0]?.id ?? ''
+      for (const { id } of toc) {
         const el = document.getElementById(id)
         if (el && el.getBoundingClientRect().top <= 120) current = id
       }
@@ -131,7 +159,7 @@ export default function BlogPost() {
     window.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
     return () => window.removeEventListener('scroll', onScroll)
-  }, [post])
+  }, [toc])
 
   // Reading depth beacon — fires Umami events at 25/50/75/100% scroll milestones
   useEffect(() => {
@@ -180,7 +208,7 @@ export default function BlogPost() {
     )
   }
 
-  const toc = headingsRef.current
+  const mathReady = !needsMath || mathPlugins !== null
 
   return (
     <div className="max-w-[720px] xl:max-w-[1060px] mx-auto px-6 py-16">
@@ -188,7 +216,7 @@ export default function BlogPost() {
         {/* Main column */}
         <div>
       {/* Back */}
-      <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="mb-12">
+      <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2 }} className="mb-12">
         <Link
           to="/blog"
           className="inline-flex items-center gap-2 font-mono text-xs text-steel hover:text-blue transition-colors"
@@ -202,7 +230,7 @@ export default function BlogPost() {
       <motion.header
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08 }}
+        transition={{ duration: 0.2 }}
         className="mb-10"
       >
         {post.tags.length > 0 && (
@@ -251,7 +279,7 @@ export default function BlogPost() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.12 }}
+          transition={{ duration: 0.2 }}
           className="mb-10 rounded-xl overflow-hidden border border-mist"
         >
           <img src={post.cover_image_url} alt={post.title} className="w-full object-cover max-h-[420px]" />
@@ -262,11 +290,18 @@ export default function BlogPost() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.18 }}
+        transition={{ duration: 0.2 }}
       >
+        {!mathReady ? (
+          <div className="space-y-3" aria-busy="true" aria-label="Loading post">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className={`h-4 rounded bg-cloud animate-pulse ${i % 4 === 3 ? 'w-2/3' : 'w-full'}`} />
+            ))}
+          </div>
+        ) : (
         <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkFrontmatter, remarkEmoji, remarkMath]}
-          rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], [rehypeHighlight, { ignoreMissing: true, detect: true }], rehypeKatex]}
+          remarkPlugins={[remarkGfm, remarkFrontmatter, remarkEmoji, ...(mathPlugins ? [mathPlugins.remark] : [])]}
+          rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], [rehypeHighlight, { ignoreMissing: true, detect: true }], ...(mathPlugins ? [mathPlugins.rehype] : [])]}
           components={{
             h1: ({ children, node }) => {
               const id = headingId(node)
@@ -395,13 +430,14 @@ export default function BlogPost() {
         >
           {post.content}
         </ReactMarkdown>
+        )}
       </motion.div>
 
       {/* Share + Footer */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
+        transition={{ duration: 0.2 }}
         className="mt-16 pt-8 border-t border-mist"
       >
         <div className="flex items-center justify-between mb-8">

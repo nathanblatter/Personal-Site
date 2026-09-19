@@ -156,13 +156,18 @@ def generate_resume_tex(about, experience, skills, projects, coursework, variant
     parts = [_PREAMBLE]
 
     # ── NAME + CONTACT ──
+    c = about.get("contact") or {}
+    contact_parts = [
+        _esc(c.get("phone") or ""),
+        _esc(c.get("email") or "nzb22@byu.edu"),
+        _href(DOMAIN, _esc(c.get("site") or "nathanblatter.com")),
+        _href(DOMAIN + "/go/linkedin", "LinkedIn"),
+        _href(DOMAIN + "/go/github", "GitHub"),
+    ]
     parts.append(
         "\\begin{center}\n"
         "    \\textbf{\\Huge \\scshape Nathan Blatter} \\\\ \\vspace{2pt}\n"
-        "    \\small nzb22@byu.edu $|$ "
-        + _href(DOMAIN, "nathanblatter.com") + " $|$ "
-        + _href(DOMAIN + "/go/linkedin", "LinkedIn") + " $|$ "
-        + _href(DOMAIN + "/go/github", "GitHub")
+        "    \\small " + " $|$ ".join(p for p in contact_parts if p)
         + "\n\\end{center}\n"
     )
 
@@ -218,17 +223,20 @@ def generate_resume_tex(about, experience, skills, projects, coursework, variant
 
     # ── TECHNICAL SKILLS ──
     from app.resume_skills import group_skills
-    parts.append(
-        "\\section{Technical Skills}\n"
-        "\\begin{itemize}[leftmargin=0.0in, label={}]\n    \\small{\\item{\n"
-    )
-    skill_lines = []
-    for label, names in group_skills(skills):
-        skill_lines.append(rf"     \textbf{{{_esc(label)}}}: {_esc(', '.join(names))}")
-    parts.append(" \\\\ \n".join(skill_lines) + "\n    }}\n\\end{itemize}\n\\vspace{-8pt}\n")
+    skill_lines = [
+        rf"     \textbf{{{_esc(label)}}}: {_esc(', '.join(names))}"
+        for label, names in group_skills(skills)
+    ]
+    if skill_lines:
+        parts.append(
+            "\\section{Technical Skills}\n"
+            "\\begin{itemize}[leftmargin=0.0in, label={}]\n    \\small{\\item{\n"
+            + " \\\\ \n".join(skill_lines) + "\n    }}\n\\end{itemize}\n\\vspace{-8pt}\n"
+        )
 
     # ── PROJECTS ──
-    parts.append("\\section{Projects}\n\\resumeSubHeadingListStart\n")
+    if projects:
+        parts.append("\\section{Projects}\n\\resumeSubHeadingListStart\n")
     for proj in projects:
         tags = ", ".join(proj.get("tags", [])[:5])
         hrs_metric = None
@@ -246,17 +254,20 @@ def generate_resume_tex(about, experience, skills, projects, coursework, variant
             rf"  \resumeProjectHeading{{{header}}}{{{' $|$ '.join(p for p in right_parts if p)}}}" + "\n"
         )
         parts.append(_bullets(proj.get("description", "")))
-    parts.append("\\resumeSubHeadingListEnd\n")
+    if projects:
+        parts.append("\\resumeSubHeadingListEnd\n")
 
     # ── EXPERIENCE ──
-    parts.append("\\section{Experience}\n\\resumeSubHeadingListStart\n")
+    if jobs:
+        parts.append("\\section{Experience}\n\\resumeSubHeadingListStart\n")
     for job in jobs:
         parts.append(
             rf"  \resumeSubheading{{{_esc(job['title'])}}}{{{_esc(job['year'])}}}"
             rf"{{{_esc(job['subtitle'])}}}{{}}" + "\n"
         )
         parts.append(_bullets(job.get("description", "")))
-    parts.append("\\resumeSubHeadingListEnd\n")
+    if jobs:
+        parts.append("\\resumeSubHeadingListEnd\n")
 
     # ── OTHER ACHIEVEMENTS ──
     others = [a for a in (about.get("achievements") or []) if a]

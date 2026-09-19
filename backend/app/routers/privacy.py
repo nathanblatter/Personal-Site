@@ -2,7 +2,7 @@
 
 The policy is not a hand-written static page. Each render:
   * derives the enumerated data practices from what the site actually does
-    (analytics proxy, cookie/local-storage keys, contact form, bookings/Zoom,
+    (analytics proxy, local-storage keys, contact form, bookings/Zoom,
     newsletter, bug reports, tracked links, third-party services). Sections that
     depend on a feature only appear when that feature is configured, so the
     policy tracks reality as the site changes.
@@ -76,7 +76,7 @@ def _build_sections() -> list[dict]:
                         "useful. It is never sold or shared with third parties.",
         })
 
-    # --- Cookies & local storage (cookie banner + theme + admin auth) ---
+    # --- Cookies & local storage (theme + admin auth) ---
     sections.append({
         "id": "cookies",
         "heading": "Cookies & Local Storage",
@@ -85,8 +85,8 @@ def _build_sections() -> list[dict]:
         "table": {
             "columns": ["Key", "Type", "Purpose"],
             "rows": [
-                ["theme", "localStorage", "Remembers your light/dark mode preference"],
-                ["cookie-consent", "localStorage", "Records that you dismissed the cookie notice"],
+                ["theme_manual", "localStorage", "Remembers a light/dark mode you picked manually (expires after 24 hours)"],
+                ["solar_cache", "localStorage", "Caches the local sunrise/sunset-based theme choice for 30 minutes so it isn't recomputed on every page"],
                 ["auth_token", "httpOnly cookie", "Admin session only — set solely if you log into the admin panel. Not accessible to JavaScript. Never set for regular visitors."],
             ],
         },

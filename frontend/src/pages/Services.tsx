@@ -23,6 +23,8 @@ export default function Services() {
     title: 'Services — Nathan Blatter',
     description: 'Consulting and freelance services from Nathan Blatter — full-stack web apps, AI systems, and automation.',
     canonical: '/services',
+    // Seeded placeholder pricing hasn't been replaced yet — reachable by URL, hidden from search.
+    noindex: true,
   })
   const [meta, setMeta] = useState<ServicesMetaResponse | null>(null)
   const [offerings, setOfferings] = useState<ServiceOfferingResponse[]>([])
@@ -39,8 +41,6 @@ export default function Services() {
     : testimonials
 
   useEffect(() => {
-    setLoading(true)
-    setError(false)
     api.services.page()
       .then(({ meta: m, offerings: o, process: p, tiers: t, testimonials: te }) => {
         setMeta(m); setOfferings(o); setProcess(p); setTiers(t); setTestimonials(te)
@@ -55,7 +55,7 @@ export default function Services() {
         <div className="text-center text-steel">
           <p className="font-mono text-sm mb-2">Couldn't load this page.</p>
           <button
-            onClick={() => setRetryKey(k => k + 1)}
+            onClick={() => { setError(false); setLoading(true); setRetryKey(k => k + 1) }}
             className="font-mono text-xs text-blue hover:underline underline-offset-2 mt-1"
           >
             Retry

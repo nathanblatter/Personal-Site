@@ -146,7 +146,13 @@ export default function Resume() {
           <div className="text-center mb-1">
             <h1 className="text-[20px] font-bold tracking-wide">Nathan Blatter</h1>
             <p className="text-[10.5px] text-slate mt-0.5">
-              nzb22@byu.edu | nathanblatter.com | linkedin.com/in/nathanblatter | github.com/nathanblatter
+              {[
+                extras.contact?.phone,
+                extras.contact?.email || 'nzb22@byu.edu',
+                extras.contact?.site || 'nathanblatter.com',
+                extras.contact?.linkedin || 'linkedin.com/in/nathanblatter',
+                extras.contact?.github || 'github.com/nathanblatter',
+              ].filter(Boolean).join(' | ')}
             </p>
           </div>
 

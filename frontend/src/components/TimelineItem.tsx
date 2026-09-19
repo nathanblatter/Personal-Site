@@ -18,8 +18,8 @@ export default function TimelineItem({ year, title, subtitle, description, index
     <motion.div
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5, delay: index * 0.15 }}
+      viewport={{ once: true, margin: '0px' }}
+      transition={{ duration: 0.3, delay: Math.min(index, 3) * 0.05 }}
       className="relative pl-10 md:pl-14 pb-14 last:pb-0 group"
     >
       {/* Vertical line */}

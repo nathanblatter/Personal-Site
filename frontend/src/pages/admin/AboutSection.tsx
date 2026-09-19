@@ -78,7 +78,10 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
   const saveAbout = async () => {
     if (!about) return
     try {
-      const updated = await api.about.update({ bio_paragraphs: [headline, bio, hobbies], gpa: about.gpa, looking_for: about.looking_for })
+      const updated = await api.about.update({
+        bio_paragraphs: [headline, bio, hobbies], gpa: about.gpa, looking_for: about.looking_for,
+        hero_tagline: about.hero_tagline ?? '', hero_intro: about.hero_intro ?? '', meta_description: about.meta_description ?? '',
+      })
       setAbout(updated)
       showToast('Bio saved')
     } catch (err) {
@@ -139,6 +142,16 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
           <AdminTextarea label="Main Paragraph" value={bio} onChange={setBio} rows={3} />
           <AdminTextarea label="Hobbies & Personal" value={hobbies} onChange={setHobbies} rows={2} />
           <AdminInput label="GPA" value={about?.gpa ?? ''} onChange={v => setAbout(prev => prev ? { ...prev, gpa: v } : prev)} placeholder="e.g. 3.64" mono />
+        </div>
+      </SectionCard>
+
+      <SectionCard>
+        <h3 className="font-sans font-semibold text-ink mb-1">Home hero &amp; site description</h3>
+        <p className="text-xs text-steel mb-5">The first thing a recruiter reads. Keep it consistent with the résumé summary. Wrap words in **double asterisks** to bold them in the intro.</p>
+        <div className="space-y-5">
+          <AdminInput label="Hero tagline (small caps line above the name)" value={about?.hero_tagline ?? ''} onChange={v => setAbout(prev => prev ? { ...prev, hero_tagline: v } : prev)} placeholder="Full-Stack & AI Engineer | M.S. Information Systems" mono />
+          <AdminTextarea label="Hero intro (paragraph under the name)" value={about?.hero_intro ?? ''} onChange={v => setAbout(prev => prev ? { ...prev, hero_intro: v } : prev)} rows={3} />
+          <AdminTextarea label="Meta description (search + link previews, ~150 chars)" value={about?.meta_description ?? ''} onChange={v => setAbout(prev => prev ? { ...prev, meta_description: v } : prev)} rows={2} />
         </div>
         <div className="flex justify-end pt-5">
           <button onClick={saveAbout} className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue text-white font-mono text-xs font-semibold rounded-lg hover:bg-blue-dim transition-colors">

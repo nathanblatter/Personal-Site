@@ -10,6 +10,7 @@ export default function ResumeVariantsSection({ showToast, showError }: AdminCal
   const [achievements, setAchievements] = useState('')
   const [achievementsTitle, setAchievementsTitle] = useState('')
   const [publications, setPublications] = useState('')
+  const [contact, setContact] = useState<NonNullable<ResumeExtras['contact']>>({})
   const [achievementsDirty, setAchievementsDirty] = useState(false)
 
   useEffect(() => {
@@ -21,6 +22,7 @@ export default function ResumeVariantsSection({ showToast, showError }: AdminCal
         setAchievements((r.data.achievements ?? []).join('\n'))
         setAchievementsTitle(r.data.achievements_title ?? '')
         setPublications((r.data.publications ?? []).join('\n'))
+        setContact(r.data.contact ?? {})
       })
       .catch(() => setAchievements(''))
   }, [showError])
@@ -32,6 +34,7 @@ export default function ResumeVariantsSection({ showToast, showError }: AdminCal
         achievements: toList(achievements),
         achievements_title: achievementsTitle.trim() || undefined,
         publications: toList(publications),
+        contact: Object.fromEntries(Object.entries(contact).map(([k, v]) => [k, (v ?? '').trim()]).filter(([, v]) => v)),
       })
       setAchievementsDirty(false)
       showToast('Other Achievements saved')
@@ -111,6 +114,18 @@ export default function ResumeVariantsSection({ showToast, showError }: AdminCal
             onChange={val => { setAchievements(val); setAchievementsDirty(true) }}
             rows={4}
           />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          {(['email', 'phone', 'site', 'linkedin', 'github'] as const).map(k => (
+            <AdminInput
+              key={k}
+              label={`Header ${k}${k === 'phone' ? ' (blank = omit)' : ''}`}
+              value={contact[k] ?? ''}
+              onChange={val => { setContact(prev => ({ ...prev, [k]: val })); setAchievementsDirty(true) }}
+              mono
+              placeholder={{ email: 'nzb22@byu.edu', phone: '', site: 'nathanblatter.com', linkedin: 'linkedin.com/in/nathanblatter', github: 'github.com/nathanblatter' }[k]}
+            />
+          ))}
         </div>
         <AdminTextarea
           label="Publications — one per line, rendered after Education (leave empty to hide)"

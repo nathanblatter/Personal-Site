@@ -31,6 +31,7 @@ def clean_description(text: str | None, limit: int = 160) -> str:
         return flat
     return flat[:limit].rsplit(" ", 1)[0].rstrip(",.;:") + "…"
 
+# /services is intentionally absent (noindex until the placeholder pricing is replaced).
 STATIC_PAGES = [
     "/",
     "/about",
@@ -38,6 +39,8 @@ STATIC_PAGES = [
     "/blog",
     "/resume",
     "/contact",
+    "/now",
+    "/uses",
 ]
 
 # OG images are binary blobs — keep in-memory (not worth serializing to Redis)
@@ -260,6 +263,7 @@ async def resume_pdf(variant: str = Query(""), db: AsyncSession = Depends(get_db
         "achievements": extras.get("achievements") or [],
         "achievements_title": extras.get("achievements_title"),
         "publications": extras.get("publications") or [],
+        "contact": extras.get("contact") or {},
     }
     experience = [
         {"title": e.title, "subtitle": e.subtitle, "year": e.year, "description": e.description, "kind": e.kind}

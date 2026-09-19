@@ -106,6 +106,7 @@ async def upsert_about(payload: schemas.AboutUpdate, db: AsyncSession = Depends(
     await db.refresh(about)
     await cache.delete("page:about")
     await cache.delete("page:home")
+    await cache.delete("site:meta_description")  # site-wide <meta description> injected by main.serve_spa
     return about
 
 

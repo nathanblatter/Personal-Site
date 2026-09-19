@@ -10,6 +10,7 @@ from difflib import SequenceMatcher
 from html import escape
 from pathlib import Path
 from fastapi import Depends, FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
@@ -20,6 +21,7 @@ from app.auth import assert_secure_secrets, require_auth
 
 from app.routers import projects, skills, experience, about, contact, auth, blog, internships, storage, github, analytics, links, seo, kpi, claude_usage, home, about_page, contact_page, status, solar, testimonial_requests, rss, resume, bookings, bio, crm, bug_report, newsletter, site_content, health, search, journal, services, privacy, quick_update, personal_photos
 from app.routers.claude_usage import _do_snapshot as _claude_snapshot
+from app.cache import cache as _cache
 from app.database import AsyncSessionLocal
 from app import models
 
@@ -50,11 +52,16 @@ DOMAIN = "https://nathanblatter.com"
 # index.html in-memory cache: {"content": str, "mtime": float}
 _index_cache: dict = {}
 
+# Site-wide default description baked into frontend/index.html. At request time
+# it is swapped for About.meta_description (admin-editable) when that is set.
+DEFAULT_SITE_DESCRIPTION = "IS student at BYU building full-stack applications, AI systems, and research tools."
+_SITE_DESC_CACHE_KEY = "site:meta_description"
+
 # Per-route OG metadata for social crawler injection
 _STATIC_OG: dict[str, dict[str, str]] = {
     "": {
         "title": "Nathan Blatter — Portfolio",
-        "description": "IS student at BYU building full-stack applications, AI systems, and research tools.",
+        "description": DEFAULT_SITE_DESCRIPTION,
         "url": f"{DOMAIN}/",
     },
     "about": {
@@ -72,14 +79,9 @@ _STATIC_OG: dict[str, dict[str, str]] = {
         "description": "Open to internships, collaborations, and interesting projects.",
         "url": f"{DOMAIN}/contact",
     },
-    "services": {
-        "title": "Work With Me — Nathan Blatter",
-        "description": "Full-stack, AI, and data consulting — offerings, process, and engagement tiers.",
-        "url": f"{DOMAIN}/services",
-    },
     "resume": {
         "title": "Résumé — Nathan Blatter",
-        "description": "Full-stack engineer skilled in Python, React, SQL, and AI systems.",
+        "description": "Résumé of Nathan Blatter — full-stack engineer skilled in Python, React, SQL, and AI systems.",
         "url": f"{DOMAIN}/resume",
     },
     "blog": {
@@ -198,12 +200,13 @@ async def lifespan(app: FastAPI):
     await journal.close_journal_db()
 
 
-def _static_og_html(route: str, index_html: str) -> str | None:
+def _static_og_html(route: str, index_html: str, site_description: str | None = None) -> str | None:
     og = _STATIC_OG.get(route)
     if og is None:
         return None
     title = escape(og["title"])
-    desc = escape(og["description"])
+    # Home's description is the admin-editable site-wide one when set.
+    desc = escape(site_description if (route == "" and site_description) else og["description"])
     url = og["url"]
     # Content pages get a branded title-card; home/about keep the personal headshot.
     image = f"{DOMAIN}/og/page/{route}.png" if route in seo.PAGE_OG else f"{DOMAIN}/headshot.webp"
@@ -550,6 +553,129 @@ async def _case_study_og_html(project_id: str, index_html: str) -> str | None:
     return html
 
 
+# ── Server preload + site-wide description ─────────────────────────────────────
+
+_PRELOAD_TAG_ID = "__preload"
+
+
+def _json_for_html(value) -> str:
+    """JSON text that is safe inside a <script> element.
+
+    Every ``<`` becomes ``\\u003c`` — a plain JSON escape the browser decodes
+    back to ``<`` — so untrusted strings (blog markdown, admin copy) can never
+    contain ``</script`` or ``<!--`` and break out of the element.
+    """
+    raw = _json.dumps(jsonable_encoder(value), ensure_ascii=False, separators=(",", ":"))
+    return raw.replace("<", "\\u003c")
+
+
+def _preload_script(payload: dict) -> str:
+    """Serialize ``payload`` into an HTML-safe <script type="application/json"> tag."""
+    return f'<script id="{_PRELOAD_TAG_ID}" type="application/json">{_json_for_html(payload)}</script>'
+
+
+def _inject_before_head_end(html: str, fragment: str) -> str:
+    idx = html.find("</head>")
+    if idx == -1:
+        return html
+    return f"{html[:idx]}    {fragment}\n  {html[idx:]}"
+
+
+async def _site_description() -> str | None:
+    """About.meta_description (admin-editable site-wide description), cached briefly."""
+    try:
+        cached = await _cache.get(_SITE_DESC_CACHE_KEY)
+        if isinstance(cached, dict):
+            return cached.get("value") or None
+        async with AsyncSessionLocal() as db:
+            row = (await db.execute(select(models.About.meta_description).where(models.About.id == 1))).first()
+        value = (row[0] or "").strip() if row else ""
+        await _cache.set(_SITE_DESC_CACHE_KEY, {"value": value}, ttl=300)
+        return value or None
+    except Exception:
+        log.warning("site description lookup failed; using index.html default", exc_info=True)
+        return None
+
+
+def _apply_site_description(html: str, description: str | None) -> str:
+    """Swap the hardcoded default description in index.html for the DB-backed one."""
+    if not description or description == DEFAULT_SITE_DESCRIPTION:
+        return html
+    # The static Person JSON-LD holds it as a JSON string literal under a
+    # "description" key; the meta tags hold it as an attribute value.
+    html = re.sub(
+        r'"description":\s*' + re.escape(_json.dumps(DEFAULT_SITE_DESCRIPTION)),
+        lambda _m: f'"description": {_json_for_html(description)}',
+        html,
+    )
+    return html.replace(escape(DEFAULT_SITE_DESCRIPTION, quote=True), escape(description, quote=True))
+
+
+def _dump(model_cls, rows):
+    return [model_cls.model_validate(r).model_dump() for r in rows]
+
+
+async def _preload_payload(route: str) -> dict | None:
+    """Return {api_path: payload} for the first GET a public route makes, or None.
+
+    Reuses the router functions (and thus their Redis caches) so this is the
+    same data the client would fetch — the api.ts ``request()`` hook consumes
+    it one-shot from <script id="__preload">.
+    """
+    from app import schemas
+    from app.routers import (
+        about_page as r_about_page, blog as r_blog, bookings as r_bookings, contact_page as r_contact_page,
+        home as r_home, projects as r_projects, resume as r_resume, services as r_services,
+        site_content as r_site_content,
+    )
+
+    async with AsyncSessionLocal() as db:
+        if route == "":
+            return {"/home": await r_home.get_home_data(db)}
+        if route == "about":
+            return {"/about-page": await r_about_page.get_about_page_data(db)}
+        if route == "projects" or route.startswith("projects/"):
+            return {"/projects": _dump(schemas.ProjectResponse, await r_projects.list_projects(db))}
+        if route == "blog":
+            return {"/blog": _dump(schemas.BlogPostResponse, await r_blog.list_published_posts(None, db))}
+        if route.startswith("blog/"):
+            slug = route.removeprefix("blog/")
+            if not slug or "/" in slug:
+                return None
+            post = await r_blog.get_post_by_slug(slug, db)
+            return {f"/blog/{slug}": schemas.BlogPostResponse.model_validate(post).model_dump()}
+        if route == "resume":
+            return {"/resume/data": await r_resume.resume_data(db)}
+        if route == "contact":
+            settings = await r_bookings.get_public_settings(db)
+            return {
+                "/contact-page": await r_contact_page.get_contact_page_data(db),
+                "/bookings/settings/public": settings.model_dump(),
+            }
+        if route in ("now", "uses"):
+            row = await r_site_content.get_content(route, db)
+            return {f"/site-content/{route}": schemas.SiteContentResponse.model_validate(row).model_dump()}
+        if route == "services":
+            return {"/services/page": await r_services.get_services_page(db)}
+    return None
+
+
+async def _preload_html(route: str, html: str) -> str:
+    """Embed the route's first-render payload; on any failure serve the plain shell."""
+    if route.startswith(("admin", "login", "api/")):
+        return html
+    try:
+        payload = await _preload_payload(route)
+    except Exception:
+        # 404s (unknown slug, missing site-content row) and DB hiccups alike:
+        # the SPA fetches normally and renders its own error/empty state.
+        log.info("preload skipped for route=%r", route, exc_info=True)
+        return html
+    if not payload:
+        return html
+    return _inject_before_head_end(html, _preload_script(payload))
+
+
 @app.get("/{full_path:path}", include_in_schema=False)
 async def serve_spa(full_path: str = "", request: Request = None):
     index_html = _read_index_html()
@@ -579,25 +705,32 @@ async def serve_spa(full_path: str = "", request: Request = None):
             response.headers["CDN-Cache-Control"] = "public, max-age=2592000"  # 30 days at CDN
         return response
 
+    route = full_path.rstrip("/")
+    site_desc = await _site_description()
+    html = _apply_site_description(index_html, site_desc)
+
     # For social crawlers, inject per-route OG tags
     if request and BOT_PATTERN.search(request.headers.get("user-agent", "")):
-        route = full_path.rstrip("/")
         if route.startswith("blog/"):
             slug = route.removeprefix("blog/")
             if slug:
-                modified = await _blog_og_html(slug, index_html)
+                modified = await _blog_og_html(slug, html)
                 if modified:
-                    return HTMLResponse(modified)
+                    html = modified
         elif route.startswith("projects/"):
             project_id = route.removeprefix("projects/")
             if project_id:
-                modified = await _case_study_og_html(project_id, index_html)
+                modified = await _case_study_og_html(project_id, html)
                 if modified:
-                    return HTMLResponse(modified)
+                    html = modified
         else:
-            modified = _static_og_html(route, index_html)
+            modified = _static_og_html(route, html, site_desc)
             if modified:
-                return HTMLResponse(modified)
+                html = modified
 
-    # All other paths → SPA entry point (use in-memory content, avoids FileResponse thread I/O)
-    return HTMLResponse(index_html)
+    # All other paths → SPA entry point (use in-memory content, avoids FileResponse thread I/O).
+    # The shell carries the route's first-render payload, so it must never be
+    # cached as a static document (mirrors _SKIP_CACHE for the API endpoints).
+    html = await _preload_html(route, html)
+    headers = {"Cache-Control": "no-cache"} if _PRELOAD_TAG_ID in html else None
+    return HTMLResponse(html, headers=headers)

@@ -8,6 +8,11 @@ export interface DocumentMeta {
   /** Absolute URL or a path like "/about" (resolved against https://nathanblatter.com) */
   canonical?: string
   ogImage?: string
+  /** Structured data for this page. Injected as a managed <script type="application/ld+json">
+   *  and removed on unmount; the static Person JSON-LD in index.html is left alone. */
+  jsonLd?: object | object[]
+  /** Keep the page reachable but tell crawlers not to index it. */
+  noindex?: boolean
 }
 
 interface MetaDefaults {
@@ -56,6 +61,33 @@ function upsertCanonical(href: string) {
   el.setAttribute('href', href)
 }
 
+const JSON_LD_SELECTOR = 'script[type="application/ld+json"][data-managed]'
+const ROBOTS_SELECTOR = 'meta[name="robots"][data-managed]'
+
+function applyJsonLd(jsonLd: object | object[] | undefined) {
+  document.head.querySelectorAll(JSON_LD_SELECTOR).forEach(el => el.remove())
+  if (!jsonLd) return
+  const el = document.createElement('script')
+  el.type = 'application/ld+json'
+  el.setAttribute('data-managed', '')
+  // "</" can terminate a script element even inside a JSON string.
+  el.textContent = JSON.stringify(jsonLd).replace(/<\//g, '<\\/')
+  document.head.appendChild(el)
+}
+
+function applyRobots(noindex: boolean | undefined) {
+  const existing = document.head.querySelector<HTMLMetaElement>(ROBOTS_SELECTOR)
+  if (!noindex) {
+    existing?.remove()
+    return
+  }
+  const el = existing ?? document.createElement('meta')
+  el.setAttribute('name', 'robots')
+  el.setAttribute('data-managed', '')
+  el.setAttribute('content', 'noindex, follow')
+  if (!existing) document.head.appendChild(el)
+}
+
 function resolveUrl(url: string): string {
   return url.startsWith('/') ? `${SITE_ORIGIN}${url}` : url
 }
@@ -80,6 +112,9 @@ function apply(meta: DocumentMeta) {
   upsertMeta('name', 'twitter:title', title)
   upsertMeta('name', 'twitter:description', description)
   upsertMeta('name', 'twitter:image', ogImage)
+
+  applyJsonLd(meta.jsonLd)
+  applyRobots(meta.noindex)
 }
 
 /**
@@ -88,11 +123,14 @@ function apply(meta: DocumentMeta) {
  * the index.html site defaults on unmount. Fields left undefined fall back to
  * the site defaults, so pages never leak meta into one another during SPA nav.
  */
-export function useDocumentMeta({ title, description, canonical, ogImage }: DocumentMeta) {
+export function useDocumentMeta({ title, description, canonical, ogImage, jsonLd, noindex }: DocumentMeta) {
+  // jsonLd is usually built inline by the caller (a fresh object each render),
+  // so compare it by value to keep the effect from re-running every render.
+  const jsonLdKey = jsonLd ? JSON.stringify(jsonLd) : undefined
   useEffect(() => {
-    apply({ title, description, canonical, ogImage })
+    apply({ title, description, canonical, ogImage, jsonLd: jsonLdKey ? JSON.parse(jsonLdKey) : undefined, noindex })
     return () => {
       apply({})
     }
-  }, [title, description, canonical, ogImage])
+  }, [title, description, canonical, ogImage, jsonLdKey, noindex])
 }
