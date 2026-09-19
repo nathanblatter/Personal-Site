@@ -1,18 +1,32 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Plus, Trash2, Save, Star, ScrollText, Download } from 'lucide-react'
-import { api, type ResumeVariantResponse } from '../../lib/api'
+import { api, type ResumeVariantResponse, type ResumeExtras } from '../../lib/api'
 import { AdminInput, AdminTextarea, SectionCard, type AdminCallbacks } from './AdminShared'
 
 export default function ResumeVariantsSection({ showToast, showError }: AdminCallbacks) {
   const [variants, setVariants] = useState<ResumeVariantResponse[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [achievements, setAchievements] = useState('')
+  const [achievementsDirty, setAchievementsDirty] = useState(false)
 
   useEffect(() => {
     api.resume.variants.list()
       .then(r => { setVariants(r); setLoaded(true) })
       .catch(e => showError((e as Error).message))
+    api.siteContent.get<ResumeExtras>('resume')
+      .then(r => setAchievements((r.data.achievements ?? []).join('\n')))
+      .catch(() => setAchievements(''))
   }, [showError])
+
+  const saveAchievements = async () => {
+    try {
+      const list = achievements.split('\n').map(l => l.replace(/^[•-]\s*/, '').trim()).filter(Boolean)
+      await api.siteContent.update<ResumeExtras>('resume', { achievements: list })
+      setAchievementsDirty(false)
+      showToast('Other Achievements saved')
+    } catch (e) { showError((e as Error).message) }
+  }
 
   const patch = (id: number, field: keyof ResumeVariantResponse, value: unknown) =>
     setVariants(prev => prev.map(v => v.id === id ? { ...v, [field]: value } : v))
@@ -65,6 +79,25 @@ export default function ResumeVariantsSection({ showToast, showError }: AdminCal
           <Plus size={12} /> Add
         </button>
       </div>
+
+      <SectionCard>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-sans font-semibold text-ink">Other Achievements</h3>
+          <button
+            onClick={saveAchievements}
+            disabled={!achievementsDirty}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-white bg-blue rounded-lg hover:bg-blue-dim transition-colors disabled:opacity-40"
+          >
+            <Save size={12} /> Save
+          </button>
+        </div>
+        <AdminTextarea
+          label="One bullet per line — rendered at the bottom of /resume and every PDF variant"
+          value={achievements}
+          onChange={val => { setAchievements(val); setAchievementsDirty(true) }}
+          rows={4}
+        />
+      </SectionCard>
 
       <div className="space-y-4">
         {variants.map(v => (

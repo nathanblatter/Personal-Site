@@ -245,6 +245,7 @@ class ExperienceBase(BaseModel):
     subtitle: str
     description: str
     kind: ExperienceKind = ExperienceKind.work
+    on_resume: bool = True
     active: bool = False
     sort_order: int = 0
 
@@ -259,6 +260,7 @@ class ExperienceUpdate(BaseModel):
     subtitle: Optional[str] = None
     description: Optional[str] = None
     kind: Optional[ExperienceKind] = None
+    on_resume: Optional[bool] = None
     active: Optional[bool] = None
     sort_order: Optional[int] = None
 

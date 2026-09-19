@@ -131,22 +131,9 @@ def generate_resume_pdf(about, experience, skills, projects, coursework, variant
     story.append(Paragraph("<b>TECHNICAL SKILLS</b>", s_section))
     story.append(_section_rule())
 
-    cats: dict[str, list[str]] = {}
-    for sk in skills:
-        cats.setdefault(sk["category"], []).append(sk["name"])
-    if "BI" in cats and "Data" in cats:
-        cats["Data"] = cats["Data"] + cats["BI"]
-        del cats["BI"]
-    elif "BI" in cats:
-        cats["Data"] = cats.pop("BI")
-
-    cat_labels = {
-        "Data": "Data &amp; BI", "Lang": "Systems Development", "Web": "Web Development",
-        "Front": "Frontend", "Back": "Backend", "Cloud": "Cloud &amp; Infrastructure",
-    }
-    for cat, names in cats.items():
-        label = cat_labels.get(cat, cat)
-        story.append(Paragraph(f'<b>{label}:</b> {", ".join(names)}', s_body))
+    from app.resume_skills import group_skills
+    for label, names in group_skills(skills):
+        story.append(Paragraph(f'<b>{label.replace("&", "&amp;")}:</b> {", ".join(names)}', s_body))
 
     # ── PROJECTS ──
     story.append(Spacer(1, 2))
@@ -200,10 +187,8 @@ def generate_resume_pdf(about, experience, skills, projects, coursework, variant
     # ── OTHER ACHIEVEMENTS ──
     story.append(Paragraph("<b>OTHER ACHIEVEMENTS</b>", s_section))
     story.append(_section_rule())
-    others = [
-        "Passionate about advancing mental health access through AI-powered therapy and research",
-    ]
-    if len(about.get("bio_paragraphs", [])) > 2:
+    others = [a for a in (about.get("achievements") or []) if a]
+    if not others and len(about.get("bio_paragraphs", [])) > 2:
         others.append(about["bio_paragraphs"][2])
     for line in others:
         if line:

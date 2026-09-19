@@ -80,7 +80,11 @@ async def resume_data(db: AsyncSession = Depends(get_db)):
     variants_r = await db.execute(
         select(models.ResumeVariant).order_by(models.ResumeVariant.sort_order, models.ResumeVariant.id)
     )
+    extras_r = await db.execute(select(models.SiteContent).where(models.SiteContent.key == "resume"))
+    extras_row = extras_r.scalar_one_or_none()
     return {
+        # Free-form résumé-only content (e.g. "Other Achievements" bullets), edited in admin → Résumé.
+        "extras": (extras_row.data if extras_row else {}) or {},
         "about": schemas.AboutResponse.model_validate(about_r.scalar_one_or_none()).model_dump(),
         "experience": [schemas.ExperienceResponse.model_validate(e).model_dump() for e in sort_experience(experience_r.scalars().all())],
         "skills": [schemas.SkillResponse.model_validate(s).model_dump() for s in skills_r.scalars().all()],

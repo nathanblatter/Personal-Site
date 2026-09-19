@@ -37,6 +37,7 @@ export default function ExperienceSection({ showToast, showError, experience, se
         subtitle: 'Company',
         description: '',
         kind: 'work',
+        on_resume: true,
         active: false,
         sort_order: experience.length,
       })
@@ -90,6 +91,7 @@ export default function ExperienceSection({ showToast, showError, experience, se
                   <span className="text-sm font-medium text-ink">{exp.title}</span>
                   {exp.kind === 'education' && <span className="font-mono text-[10px] text-violet bg-violet/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Education</span>}
                   {exp.active && <span className="font-mono text-[10px] text-teal bg-teal/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Active</span>}
+                  {exp.on_resume === false && <span className="font-mono text-[10px] text-steel bg-cloud px-2 py-0.5 rounded-full uppercase tracking-wider">Timeline only</span>}
                 </div>
                 <p className="text-xs text-steel mt-0.5">{exp.subtitle}</p>
               </div>
@@ -132,14 +134,30 @@ export default function ExperienceSection({ showToast, showError, experience, se
                       />
                     </div>
                     <AdminTextarea label="Description" value={exp.description} onChange={v => updateExpLocal(exp.id, 'description', v)} />
-                    <div className="flex items-center gap-3">
-                      <label className="font-mono text-[11px] text-steel tracking-wider uppercase">Currently Active</label>
-                      <button
-                        onClick={() => updateExpLocal(exp.id, 'active', !exp.active)}
-                        className={`relative w-11 h-6 rounded-full transition-colors ${exp.active ? 'bg-blue' : 'bg-silver'}`}
-                      >
-                        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${exp.active ? 'left-6' : 'left-1'}`} />
-                      </button>
+                    <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+                      <div className="flex items-center gap-3">
+                        <label className="font-mono text-[11px] text-steel tracking-wider uppercase">Currently Active</label>
+                        <button
+                          onClick={() => updateExpLocal(exp.id, 'active', !exp.active)}
+                          className={`relative w-11 h-6 rounded-full transition-colors ${exp.active ? 'bg-blue' : 'bg-silver'}`}
+                          aria-label="Toggle currently active"
+                          aria-pressed={exp.active}
+                        >
+                          <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${exp.active ? 'left-6' : 'left-1'}`} />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <label className="font-mono text-[11px] text-steel tracking-wider uppercase">Show on résumé</label>
+                        <button
+                          onClick={() => updateExpLocal(exp.id, 'on_resume', !(exp.on_resume !== false))}
+                          className={`relative w-11 h-6 rounded-full transition-colors ${exp.on_resume !== false ? 'bg-blue' : 'bg-silver'}`}
+                          aria-label="Toggle show on résumé"
+                          aria-pressed={exp.on_resume !== false}
+                        >
+                          <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${exp.on_resume !== false ? 'left-6' : 'left-1'}`} />
+                        </button>
+                        <span className="text-[11px] text-silver">off = timeline only (About / Home)</span>
+                      </div>
                     </div>
                     <div className="flex justify-end pt-2">
                       <button onClick={() => saveExp(exp)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue text-white font-mono text-xs font-semibold rounded-lg hover:bg-blue-dim transition-colors">

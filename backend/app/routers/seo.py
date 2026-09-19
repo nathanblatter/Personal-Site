@@ -248,8 +248,13 @@ async def resume_pdf(variant: str = Query(""), db: AsyncSession = Depends(get_db
         if vrow:
             variant_dict = {"headline": vrow.headline, "summary": vrow.summary, "emphasis_tags": vrow.emphasis_tags or []}
 
-    about = {"bio_paragraphs": about_row.bio_paragraphs, "gpa": about_row.gpa}
-    experience = [{"title": e.title, "subtitle": e.subtitle, "year": e.year, "description": e.description, "kind": e.kind} for e in exp_rows]
+    extras_row = (await db.execute(select(models.SiteContent).where(models.SiteContent.key == "resume"))).scalar_one_or_none()
+    extras = (extras_row.data if extras_row else {}) or {}
+    about = {"bio_paragraphs": about_row.bio_paragraphs, "gpa": about_row.gpa, "achievements": extras.get("achievements") or []}
+    experience = [
+        {"title": e.title, "subtitle": e.subtitle, "year": e.year, "description": e.description, "kind": e.kind}
+        for e in exp_rows if e.on_resume
+    ]
     skills = [{"name": s.name, "category": s.category} for s in skill_rows]
     # Résumé lines use the short summary when one exists; the long body is for the case study.
     projects = [{"title": p.title, "description": p.summary or p.description, "tags": p.tags or [], "year": p.year, "link": p.link, "metrics": p.metrics or []} for p in proj_rows]

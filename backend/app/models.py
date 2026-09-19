@@ -97,6 +97,7 @@ class Experience(Base):
     subtitle = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     kind = Column(String, nullable=False, default="work", server_default="work")  # work | education
+    on_resume = Column(Boolean, nullable=False, default=True, server_default="true")  # timeline-only entries set False
     active = Column(Boolean, nullable=False, default=False)
     sort_order = Column(Integer, nullable=False, default=0)
 

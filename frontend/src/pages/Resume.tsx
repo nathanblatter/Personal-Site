@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Download } from 'lucide-react'
 import { useDocumentMeta } from '../lib/useDocumentMeta'
-import { api, type ExperienceResponse, type SkillResponse, type ProjectResponse, type AboutResponse, type CourseworkResponse, type ResumeVariantResponse } from '../lib/api'
+import { api, type ExperienceResponse, type SkillResponse, type ProjectResponse, type AboutResponse, type CourseworkResponse, type ResumeVariantResponse, type ResumeExtras } from '../lib/api'
 
 export default function Resume() {
   const [about, setAbout] = useState<AboutResponse | null>(null)
@@ -11,6 +11,7 @@ export default function Resume() {
   const [projects, setProjects] = useState<ProjectResponse[]>([])
   const [coursework, setCoursework] = useState<CourseworkResponse[]>([])
   const [variants, setVariants] = useState<ResumeVariantResponse[]>([])
+  const [extras, setExtras] = useState<ResumeExtras>({})
   const [activeKey, setActiveKey] = useState<string | null>(null)
 
   useDocumentMeta({
@@ -20,9 +21,10 @@ export default function Resume() {
   })
 
   useEffect(() => {
-    api.resume.data().then(({ about: ab, experience: ex, skills: sk, projects: pr, coursework: cw, variants: vs }) => {
+    api.resume.data().then(({ about: ab, experience: ex, skills: sk, projects: pr, coursework: cw, variants: vs, extras: xt }) => {
       setAbout(ab)
-      setExperience(ex)
+      setExperience(ex.filter(e => e.on_resume !== false))
+      setExtras(xt ?? {})
       setSkills(sk)
       setProjects(pr.filter(p => p.status === 'live'))
       setCoursework(cw)
@@ -56,21 +58,23 @@ export default function Resume() {
     )
   }
 
-  const skillsByCategory = skills.reduce<Record<string, string[]>>((acc, s) => {
-    acc[s.category] = acc[s.category] || []
-    acc[s.category].push(s.name)
-    return acc
-  }, {})
-
-  // Merge BI into Data
-  if (skillsByCategory['BI'] && skillsByCategory['Data']) {
-    skillsByCategory['Data'] = [...skillsByCategory['Data'], ...skillsByCategory['BI']]
-    delete skillsByCategory['BI']
-  }
-
-  const categoryLabels: Record<string, string> = {
-    Data: 'Data & BI', Lang: 'Systems Development', Web: 'Web Development',
-    Front: 'Frontend', Back: 'Backend', Cloud: 'Cloud & Infrastructure',
+  // Collapse the site's granular skill categories into the résumé's four lines
+  // (same grouping as backend/app/resume_skills.py so the PDF matches the page).
+  const groups: [string, string[]][] = [
+    ['Data & BI', ['Data', 'BI']],
+    ['Systems Development', ['Backend', 'Lang', 'Back']],
+    ['Web Development', ['Web', 'Frontend', 'Front']],
+    ['Cloud & Infrastructure', ['Cloud']],
+  ]
+  const grouped = groups
+    .map(([label, cats]) => [label, skills.filter(s => cats.includes(s.category)).map(s => s.name)] as [string, string[]])
+    .filter(([, names]) => names.length > 0)
+  const known = new Set(groups.flatMap(([, cats]) => cats))
+  for (const s of skills) {
+    if (known.has(s.category)) continue
+    const row = grouped.find(([label]) => label === s.category)
+    if (row) row[1].push(s.name)
+    else grouped.push([s.category, [s.name]])
   }
 
   const degrees = experience.filter(e => e.kind === 'education')
@@ -151,7 +155,7 @@ export default function Resume() {
             {activeVariant ? (
               <><span className="font-bold">{activeVariant.headline}</span> {activeVariant.summary}</>
             ) : (
-              <><span className="font-bold">Information Systems student (Full-Stack Software Engineering emphasis)</span> with experience in C#, Java, Python, SQL, and cloud platforms, complemented by a background in SCM, ERP, and AI-driven systems. Proven ability to build full-stack analytics and intelligent applications, including a voice-enabled AI platform deployed for clinical research. Known for strong ownership, clean code practices, and delivering measurable technical impact in collaborative team environments.</>
+              <><span className="font-bold">Information Systems student (Full-Stack Software Engineering emphasis)</span> with experience in Python, Go, C#, PHP, SQL, and cloud platforms, complemented by a background in SCM, ERP, and AI-driven systems. Proven ability to build full-stack analytics and intelligent applications, including a voice-enabled AI platform deployed for clinical research. Known for strong ownership, clean code practices, and delivering measurable technical impact in collaborative team environments.</>
             )}
           </p>
 
@@ -181,9 +185,9 @@ export default function Resume() {
 
           {/* ── TECHNICAL SKILLS ── */}
           <Section title="technical skills">
-            {Object.entries(skillsByCategory).map(([cat, names]) => (
-              <p key={cat} className="text-[10.5px]">
-                <span className="font-bold">{categoryLabels[cat] || cat}:</span> {names.join(', ')}
+            {grouped.map(([label, names]) => (
+              <p key={label} className="text-[10.5px]">
+                <span className="font-bold">{label}:</span> {names.join(', ')}
               </p>
             ))}
           </Section>
@@ -229,10 +233,10 @@ export default function Resume() {
 
           {/* ── OTHER ── */}
           <Section title="Other Achievements">
-            <Bullets text={[
-              'Passionate about advancing mental health access through AI-powered therapy and research',
-              about.bio_paragraphs[2] || '',
-            ].filter(Boolean).join('\n')} />
+            <Bullets text={(extras.achievements?.length
+              ? extras.achievements
+              : ['Passionate about advancing mental health access through AI-powered therapy and research', about.bio_paragraphs[2] || '']
+            ).filter(Boolean).join('\n')} />
           </Section>
 
         </div>

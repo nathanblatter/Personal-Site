@@ -55,6 +55,8 @@ export interface ExperienceResponse {
   subtitle: string
   description: string
   kind: ExperienceKind
+  /** false = shown on the site timeline but left off /resume and the PDF */
+  on_resume: boolean
   active: boolean
   sort_order: number
 }
@@ -472,6 +474,13 @@ export interface ResumeDataResponse {
   projects: ProjectResponse[]
   coursework: CourseworkResponse[]
   variants: ResumeVariantResponse[]
+  /** site-content key "resume": résumé-only free-form content */
+  extras: ResumeExtras
+}
+
+export interface ResumeExtras {
+  /** "Other Achievements" bullets, one per entry */
+  achievements?: string[]
 }
 
 // ── Services ("Work With Me") Types ────────────────────────────────────────────

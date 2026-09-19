@@ -762,10 +762,13 @@ async def ensure_normalized_blog_tags(db) -> None:
 
 async def ensure_columns(conn) -> None:
     """Idempotent column adds for tables that predate the column (create_all
-    never ALTERs existing tables). Mirrors alembic/versions/020_*.py."""
+    never ALTERs existing tables). Mirrors alembic/versions/020_*.py and 021_*.py."""
     from sqlalchemy import text
     await conn.execute(text(
         "ALTER TABLE experience ADD COLUMN IF NOT EXISTS kind VARCHAR NOT NULL DEFAULT 'work'"
+    ))
+    await conn.execute(text(
+        "ALTER TABLE experience ADD COLUMN IF NOT EXISTS on_resume BOOLEAN NOT NULL DEFAULT TRUE"
     ))
     await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS summary TEXT"))
     await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS demo_credentials VARCHAR"))
