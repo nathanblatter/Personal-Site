@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from app.database import get_db
 from app import models
+from app.utils import sort_experience
 
 router = APIRouter(tags=["seo"])
 
@@ -240,20 +241,21 @@ async def resume_pdf(variant: str = Query(""), db: AsyncSession = Depends(get_db
     cw_rows = (await db.execute(select(models.Coursework).order_by(models.Coursework.sort_order))).scalars().all()
 
     # Optional résumé flavor: overrides the summary and surfaces matching projects first.
+    # No ?variant= → the default variant, so the bare /resume.pdf matches what the
+    # /resume page shows on first load instead of a hardcoded summary.
     variant_dict = None
-    if variant:
-        vrow = (await db.execute(
-            select(models.ResumeVariant).where(models.ResumeVariant.key == variant)
-        )).scalar_one_or_none()
-        if vrow:
-            variant_dict = {"headline": vrow.headline, "summary": vrow.summary, "emphasis_tags": vrow.emphasis_tags or []}
+    vq = select(models.ResumeVariant).where(models.ResumeVariant.key == variant) if variant else \
+        select(models.ResumeVariant).where(models.ResumeVariant.is_default.is_(True))
+    vrow = (await db.execute(vq)).scalar_one_or_none()
+    if vrow:
+        variant_dict = {"headline": vrow.headline, "summary": vrow.summary, "emphasis_tags": vrow.emphasis_tags or []}
 
     extras_row = (await db.execute(select(models.SiteContent).where(models.SiteContent.key == "resume"))).scalar_one_or_none()
     extras = (extras_row.data if extras_row else {}) or {}
     about = {"bio_paragraphs": about_row.bio_paragraphs, "gpa": about_row.gpa, "achievements": extras.get("achievements") or []}
     experience = [
         {"title": e.title, "subtitle": e.subtitle, "year": e.year, "description": e.description, "kind": e.kind}
-        for e in exp_rows if e.on_resume
+        for e in sort_experience(exp_rows) if e.on_resume
     ]
     skills = [{"name": s.name, "category": s.category} for s in skill_rows]
     # Résumé lines use the short summary when one exists; the long body is for the case study.
@@ -267,7 +269,7 @@ async def resume_pdf(variant: str = Query(""), db: AsyncSession = Depends(get_db
 
     pdf_bytes = generate_resume_pdf(about, experience, skills, projects[:5], coursework, variant=variant_dict)
 
-    suffix = f"_{variant}" if variant_dict else ""
+    suffix = f"_{variant}" if variant and variant_dict else ""
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

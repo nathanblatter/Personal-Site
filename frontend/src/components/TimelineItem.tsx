@@ -45,7 +45,18 @@ export default function TimelineItem({ year, title, subtitle, description, index
       )}
       <h4 className={`text-xl font-sans font-semibold mt-2 ${highlighted ? 'text-blue' : 'text-ink'}`}>{title}</h4>
       <p className="text-sm text-steel mt-1">{subtitle}</p>
-      <p className="text-sm text-slate mt-4 leading-relaxed max-w-lg">{description}</p>
+      {(() => {
+        const lines = description.split('\n').map(l => l.replace(/^[•-]\s*/, '').trim()).filter(Boolean)
+        return lines.length > 1 ? (
+          <ul className="text-sm text-slate mt-4 leading-relaxed max-w-lg space-y-1.5">
+            {lines.map((line, i) => (
+              <li key={i} className="pl-3.5 relative before:content-['•'] before:absolute before:left-0 before:text-steel">{line}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-slate mt-4 leading-relaxed max-w-lg">{lines[0] ?? ''}</p>
+        )
+      })()}
       {note && (
         <p className="text-sm text-blue/80 mt-3 leading-relaxed max-w-lg italic border-l-2 border-blue/30 pl-3">{note}</p>
       )}

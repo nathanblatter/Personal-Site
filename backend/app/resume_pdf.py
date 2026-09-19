@@ -97,7 +97,7 @@ def generate_resume_pdf(about, experience, skills, projects, coursework, variant
     else:
         summary_html = (
             '<b>Information Systems student (Full-Stack Software Engineering emphasis)</b>'
-            ' with experience in C#, Java, Python, SQL, and cloud platforms, complemented by a background in SCM, ERP, and '
+            ' with experience in Python, Go, C#, PHP, SQL, and cloud platforms, complemented by a background in SCM, ERP, and '
             'AI-driven systems. Proven ability to build full-stack analytics and intelligent applications, including a '
             'voice-enabled AI platform deployed for clinical research. Known for strong ownership, clean code practices, '
             'and delivering measurable technical impact in collaborative team environments.'
