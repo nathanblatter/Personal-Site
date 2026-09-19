@@ -3,9 +3,16 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: self-hosted
+    # A stalled docker step once hung for GitHub's 6h default (2026-09-19); a full
+    # build + rollout takes ~10 min, so anything past this is a wedge, not progress.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
 
@@ -21,7 +28,11 @@ jobs:
 
       - name: Deploy
         run: |
-          PROD=/Users/nathanblatter/Desktop/Personal-Site
+          # Secrets live OUTSIDE iCloud Drive. ~/Desktop is iCloud-synced and file
+          # opens from the launchd-spawned runner block forever / EDEADLK there
+          # (2026-08-29 "resource deadlock avoided", 2026-09-19 6h hang in
+          # compose's env_file open). Only .env.prod is resolved from here.
+          PROD=/Users/nathanblatter/deploy/Personal-Site
           COMPOSE=$GITHUB_WORKSPACE/backend/docker-compose.prod.yml
           COMPOSE_ARGS="--project-directory $PROD/backend -f $COMPOSE"
 

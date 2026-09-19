@@ -38,7 +38,7 @@ These are the conventions already established across the site. New features shou
 - **Org:** github.com/nathanblatter
 - **Runner:** Native macOS GitHub Actions runner on Mac Mini (launchd service at ~/actions-runner)
 - **Deploy trigger:** Push to `main` branch
-- **Deploy workflow:** `.github/workflows/deploy.yml` — checks out the pushed SHA into the runner workspace, builds frontend + Docker images from that clean checkout (never from this working tree), smoke-checks imports, then zero-downtime compose rollout + seed. `--project-directory` still points at `~/Desktop/Personal-Site/backend` only to resolve `.env.prod`.
+- **Deploy workflow:** `.github/workflows/deploy.yml` — checks out the pushed SHA into the runner workspace, builds frontend + Docker images from that clean checkout (never from this working tree), smoke-checks imports, then zero-downtime compose rollout + seed. `--project-directory` points at `~/deploy/Personal-Site/backend` only to resolve `.env.prod` — that copy lives **outside iCloud** on purpose (the runner is launchd-spawned and iCloud blocks its file opens: Aug 29 EDEADLK failure, Sep 19 six-hour hang). If you rotate a secret, update `~/deploy/Personal-Site/backend/.env.prod`; the `backend/.env.prod` in this checkout is for local use.
 - **Commit completeness matters:** the 2026-08-01 failed deploy was a partial commit (main.py imported `routers/privacy.py` which was never `git add`ed). The import smoke-check in deploy.yml now catches this before rollout — but always `git status` before pushing.
-- **Secrets:** `backend/.env.prod` file on host (gitignored)
+- **Secrets:** `~/deploy/Personal-Site/backend/.env.prod` on the Mac mini (prod, non-iCloud); `backend/.env.prod` here is a gitignored local copy
 - **Infrastructure:** Docker Compose (FastAPI backend), shared Postgres from docker-services, frontend served separately
