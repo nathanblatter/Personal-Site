@@ -118,12 +118,18 @@ def _build_ics(summary: str, start: datetime, duration_minutes: int,
 
 
 async def _send_mime(to: str, subject: str, text_body: str, html_body: str,
-                     ics_content: str | None = None) -> bool:
-    """Send a MIME email, optionally with .ics attachment."""
+                     ics_content: str | None = None, reply_to: str | None = None) -> bool:
+    """Send a MIME email, optionally with .ics attachment.
+
+    `reply_to` matters for owner notifications: the From is a no-mailbox
+    noreply@ address, so without it "Reply" in Nathan's inbox goes nowhere.
+    """
     msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
     msg["From"] = f"Nathan Blatter <{SMTP_FROM}>"
     msg["To"] = to
+    if reply_to:
+        msg["Reply-To"] = reply_to
 
     alt = MIMEMultipart("alternative")
     alt.attach(MIMEText(text_body, "plain"))
@@ -268,7 +274,7 @@ async def send_booking_request_email(booking, admin_tz: str = "America/Denver",
 </div>
 </div></body></html>"""
 
-    return await _send_mime(CONTACT_TO_EMAIL, subject, text_body, html_body)
+    return await _send_mime(CONTACT_TO_EMAIL, subject, text_body, html_body, reply_to=booking.visitor_email)
 
 
 async def send_booking_confirmed_email(booking, admin_tz: str = "America/Denver", cancel_token: str | None = None) -> bool:
@@ -321,7 +327,7 @@ async def send_booking_confirmed_email(booking, admin_tz: str = "America/Denver"
 </div></body></html>"""
 
     ok1 = await _send_mime(booking.visitor_email, subject, text_body, html_body, ics)
-    ok2 = await _send_mime(CONTACT_TO_EMAIL, subject, text_body, html_body, ics)
+    ok2 = await _send_mime(CONTACT_TO_EMAIL, subject, text_body, html_body, ics, reply_to=booking.visitor_email)
     return ok1 and ok2
 
 
@@ -394,7 +400,7 @@ async def send_booking_cancelled_email(booking, admin_tz: str = "America/Denver"
     ok1 = await _send_mime(booking.visitor_email, subject, text_body, html_body)
     if not cancelled_by_visitor:
         return ok1
-    ok2 = await _send_mime(CONTACT_TO_EMAIL, subject, text_body, html_body)
+    ok2 = await _send_mime(CONTACT_TO_EMAIL, subject, text_body, html_body, reply_to=booking.visitor_email)
     return ok1 and ok2
 
 
