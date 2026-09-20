@@ -322,8 +322,8 @@ function BookACall() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase">Name</label>
-                      <input
+                      <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase" htmlFor="contact-name-1">Name</label>
+                      <input id="contact-name-1" autoComplete="name"
                         type="text"
                         required
                         value={bookingForm.name}
@@ -333,8 +333,8 @@ function BookACall() {
                       />
                     </div>
                     <div>
-                      <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase">Email</label>
-                      <input
+                      <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase" htmlFor="contact-email-1">Email</label>
+                      <input id="contact-email-1" autoComplete="email"
                         type="email"
                         required
                         value={bookingForm.email}
@@ -346,8 +346,8 @@ function BookACall() {
                   </div>
 
                   <div>
-                    <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase">Topic</label>
-                    <textarea
+                    <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase" htmlFor="contact-topic-1">Topic</label>
+                    <textarea id="contact-topic-1"
                       required
                       minLength={5}
                       rows={3}
@@ -418,7 +418,7 @@ export default function Contact() {
   return (
     <section className="py-16 md:py-28 min-h-screen">
       <div className="max-w-[900px] w-full mx-auto px-6">
-        <SectionHeader
+        <SectionHeader level={1}
           code="// CONTACT"
           title={meta?.heading ?? 'Get in Touch'}
           subtitle={meta?.subheading ?? 'Have a project idea, opportunity, or just want to say hi?'}
@@ -507,8 +507,8 @@ export default function Contact() {
               <form onSubmit={handleSubmit} className="space-y-5">
                 <HoneypotField name="honeypot" value={formData.honeypot ?? ''} onChange={v => setFormData({ ...formData, honeypot: v })} />
                 <div>
-                  <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase">Name</label>
-                  <input
+                  <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase" htmlFor="contact-name-2">Name</label>
+                  <input id="contact-name-2" autoComplete="name"
                     type="text"
                     required
                     value={formData.name}
@@ -518,8 +518,8 @@ export default function Contact() {
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase">Email</label>
-                  <input
+                  <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase" htmlFor="contact-email-2">Email</label>
+                  <input id="contact-email-2" autoComplete="email"
                     type="email"
                     required
                     value={formData.email}
@@ -529,8 +529,8 @@ export default function Contact() {
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase">Message</label>
-                  <textarea
+                  <label className="block font-mono text-xs text-steel mb-2 tracking-wider uppercase" htmlFor="contact-message-1">Message</label>
+                  <textarea id="contact-message-1"
                     required
                     minLength={10}
                     rows={5}

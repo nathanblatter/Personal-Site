@@ -230,6 +230,23 @@ async def sitemap_xml(db: AsyncSession = Depends(get_db)):
     return Response(content=xml, media_type="application/xml")
 
 
+@router.get("/robots.txt", include_in_schema=False)
+async def robots_txt():
+    # Was falling through to the SPA shell (HTML) before this route existed.
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /admin\n"
+        "Disallow: /api/\n"
+        "Disallow: /quick-update/\n"
+        "Disallow: /invoice/\n"
+        "Disallow: /contract/\n"
+        "Disallow: /testimonial/\n"
+        f"Sitemap: {DOMAIN}/sitemap.xml\n"
+    )
+    return Response(content=body, media_type="text/plain", headers={"Cache-Control": "public, max-age=3600"})
+
+
 @router.get("/resume.pdf", include_in_schema=False)
 async def resume_pdf(variant: str = Query(""), db: AsyncSession = Depends(get_db)):
     from app.resume_pdf import generate_resume_pdf

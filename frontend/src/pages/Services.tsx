@@ -119,7 +119,7 @@ export default function Services() {
       {/* ═══ OFFERINGS ═══ */}
       <section className="py-16 md:py-24 bg-snow">
         <div className="max-w-[1100px] w-full mx-auto px-6">
-          <SectionHeader
+          <SectionHeader level={1}
             code="// 01"
             title="What I Do"
             subtitle="Where I can help — from a single feature to an end-to-end build."

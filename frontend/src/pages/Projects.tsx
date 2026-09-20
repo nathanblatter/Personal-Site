@@ -54,7 +54,7 @@ export default function Projects() {
   return (
     <section className="py-16 md:py-28 min-h-screen">
       <div className="max-w-[1100px] w-full mx-auto px-6">
-        <SectionHeader
+        <SectionHeader level={1}
           code="// PROJECTS"
           title="All Work"
           subtitle="A collection of research, professional, and personal projects."
@@ -66,7 +66,9 @@ export default function Projects() {
           transition={{ duration: 0.2 }}
           className="flex flex-wrap justify-center gap-2 md:gap-3 mb-10 md:mb-12"
         >
-          {categories.map((cat) => (
+          {categories.filter(cat => cat === 'All' || cat === filter || (cat === 'All'
+                  ? visibleProjects.length
+                  : visibleProjects.filter((p) => p.status === cat.toLowerCase()).length) > 0).map((cat) => (
             <button
               key={cat}
               onClick={() => setFilter(cat)}

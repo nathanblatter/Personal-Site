@@ -2,6 +2,8 @@ import asyncio
 import json as _json
 import logging
 import mimetypes
+mimetypes.add_type("image/webp", ".webp")
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 import os
 import re
 import time
@@ -14,7 +16,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse, Response
 from sqlalchemy import select
 
 from app.auth import assert_secure_secrets, require_auth
@@ -253,6 +255,16 @@ app.add_middleware(
 
 
 _req_log = logging.getLogger("request")
+
+
+@app.middleware("http")
+async def canonical_host(request: Request, call_next):
+    """www.nathanblatter.com served a full duplicate of the site (200, no redirect)."""
+    host = request.headers.get("host", "")
+    if host.startswith("www."):
+        url = request.url.replace(netloc=host[4:], scheme="https")
+        return RedirectResponse(url=str(url), status_code=301)
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -676,8 +688,23 @@ async def _preload_html(route: str, html: str) -> str:
     return _inject_before_head_end(html, _preload_script(payload))
 
 
-@app.get("/{full_path:path}", include_in_schema=False)
+# Client-side routes (mirror frontend/src/App.tsx). Anything else gets the same
+# shell (the SPA renders its 404 page) but with a real 404 status so crawlers
+# don't index junk URLs and monitoring sees misses (was a 200 "soft 404").
+_SPA_ROUTES = re.compile(
+    r"^(|about|projects|projects/[^/]+|now|uses|status|services|contact|resume|blog|blog/[^/]+"
+    r"|privacy|admin|admin/login|testimonial/[^/]+|linkinbio|invoice/[^/]+|quick-update/[^/]+|contract/[^/]+)$"
+)
+
+
+@app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
 async def serve_spa(full_path: str = "", request: Request = None):
+    # API misses must never fall through to the HTML shell.
+    if full_path.startswith("api/"):
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    # Canonical URLs: no trailing slash (except root).
+    if full_path.endswith("/") and full_path.strip("/"):
+        return RedirectResponse(url="/" + full_path.rstrip("/"), status_code=301)
     index_html = _read_index_html()
 
     if index_html is None:
@@ -697,7 +724,8 @@ async def serve_spa(full_path: str = "", request: Request = None):
         # Vite writes content-hashed filenames (e.g. index-DwP6FtY2.js).
         # These are safe to cache forever; the hash changes when content does.
         # CDN-Cache-Control tells Cloudflare to cache independently of browser cache.
-        if re.search(r'-[A-Za-z0-9]{8}\.(js|css)$', full_path):
+        # Vite hashes are 8 chars from [A-Za-z0-9_-] (e.g. index-BZC6Z3r-.js).
+        if re.search(r'-[A-Za-z0-9_-]{8}\.(js|css)$', full_path):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
             response.headers["CDN-Cache-Control"] = "public, max-age=31536000, immutable"
         elif full_path.endswith(('.webp', '.png', '.jpg', '.svg', '.ico', '.gif', '.woff2', '.woff')):
@@ -733,4 +761,5 @@ async def serve_spa(full_path: str = "", request: Request = None):
     # cached as a static document (mirrors _SKIP_CACHE for the API endpoints).
     html = await _preload_html(route, html)
     headers = {"Cache-Control": "no-cache"} if _PRELOAD_TAG_ID in html else None
-    return HTMLResponse(html, headers=headers)
+    status = 200 if _SPA_ROUTES.match(route) else 404
+    return HTMLResponse(html, headers=headers, status_code=status)

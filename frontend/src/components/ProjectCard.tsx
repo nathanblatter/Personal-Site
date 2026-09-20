@@ -40,8 +40,15 @@ export default function ProjectCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '0px' }}
       transition={{ duration: 0.3, delay: Math.min(index, 3) * 0.05 }}
-      className="group relative cursor-pointer"
+      className="group relative cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-blue focus-visible:outline-offset-4"
       onClick={() => onSelect?.(project)}
+      role={onSelect ? 'button' : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      aria-label={onSelect ? `Open ${project.title}` : undefined}
+      onKeyDown={(e) => {
+        if (!onSelect) return
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(project) }
+      }}
     >
       <div className={`relative overflow-hidden rounded-xl border bg-white hover:border-blue/30 transition-all duration-500 hover:shadow-lg hover:shadow-blue/5 ${highlighted ? 'border-blue/40 ring-2 ring-blue/20' : 'border-mist'}`}>
         {/* Colored accent bar */}
@@ -92,7 +99,8 @@ export default function ProjectCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-2 mt-6 font-mono text-xs text-blue hover:text-blue-dim transition-colors"
+              aria-label={`View ${project.title} live`}
+              className="inline-flex items-center gap-2 mt-6 py-1 min-h-6 font-mono text-xs text-blue hover:text-blue-dim transition-colors"
             >
               View Live
               <ArrowUpRight size={12} />

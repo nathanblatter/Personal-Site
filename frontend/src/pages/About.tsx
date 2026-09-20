@@ -76,7 +76,7 @@ export default function About() {
       {/* Bio section */}
       <section className="py-16 md:py-28">
         <div className="max-w-[900px] w-full mx-auto px-6">
-          <SectionHeader code="// ABOUT" title="About Me" />
+          <SectionHeader level={1} code="// ABOUT" title="About Me" />
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-10 md:gap-16">
             <motion.div
@@ -375,6 +375,8 @@ export default function About() {
                             <img
                               src={cert.image_url}
                               alt={cert.name}
+                              width={80}
+                              height={80}
                               loading="lazy"
                               decoding="async"
                               className="w-20 h-20 object-contain shrink-0 bg-[#ffffff] rounded-lg p-2 border border-mist"

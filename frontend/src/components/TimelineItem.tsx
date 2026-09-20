@@ -43,7 +43,7 @@ export default function TimelineItem({ year, title, subtitle, description, index
           <GraduationCap size={11} /> Education
         </span>
       )}
-      <h4 className={`text-xl font-sans font-semibold mt-2 ${highlighted ? 'text-blue' : 'text-ink'}`}>{title}</h4>
+      <h3 className={`text-xl font-sans font-semibold mt-2 ${highlighted ? 'text-blue' : 'text-ink'}`}>{title}</h3>
       <p className="text-sm text-steel mt-1">{subtitle}</p>
       {(() => {
         const lines = description.split('\n').map(l => l.replace(/^[•-]\s*/, '').trim()).filter(Boolean)

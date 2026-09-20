@@ -305,7 +305,8 @@ export default function BlogPost() {
           components={{
             h1: ({ children, node }) => {
               const id = headingId(node)
-              return <h1 id={id} className="text-2xl font-sans font-bold text-ink mt-10 mb-4 leading-snug">{children}</h1>
+              // The post title above the article is the page's only h1; demote in-body H1s.
+              return <h2 id={id} className="text-2xl font-sans font-bold text-ink mt-10 mb-4 leading-snug">{children}</h2>
             },
             h2: ({ children, node }) => {
               const id = headingId(node)
