@@ -114,10 +114,10 @@ export default function ProjectModal({ project, onClose }: Props) {
                     </span>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="font-mono text-xs text-silver">{project.year}</span>
+                    <span className="font-mono text-xs text-steel">{project.year}</span>
                     <button
                       onClick={onClose}
-                      className="text-silver hover:text-ink transition-colors"
+                      className="text-steel hover:text-ink transition-colors"
                       aria-label="Close"
                     >
                       <X size={18} />

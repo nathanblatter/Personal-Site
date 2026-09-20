@@ -294,7 +294,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: group.color }} />
               <span className="font-mono text-[11px] text-steel tracking-wider uppercase">{group.label}</span>
               <div className="flex-1 h-px bg-mist" />
-              <span className="font-mono text-[11px] text-silver">{group.apps.length}</span>
+              <span className="font-mono text-[11px] text-steel">{group.apps.length}</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
               {group.apps.map(app => (
@@ -315,7 +315,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
                   <p className="text-xs text-steel truncate">{app.job_title}</p>
                   <div className="flex items-center gap-3 mt-2">
                     {app.location_city && (
-                      <span className="text-[10px] text-silver flex items-center gap-1"><MapPin size={9} />{app.location_city}</span>
+                      <span className="text-[10px] text-steel flex items-center gap-1"><MapPin size={9} />{app.location_city}</span>
                     )}
                     {app.next_action_due && (
                       <span className="text-[10px] text-ember font-mono flex items-center gap-1"><Clock size={9} />{app.next_action_due}</span>
@@ -337,7 +337,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
         ))}
         {stageApps.length === 0 && (
           <div className="text-center py-16">
-            <Target size={32} className="mx-auto text-silver mb-3" />
+            <Target size={32} className="mx-auto text-steel mb-3" />
             <p className="text-steel text-sm">No applications yet</p>
           </div>
         )}
@@ -377,7 +377,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
               <span className="font-mono text-[11px] text-steel">{app.applied_on ?? '—'}</span>
               <button
                 onClick={e => { e.stopPropagation(); deleteApplication(app.id) }}
-                className="p-1.5 text-silver hover:text-ember transition-colors"
+                className="p-1.5 text-steel hover:text-ember transition-colors"
                 aria-label="Delete"
               >
                 <Trash2 size={13} />
@@ -475,7 +475,7 @@ export default function InternshipsSection({ showToast, showError }: AdminCallba
       })}
       {intApps.length === 0 && (
         <div className="text-center py-16">
-          <Target size={32} className="mx-auto text-silver mb-3" />
+          <Target size={32} className="mx-auto text-steel mb-3" />
           <p className="text-steel text-sm">No applications yet. Add your first one!</p>
         </div>
       )}

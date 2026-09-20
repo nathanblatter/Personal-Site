@@ -81,7 +81,7 @@ export default function ExperienceSection({ showToast, showError, experience, se
               className="flex items-center gap-4 p-5 cursor-pointer hover:bg-cloud/50 transition-colors"
               onClick={() => setEditingExp(editingExp === exp.id ? null : exp.id)}
             >
-              <GripVertical size={14} className="text-silver" />
+              <GripVertical size={14} className="text-steel" />
               <div className={`w-3 h-3 rounded-full border-2 ${exp.active ? 'bg-blue border-blue' : 'bg-white border-silver'}`} />
               {exp.kind === 'education'
                 ? <GraduationCap size={14} className="text-violet shrink-0" aria-label="Education" />
@@ -95,7 +95,7 @@ export default function ExperienceSection({ showToast, showError, experience, se
                 </div>
                 <p className="text-xs text-steel mt-0.5">{exp.subtitle}</p>
               </div>
-              <span className="font-mono text-xs text-silver shrink-0">{exp.year}</span>
+              <span className="font-mono text-xs text-steel shrink-0">{exp.year}</span>
               <div className="flex items-center gap-1.5 shrink-0">
                 <button onClick={e => { e.stopPropagation(); setEditingExp(editingExp === exp.id ? null : exp.id) }} className="p-1.5 text-steel hover:text-blue transition-colors" aria-label={`Edit ${exp.title}`}>
                   <Pencil size={13} />
@@ -156,7 +156,7 @@ export default function ExperienceSection({ showToast, showError, experience, se
                         >
                           <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${exp.on_resume !== false ? 'left-6' : 'left-1'}`} />
                         </button>
-                        <span className="text-[11px] text-silver">off = timeline only (About / Home)</span>
+                        <span className="text-[11px] text-steel">off = timeline only (About / Home)</span>
                       </div>
                     </div>
                     <div className="flex justify-end pt-2">

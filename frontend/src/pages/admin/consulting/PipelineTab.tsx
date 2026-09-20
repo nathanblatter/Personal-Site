@@ -85,7 +85,7 @@ export default function PipelineTab({ shared }: { shared: CrmShared }) {
                           <div className="text-sm font-medium text-ink truncate">{d.title}</div>
                           <div className="text-xs text-steel truncate">{d.contact_name}</div>
                         </div>
-                        <button onClick={() => remove(d.id)} className="text-silver hover:text-ember opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <button onClick={() => remove(d.id)} className="text-steel hover:text-ember opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                           <Trash2 size={13} />
                         </button>
                       </div>
@@ -103,7 +103,7 @@ export default function PipelineTab({ shared }: { shared: CrmShared }) {
                     </div>
                   )
                 })}
-                {inStage.length === 0 && <div className="text-center text-xs text-silver py-3">—</div>}
+                {inStage.length === 0 && <div className="text-center text-xs text-steel py-3">—</div>}
               </div>
             </div>
           )

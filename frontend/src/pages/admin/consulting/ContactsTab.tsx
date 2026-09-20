@@ -60,7 +60,7 @@ export default function ContactsTab({ shared }: { shared: CrmShared }) {
       <div className="flex-1 min-w-0 space-y-4">
         <div className="flex gap-2">
           <div className="flex-1 relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-silver" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-steel" />
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search contacts…"
               className="w-full pl-9 pr-3 py-2.5 bg-white border border-mist rounded-lg text-sm focus:outline-none focus:border-blue/50 focus:ring-2 focus:ring-blue/10" />
           </div>
@@ -90,10 +90,10 @@ export default function ContactsTab({ shared }: { shared: CrmShared }) {
                 <div className="text-sm font-medium text-ink truncate">{c.name}</div>
                 <div className="text-xs text-steel truncate">{c.email || c.company_name || '—'}</div>
               </div>
-              {c.source && <span className="font-mono text-[9px] text-silver uppercase shrink-0">{c.source.replace('_', ' ')}</span>}
+              {c.source && <span className="font-mono text-[9px] text-steel uppercase shrink-0">{c.source.replace('_', ' ')}</span>}
             </button>
           ))}
-          {filtered.length === 0 && <div className="text-center text-sm text-silver py-8">No contacts</div>}
+          {filtered.length === 0 && <div className="text-center text-sm text-steel py-8">No contacts</div>}
         </div>
       </div>
 
@@ -104,7 +104,7 @@ export default function ContactsTab({ shared }: { shared: CrmShared }) {
               <h3 className="text-lg font-semibold text-ink">{selected.name}</h3>
               {selected.title && <div className="text-xs text-steel">{selected.title}</div>}
             </div>
-            <button onClick={() => setSelected(null)} className="text-silver hover:text-ink"><X size={16} /></button>
+            <button onClick={() => setSelected(null)} className="text-steel hover:text-ink"><X size={16} /></button>
           </div>
 
           <div className="space-y-1.5 mb-4 text-sm">
@@ -142,14 +142,14 @@ export default function ContactsTab({ shared }: { shared: CrmShared }) {
           <div className="space-y-2 max-h-[280px] overflow-y-auto">
             {selected.activities.map(a => (
               <div key={a.id} className="flex gap-2 text-xs">
-                <MessageSquare size={12} className="text-silver shrink-0 mt-0.5" />
+                <MessageSquare size={12} className="text-steel shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <div className="text-ink break-words">{a.body_md || a.type}</div>
-                  <div className="text-silver font-mono text-[10px]">{a.type} · {fmtDate(a.occurred_at)}</div>
+                  <div className="text-steel font-mono text-[10px]">{a.type} · {fmtDate(a.occurred_at)}</div>
                 </div>
               </div>
             ))}
-            {selected.activities.length === 0 && <div className="text-xs text-silver">No activity yet</div>}
+            {selected.activities.length === 0 && <div className="text-xs text-steel">No activity yet</div>}
           </div>
 
           <button onClick={() => remove(selected.id)} className="mt-4 inline-flex items-center gap-1.5 text-xs text-steel hover:text-ember">

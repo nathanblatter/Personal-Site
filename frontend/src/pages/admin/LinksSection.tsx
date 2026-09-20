@@ -98,7 +98,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                   placeholder="Label"
                 />
                 <div className="flex items-center gap-1 ml-0">
-                  <span className="font-mono text-[10px] text-silver">/go/</span>
+                  <span className="font-mono text-[10px] text-steel">/go/</span>
                   <input
                     value={link.slug}
                     onChange={e => setTrackedLinks(prev => prev.map(l => l.id === link.id ? { ...l, slug: e.target.value } : l))}
@@ -107,7 +107,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                   />
                   <button
                     onClick={() => { navigator.clipboard.writeText(`https://nathanblatter.com/go/${link.slug}`); showToast('Copied') }}
-                    className="p-1 text-silver hover:text-blue transition-colors"
+                    className="p-1 text-steel hover:text-blue transition-colors"
                     aria-label="Copy link"
                   >
                     <Copy size={10} />
@@ -186,7 +186,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                           <div key={p.project_id} className="flex items-center justify-between py-2 border-b border-mist/50 last:border-0">
                             <div>
                               <span className="text-sm text-ink">{p.title}</span>
-                              <span className="ml-2 font-mono text-[10px] text-silver">{p.year}</span>
+                              <span className="ml-2 font-mono text-[10px] text-steel">{p.year}</span>
                             </div>
                             <VisibilityToggle
                               value={link.portfolio_ctx?.projects?.[p.project_id]?.visibility ?? 'show'}
@@ -204,7 +204,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                           <div key={s.id} className="flex items-center justify-between py-2 border-b border-mist/50 last:border-0">
                             <div>
                               <span className="text-sm text-ink">{s.name}</span>
-                              <span className="ml-2 font-mono text-[10px] text-silver">{s.category}</span>
+                              <span className="ml-2 font-mono text-[10px] text-steel">{s.category}</span>
                             </div>
                             <VisibilityToggle
                               value={link.portfolio_ctx?.skills?.[String(s.id)]?.visibility ?? 'show'}
@@ -327,7 +327,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                                 className="font-mono text-[11px] text-steel hover:text-blue transition-colors">+ Add item</button>
                             </div>
                           ) : (
-                            <p className="font-mono text-[11px] text-silver">Using default values</p>
+                            <p className="font-mono text-[11px] text-steel">Using default values</p>
                           )}
                         </div>
 
@@ -365,7 +365,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                                 className="font-mono text-[11px] text-steel hover:text-blue transition-colors">+ Add field</button>
                             </div>
                           ) : (
-                            <p className="font-mono text-[11px] text-silver">Using default values</p>
+                            <p className="font-mono text-[11px] text-steel">Using default values</p>
                           )}
                         </div>
                       </div>
@@ -393,7 +393,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                           <div key={t.id} className="flex items-center justify-between py-2 border-b border-mist/50 last:border-0">
                             <div>
                               <span className="text-sm text-ink">{t.name}</span>
-                              <span className="ml-2 font-mono text-[10px] text-silver">{t.role}</span>
+                              <span className="ml-2 font-mono text-[10px] text-steel">{t.role}</span>
                             </div>
                             <VisibilityToggle
                               value={link.portfolio_ctx?.testimonials?.[String(t.id)]?.visibility ?? 'show'}
@@ -409,7 +409,7 @@ export default function LinksSection({ showToast, showError, projects, skills, e
                         className="font-mono text-[11px] text-steel hover:text-ember transition-colors">
                         Clear all customization
                       </button>
-                      <span className="font-mono text-[10px] text-silver">Save using the row save button →</span>
+                      <span className="font-mono text-[10px] text-steel">Save using the row save button →</span>
                     </div>
                   </div>
                 </div>

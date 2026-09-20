@@ -106,7 +106,7 @@ export default function InvoicesTab({ shared }: { shared: CrmShared }) {
                   <DollarSign size={12} /> Record payment
                 </button>
               )}
-              <button onClick={() => remove(inv.id)} className="ml-auto text-silver hover:text-ember"><Trash2 size={13} /></button>
+              <button onClick={() => remove(inv.id)} className="ml-auto text-steel hover:text-ember"><Trash2 size={13} /></button>
             </div>
 
             {payFor === inv.id && (
@@ -120,7 +120,7 @@ export default function InvoicesTab({ shared }: { shared: CrmShared }) {
           </div>
         )
       })}
-      {invoices.length === 0 && <div className="text-center text-sm text-silver py-10">No invoices yet. Generate one from an engagement.</div>}
+      {invoices.length === 0 && <div className="text-center text-sm text-steel py-10">No invoices yet. Generate one from an engagement.</div>}
     </div>
   )
 }

@@ -103,7 +103,7 @@ export default function LiveStatus() {
           </div>
         </div>
         {devStatus && (
-          <span className="font-mono text-[10px] text-silver shrink-0 mt-0.5">
+          <span className="font-mono text-[10px] text-steel shrink-0 mt-0.5">
             {devStatus.stale ? 'no recent ping' : 'updated just now'}
           </span>
         )}

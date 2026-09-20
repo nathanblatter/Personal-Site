@@ -63,7 +63,7 @@ export default function ProjectCard({
                 {project.status}
               </span>
             </div>
-            <span className="font-mono text-xs text-silver">{project.year}</span>
+            <span className="font-mono text-xs text-steel">{project.year}</span>
           </div>
 
           {/* Title */}

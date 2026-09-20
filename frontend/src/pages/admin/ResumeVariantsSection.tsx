@@ -154,7 +154,7 @@ export default function ResumeVariantsSection({ showToast, showError }: AdminCal
                 </a>
                 <button
                   onClick={() => patch(v.id, 'is_default', !v.is_default)}
-                  className={`p-1.5 transition-colors ${v.is_default ? 'text-violet' : 'text-silver hover:text-violet'}`}
+                  className={`p-1.5 transition-colors ${v.is_default ? 'text-violet' : 'text-steel hover:text-violet'}`}
                   title={v.is_default ? 'Default variant' : 'Make default'}
                 >
                   <Star size={14} fill={v.is_default ? 'currentColor' : 'none'} />
@@ -162,7 +162,7 @@ export default function ResumeVariantsSection({ showToast, showError }: AdminCal
                 <button onClick={() => save(v)} className="p-1.5 text-steel hover:text-blue transition-colors" title="Save">
                   <Save size={14} />
                 </button>
-                <button onClick={() => remove(v.id)} className="p-1.5 text-silver hover:text-ember transition-colors" title="Delete">
+                <button onClick={() => remove(v.id)} className="p-1.5 text-steel hover:text-ember transition-colors" title="Delete">
                   <Trash2 size={14} />
                 </button>
               </div>

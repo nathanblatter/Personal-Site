@@ -184,6 +184,8 @@ def _build_sections() -> list[dict]:
     third_parties = [
         {"name": "Google Fonts", "url": "https://policies.google.com/privacy",
          "note": "This site loads fonts from Google's CDN. When your browser fetches these fonts, Google may log your IP address."},
+        {"name": "ip-api.com", "url": "https://ip-api.com/docs/legal",
+         "note": "The automatic light/dark theme follows local sunrise and sunset. To pick a time zone, the server sends your IP address to ip-api.com once and caches only the resulting mode for a short time; your IP is not stored, and choosing a theme manually skips this entirely."},
         {"name": "Cloudflare", "url": "https://www.cloudflare.com/privacypolicy/",
          "note": "This site is served through Cloudflare's network, which may process request metadata (IP address, headers) for security and performance."},
     ]

@@ -404,7 +404,7 @@ export default function About() {
                     <div className="flex items-center gap-3 mb-4">
                       <h3 className="font-mono text-[11px] text-steel tracking-wider uppercase shrink-0">{group.category}</h3>
                       <div className="flex-1 h-px bg-mist" />
-                      <span className="font-mono text-[11px] text-silver shrink-0">{group.items.length}</span>
+                      <span className="font-mono text-[11px] text-steel shrink-0">{group.items.length}</span>
                     </div>
                     <div className="flex flex-wrap gap-3">
                       {group.items.map((cert, i) => {
@@ -437,7 +437,7 @@ export default function About() {
                               <p className="font-mono text-[10px] text-steel truncate">{cert.issuer}</p>
                             </div>
                             {href && (
-                              <ExternalLink size={11} className="text-silver group-hover:text-blue shrink-0 transition-colors" />
+                              <ExternalLink size={11} className="text-steel group-hover:text-blue shrink-0 transition-colors" />
                             )}
                           </motion.a>
                         )

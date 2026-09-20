@@ -98,11 +98,11 @@ export default function PhotosSection({ showToast, showError }: AdminCallbacks) 
           {photos.map(photo => (
             <SectionCard key={photo.id} {...drag.dropTargetProps(photo.id)} className={`!p-0 overflow-hidden ${drag.overId === photo.id ? 'ring-2 ring-blue/30' : ''}`}>
               <div className="flex items-center gap-3 px-4 py-3">
-                <span {...drag.dragHandleProps(photo.id)} className="cursor-grab text-silver hover:text-steel shrink-0" title="Drag to reorder"><GripVertical size={14} /></span>
+                <span {...drag.dragHandleProps(photo.id)} className="cursor-grab text-steel hover:text-steel shrink-0" title="Drag to reorder"><GripVertical size={14} /></span>
                 <div className="w-14 h-14 rounded-lg bg-cloud border border-mist overflow-hidden flex items-center justify-center shrink-0">
                   {photo.image_url
                     ? <img src={photo.image_url} alt={photo.caption || 'Photo'} loading="lazy" decoding="async" className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
-                    : <ImageIcon size={18} className="text-silver" />}
+                    : <ImageIcon size={18} className="text-steel" />}
                 </div>
                 <input
                   value={photo.caption ?? ''}
@@ -125,7 +125,7 @@ export default function PhotosSection({ showToast, showError }: AdminCallbacks) 
                 >
                   <Save size={13} />
                 </button>
-                <button onClick={() => deletePhoto(photo.id)} className="p-1.5 text-silver hover:text-ember transition-colors shrink-0" title="Delete">
+                <button onClick={() => deletePhoto(photo.id)} className="p-1.5 text-steel hover:text-ember transition-colors shrink-0" title="Delete">
                   <Trash2 size={13} />
                 </button>
               </div>

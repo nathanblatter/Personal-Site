@@ -19,7 +19,7 @@ const STATUS: Record<string, { label: string; dot: string; text: string }> = {
   partial: { label: 'Partially paid', dot: 'bg-violet', text: 'text-violet' },
   overdue: { label: 'Overdue', dot: 'bg-ember', text: 'text-ember' },
   draft: { label: 'Draft', dot: 'bg-silver', text: 'text-steel' },
-  void: { label: 'Void', dot: 'bg-silver', text: 'text-silver' },
+  void: { label: 'Void', dot: 'bg-silver', text: 'text-steel' },
 }
 
 export default function InvoiceView() {

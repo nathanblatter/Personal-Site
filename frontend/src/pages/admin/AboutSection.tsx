@@ -192,7 +192,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                 <button onClick={() => saveInterest(item)} className="p-1.5 text-steel hover:text-blue transition-colors" aria-label="Save">
                   <Save size={13} />
                 </button>
-                <button onClick={() => deleteInterest(item.id)} className="p-1.5 text-silver hover:text-ember transition-colors" aria-label="Delete">
+                <button onClick={() => deleteInterest(item.id)} className="p-1.5 text-steel hover:text-ember transition-colors" aria-label="Delete">
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -247,7 +247,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
               />
               <button
                 onClick={() => setAbout(prev => prev ? { ...prev, looking_for: prev.looking_for.filter((_, j) => j !== i) } : prev)}
-                className="p-1.5 text-silver hover:text-ember transition-colors mt-1"
+                className="p-1.5 text-steel hover:text-ember transition-colors mt-1"
                 aria-label="Delete"
               >
                 <Trash2 size={13} />
@@ -330,7 +330,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                       showToast('Deleted')
                     } catch (err) { showError((err as Error).message) }
                   }}
-                  className="p-1.5 text-silver hover:text-ember transition-colors"
+                  className="p-1.5 text-steel hover:text-ember transition-colors"
                   aria-label="Delete"
                 >
                   <Trash2 size={13} />
@@ -368,7 +368,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                 <div className="w-16 h-16 rounded-lg bg-[#ffffff] border border-mist overflow-hidden flex items-center justify-center">
                   {cert.image_url
                     ? <img src={cert.image_url} alt={cert.name} className="w-full h-full object-contain p-1.5" />
-                    : <Award size={20} className="text-silver" />}
+                    : <Award size={20} className="text-steel" />}
                 </div>
                 <FileUploadButton
                   prefix="certs"
@@ -420,7 +420,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
               <div className="flex flex-col items-center gap-1 shrink-0">
                 <button
                   onClick={() => setCerts(prev => prev.map(c => c.id === cert.id ? { ...c, featured: !c.featured } : c))}
-                  className={`p-1.5 transition-colors ${cert.featured ? 'text-violet' : 'text-silver hover:text-violet'}`}
+                  className={`p-1.5 transition-colors ${cert.featured ? 'text-violet' : 'text-steel hover:text-violet'}`}
                   title={cert.featured ? 'Featured — click to unfeature' : 'Feature this cert'}
                 >
                   <Star size={13} fill={cert.featured ? 'currentColor' : 'none'} />
@@ -428,7 +428,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                 <button onClick={() => saveCert(cert)} className="p-1.5 text-steel hover:text-blue transition-colors" title="Save">
                   <Save size={13} />
                 </button>
-                <button onClick={() => deleteCert(cert.id)} className="p-1.5 text-silver hover:text-ember transition-colors" title="Delete">
+                <button onClick={() => deleteCert(cert.id)} className="p-1.5 text-steel hover:text-ember transition-colors" title="Delete">
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -474,17 +474,17 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
             <p className="font-mono text-xs text-blue uppercase tracking-wider">New testimonial request</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block font-mono text-[10px] text-silver uppercase tracking-wider mb-1">Slug (URL)</label>
+                <label className="block font-mono text-[10px] text-steel uppercase tracking-wider mb-1">Slug (URL)</label>
                 <input
                   value={newReqForm.slug}
                   onChange={e => setNewReqForm(f => ({ ...f, slug: e.target.value }))}
                   placeholder="jamesgaskin"
                   className="w-full text-sm text-ink font-mono bg-white border border-mist rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue/20"
                 />
-                <p className="text-[10px] text-silver font-mono mt-1">→ /go/{newReqForm.slug || 'slug'}</p>
+                <p className="text-[10px] text-steel font-mono mt-1">→ /go/{newReqForm.slug || 'slug'}</p>
               </div>
               <div>
-                <label className="block font-mono text-[10px] text-silver uppercase tracking-wider mb-1">Full name</label>
+                <label className="block font-mono text-[10px] text-steel uppercase tracking-wider mb-1">Full name</label>
                 <input
                   value={newReqForm.requester_name}
                   onChange={e => setNewReqForm(f => ({ ...f, requester_name: e.target.value }))}
@@ -493,7 +493,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                 />
               </div>
               <div>
-                <label className="block font-mono text-[10px] text-silver uppercase tracking-wider mb-1">Email (optional)</label>
+                <label className="block font-mono text-[10px] text-steel uppercase tracking-wider mb-1">Email (optional)</label>
                 <input
                   value={newReqForm.requester_email}
                   onChange={e => setNewReqForm(f => ({ ...f, requester_email: e.target.value }))}
@@ -503,7 +503,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                 />
               </div>
               <div>
-                <label className="block font-mono text-[10px] text-silver uppercase tracking-wider mb-1">Their role (optional)</label>
+                <label className="block font-mono text-[10px] text-steel uppercase tracking-wider mb-1">Their role (optional)</label>
                 <input
                   value={newReqForm.requester_role}
                   onChange={e => setNewReqForm(f => ({ ...f, requester_role: e.target.value }))}
@@ -513,7 +513,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
               </div>
             </div>
             <div>
-              <label className="block font-mono text-[10px] text-silver uppercase tracking-wider mb-1">Personal message (optional)</label>
+              <label className="block font-mono text-[10px] text-steel uppercase tracking-wider mb-1">Personal message (optional)</label>
               <textarea
                 value={newReqForm.personal_message}
                 onChange={e => setNewReqForm(f => ({ ...f, personal_message: e.target.value }))}
@@ -558,7 +558,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
         <div className="space-y-2">
           {testimonialReqs.map(req => {
             const statusColors: Record<string, string> = {
-              pending: 'bg-silver/10 text-silver',
+              pending: 'bg-silver/10 text-steel',
               sent: 'bg-blue-wash text-blue',
               submitted: 'bg-amber-50 text-amber-600 border border-amber-200',
               approved: 'bg-emerald-50 text-emerald-600 border border-emerald-200',
@@ -577,7 +577,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                         {req.status}
                       </span>
                     </div>
-                    <p className="text-xs text-silver font-mono mt-0.5">/go/{req.slug}</p>
+                    <p className="text-xs text-steel font-mono mt-0.5">/go/{req.slug}</p>
                   </div>
 
                   {/* Actions */}
@@ -586,7 +586,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                     <button
                       title="Copy link"
                       onClick={() => { navigator.clipboard.writeText(`https://nathanblatter.com/go/${req.slug}`); showToast('Link copied') }}
-                      className="p-1.5 text-silver hover:text-blue transition-colors"
+                      className="p-1.5 text-steel hover:text-blue transition-colors"
                     >
                       <Copy size={13} />
                     </button>
@@ -602,7 +602,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                             showToast('Email sent')
                           } catch (err) { showError((err as Error).message) }
                         }}
-                        className="p-1.5 text-silver hover:text-blue transition-colors"
+                        className="p-1.5 text-steel hover:text-blue transition-colors"
                       >
                         <ExternalLink size={13} />
                       </button>
@@ -613,7 +613,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                       <button
                         title="View submission"
                         onClick={() => setExpandedReq(isExpanded ? null : req.id)}
-                        className="p-1.5 text-silver hover:text-blue transition-colors"
+                        className="p-1.5 text-steel hover:text-blue transition-colors"
                       >
                         <Eye size={13} />
                       </button>
@@ -630,7 +630,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                             showToast('Approved — testimonial created')
                           } catch (err) { showError((err as Error).message) }
                         }}
-                        className="p-1.5 text-silver hover:text-emerald-600 transition-colors"
+                        className="p-1.5 text-steel hover:text-emerald-600 transition-colors"
                       >
                         <Check size={13} />
                       </button>
@@ -647,7 +647,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                             showToast('Rejected')
                           } catch (err) { showError((err as Error).message) }
                         }}
-                        className="p-1.5 text-silver hover:text-ember transition-colors"
+                        className="p-1.5 text-steel hover:text-ember transition-colors"
                       >
                         <X size={13} />
                       </button>
@@ -663,7 +663,7 @@ export default function AboutSection({ showToast, showError, about, setAbout, in
                           showToast('Deleted')
                         } catch (err) { showError((err as Error).message) }
                       }}
-                      className="p-1.5 text-silver hover:text-ember transition-colors"
+                      className="p-1.5 text-steel hover:text-ember transition-colors"
                     >
                       <Trash2 size={13} />
                     </button>

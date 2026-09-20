@@ -91,7 +91,7 @@ export default function SkillsSection({ showToast, showError, skills, setSkills 
             {...dropTargetProps(skill.id)}
             className={`grid grid-cols-[auto_1fr_auto_auto_auto] gap-0 items-center px-6 py-3.5 border-b border-mist last:border-b-0 hover:bg-cloud/30 transition-colors ${overId === skill.id ? 'bg-blue-wash/60' : ''}`}
           >
-            <span {...dragHandleProps(skill.id)} className="w-6 -ml-1 cursor-grab active:cursor-grabbing text-silver hover:text-steel" title="Drag to reorder">
+            <span {...dragHandleProps(skill.id)} className="w-6 -ml-1 cursor-grab active:cursor-grabbing text-steel hover:text-steel" title="Drag to reorder">
               <GripVertical size={14} />
             </span>
             <input
@@ -122,7 +122,7 @@ export default function SkillsSection({ showToast, showError, skills, setSkills 
               <span className="font-mono text-xs text-steel w-8 text-right">{skill.level}%</span>
             </div>
             <div className="w-16 flex justify-end">
-              <button onClick={() => deleteSkill(skill.id)} className="p-1.5 text-silver hover:text-ember transition-colors" aria-label="Delete">
+              <button onClick={() => deleteSkill(skill.id)} className="p-1.5 text-steel hover:text-ember transition-colors" aria-label="Delete">
                 <Trash2 size={13} />
               </button>
             </div>

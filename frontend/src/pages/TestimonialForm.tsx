@@ -182,12 +182,12 @@ export default function TestimonialForm() {
                   placeholder="Share what it was like working with Nathan, what stood out, or what you'd tell someone considering working with him…"
                   className="w-full px-3 py-2.5 text-sm text-ink bg-snow border border-mist rounded-lg focus:outline-none focus:ring-2 focus:ring-blue/20 focus:border-blue/40 transition-all resize-none"
                 />
-                <p className="mt-1 text-xs text-silver font-mono">{quote.length} characters</p>
+                <p className="mt-1 text-xs text-steel font-mono">{quote.length} characters</p>
               </div>
 
               <div>
                 <label className="block font-mono text-xs text-steel uppercase tracking-wider mb-1.5">
-                  Photo URL <span className="text-silver">(optional)</span>
+                  Photo URL <span className="text-steel">(optional)</span>
                 </label>
                 <input
                   value={avatarUrl}
@@ -195,7 +195,7 @@ export default function TestimonialForm() {
                   placeholder="https://linkedin.com/in/… or leave blank"
                   className="w-full px-3 py-2.5 text-sm text-ink bg-snow border border-mist rounded-lg focus:outline-none focus:ring-2 focus:ring-blue/20 focus:border-blue/40 transition-all font-mono text-xs"
                 />
-                <p className="mt-1 text-xs text-silver font-mono">A headshot or LinkedIn photo URL — or just leave it blank.</p>
+                <p className="mt-1 text-xs text-steel font-mono">A headshot or LinkedIn photo URL — or just leave it blank.</p>
               </div>
 
               {error && (
@@ -219,7 +219,7 @@ export default function TestimonialForm() {
                 )}
               </button>
 
-              <p className="text-center text-xs text-silver font-mono">
+              <p className="text-center text-xs text-steel font-mono">
                 Your testimonial will be reviewed before appearing on the site.
               </p>
             </form>

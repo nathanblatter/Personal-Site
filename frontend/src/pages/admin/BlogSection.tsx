@@ -128,7 +128,7 @@ export default function BlogSection({ showToast, showError, blogs, setBlogs }: B
               <FileText size={15} className="text-steel shrink-0" />
               <div className="flex-1 min-w-0">
                 <span className="text-sm font-medium text-ink block truncate">{post.title}</span>
-                <p className="text-xs text-silver font-mono mt-0.5 truncate">/{post.slug}</p>
+                <p className="text-xs text-steel font-mono mt-0.5 truncate">/{post.slug}</p>
               </div>
               <span className={`inline-flex items-center gap-1.5 font-mono text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 ${
                 post.published ? 'bg-teal/10 text-teal' : 'bg-silver/20 text-steel'
@@ -136,7 +136,7 @@ export default function BlogSection({ showToast, showError, blogs, setBlogs }: B
                 {post.published ? <><Globe size={10} /> Published</> : <><EyeOff size={10} /> Draft</>}
               </span>
               {post.published_at && (
-                <span className="font-mono text-[11px] text-silver shrink-0 hidden md:block">
+                <span className="font-mono text-[11px] text-steel shrink-0 hidden md:block">
                   {new Date(post.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
               )}

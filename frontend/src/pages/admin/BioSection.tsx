@@ -221,7 +221,7 @@ export default function BioSection({ showToast, showError }: AdminCallbacks) {
                 <div className="p-4">
                   <div className="flex items-center gap-4">
                     {/* Sort order handle */}
-                    <div className="flex items-center gap-1 text-silver shrink-0">
+                    <div className="flex items-center gap-1 text-steel shrink-0">
                       <GripVertical size={14} />
                       <span className="font-mono text-[10px] w-5 text-center">{link.sort_order}</span>
                     </div>
@@ -266,7 +266,7 @@ export default function BioSection({ showToast, showError }: AdminCallbacks) {
                           .then(updated => setBioLinks(prev => prev.map(l => l.id === updated.id ? updated : l)))
                           .catch(err => showError((err as Error).message))
                       }}
-                      className={`p-1.5 rounded transition-colors ${link.enabled ? 'text-teal hover:text-teal/70' : 'text-silver hover:text-steel'}`}
+                      className={`p-1.5 rounded transition-colors ${link.enabled ? 'text-teal hover:text-teal/70' : 'text-steel hover:text-steel'}`}
                       title={link.enabled ? 'Enabled' : 'Disabled'}
                     >
                       {link.enabled ? <Eye size={14} /> : <EyeOff size={14} />}

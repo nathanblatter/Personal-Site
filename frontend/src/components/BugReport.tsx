@@ -189,7 +189,7 @@ export default function BugReport() {
                 </select>
 
                 <span className="mt-4 block font-mono text-[11px] uppercase tracking-wider text-steel">
-                  Screenshots <span className="normal-case tracking-normal text-silver">(optional, up to {MAX_SHOTS})</span>
+                  Screenshots <span className="normal-case tracking-normal text-steel">(optional, up to {MAX_SHOTS})</span>
                 </span>
                 <input ref={fileRef} type="file" multiple accept={IMAGE_TYPES.join(',')} className="hidden"
                   onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = '' }} />

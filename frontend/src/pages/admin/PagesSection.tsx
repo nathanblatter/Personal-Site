@@ -142,7 +142,7 @@ function NowEditor({ now, setNow }: { now: NowContent; setNow: (n: NowContent) =
             <span className="font-mono text-[11px] text-steel uppercase tracking-wider pt-2">Section {i + 1}</span>
             <button
               onClick={() => setNow({ ...now, sections: now.sections.filter((_, j) => j !== i) })}
-              className="text-silver hover:text-ember transition-colors p-1"
+              className="text-steel hover:text-ember transition-colors p-1"
               aria-label="Remove section"
             >
               <Trash2 size={15} />
@@ -185,7 +185,7 @@ function UsesEditor({ uses, setUses }: { uses: UsesContent; setUses: (u: UsesCon
             <span className="font-mono text-[11px] text-steel uppercase tracking-wider pt-2">Category {i + 1}</span>
             <button
               onClick={() => setUses({ ...uses, categories: uses.categories.filter((_, j) => j !== i) })}
-              className="text-silver hover:text-ember transition-colors p-1"
+              className="text-steel hover:text-ember transition-colors p-1"
               aria-label="Remove category"
             >
               <Trash2 size={15} />
@@ -214,7 +214,7 @@ function UsesEditor({ uses, setUses }: { uses: UsesContent; setUses: (u: UsesCon
                 />
                 <button
                   onClick={() => updateCat(i, { items: cat.items.filter((_, k) => k !== j) })}
-                  className="text-silver hover:text-ember transition-colors p-1.5 shrink-0"
+                  className="text-steel hover:text-ember transition-colors p-1.5 shrink-0"
                   aria-label="Remove item"
                 >
                   <Trash2 size={14} />

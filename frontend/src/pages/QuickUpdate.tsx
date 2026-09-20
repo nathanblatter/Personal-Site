@@ -94,7 +94,7 @@ function daysToWindows(days: DayEdit[]): QuickAvailabilityWindow[] {
 // ── Small styled primitives ──────────────────────────────────────────────────
 
 const inputCls =
-  'w-full rounded-lg border border-mist bg-white px-3 py-2 text-sm text-ink placeholder:text-silver focus:border-blue focus:outline-none'
+  'w-full rounded-lg border border-mist bg-white px-3 py-2 text-sm text-ink placeholder:text-steel focus:border-blue focus:outline-none'
 
 function FormSkeleton() {
   return (

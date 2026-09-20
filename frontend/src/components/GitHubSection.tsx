@@ -116,7 +116,7 @@ function ContributionGraph({ data }: { data: GitHubContributions }) {
                   >
                     <Github size={14} className="shrink-0 text-steel" />
                     <span className="font-mono">{repo.name}</span>
-                    <ExternalLink size={11} className="shrink-0 text-silver" />
+                    <ExternalLink size={11} className="shrink-0 text-steel" />
                   </a>
                 ))}
               </div>
@@ -144,7 +144,7 @@ function RepoCard({ repo }: { repo: GitHubRepo }) {
         <span className="text-sm font-medium text-ink group-hover:text-blue transition-colors truncate">
           {repo.name}
         </span>
-        <ExternalLink size={12} className="text-silver group-hover:text-blue transition-colors shrink-0 mt-0.5" />
+        <ExternalLink size={12} className="text-steel group-hover:text-blue transition-colors shrink-0 mt-0.5" />
       </div>
       {repo.description && (
         <p className="text-xs text-steel leading-relaxed mb-3 line-clamp-2">{repo.description}</p>
@@ -224,7 +224,7 @@ export default function GitHubSection({ compact = false }: { compact?: boolean }
           <span className="font-mono text-sm text-steel group-hover:text-blue transition-colors">
             @{profile.username}
           </span>
-          <span className="font-mono text-[11px] text-silver">
+          <span className="font-mono text-[11px] text-steel">
             {profile.public_repos} repos
           </span>
         </a>

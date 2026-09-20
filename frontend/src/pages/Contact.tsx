@@ -165,7 +165,7 @@ function BookACall() {
             A confirmation has been sent to <span className="font-medium text-ink">{bookingForm.email}</span>.
             Nathan will review your request and you'll hear back within 48 hours.
           </p>
-          <p className="text-silver text-xs mt-3 max-w-md">
+          <p className="text-steel text-xs mt-3 max-w-md">
             If accepted, you'll receive a Zoom link and calendar invite by email.
           </p>
         </motion.div>
@@ -214,7 +214,7 @@ function BookACall() {
                     disabled={!hasWindows}
                     className={`flex flex-col items-center py-3 px-2 rounded-xl border transition-all text-center ${
                       !hasWindows
-                        ? 'border-mist/50 bg-cloud/50 text-silver cursor-not-allowed opacity-50'
+                        ? 'border-mist/50 bg-cloud/50 text-steel cursor-not-allowed opacity-50'
                         : isSelected
                         ? 'border-blue bg-blue-wash text-blue'
                         : isToday
@@ -314,7 +314,7 @@ function BookACall() {
                       <span className="font-mono text-xs text-steel">({selectedDuration} min)</span>
                     </div>
                     {bookingSettings?.timezone && bookingSettings.timezone !== Intl.DateTimeFormat().resolvedOptions().timeZone && (
-                      <p className="font-mono text-[11px] text-silver ml-6">
+                      <p className="font-mono text-[11px] text-steel ml-6">
                         {formatSlotTimeInTz(selectedSlot.start, bookingSettings.timezone)} {bookingSettings.timezone.split('/').pop()?.replace('_', ' ')} time
                       </p>
                     )}
@@ -463,7 +463,7 @@ export default function Contact() {
                       <p className="text-sm font-medium text-ink">{social.label}</p>
                       <p className="text-xs text-steel font-mono mt-0.5">{social.handle}</p>
                     </div>
-                    <ArrowUpRight size={14} className="text-silver group-hover:text-blue transition-colors" />
+                    <ArrowUpRight size={14} className="text-steel group-hover:text-blue transition-colors" />
                   </motion.a>
                 )
               })}

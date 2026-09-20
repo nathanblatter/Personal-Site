@@ -186,7 +186,7 @@ export default function HeatmapGrid<T extends { date: string }>({
                 </span>
                 <button
                   onClick={onDeselect}
-                  className="text-silver hover:text-ink transition-colors p-0.5"
+                  className="text-steel hover:text-ink transition-colors p-0.5"
                 >
                   <X size={14} />
                 </button>

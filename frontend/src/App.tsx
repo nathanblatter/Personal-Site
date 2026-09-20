@@ -1,4 +1,5 @@
 import { lazy, Suspense, useRef } from 'react'
+import ErrorBoundary from './components/ErrorBoundary'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import Layout from './components/Layout'
@@ -61,6 +62,7 @@ function App() {
   return (
     <div>
       <ScrollToTop />
+      <ErrorBoundary>
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
@@ -86,6 +88,7 @@ function App() {
         <Route path="/quick-update/:token" element={<Suspense fallback={<PageFallback />}><QuickUpdate /></Suspense>} />
         <Route path="/contract/:token" element={<Suspense fallback={<PageFallback />}><ContractView /></Suspense>} />
       </Routes>
+      </ErrorBoundary>
     </div>
   )
 }

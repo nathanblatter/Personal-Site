@@ -296,7 +296,7 @@ export default function ClaudeSection() {
                     <span className="font-mono text-[11px] text-steel ml-2 shrink-0">
                       ${(m.cost_cents / 100).toFixed(2)}
                       {typeof m.sessions === 'number' && m.sessions > 0 && (
-                        <span className="text-silver"> · {m.sessions} sess</span>
+                        <span className="text-steel"> · {m.sessions} sess</span>
                       )}
                     </span>
                   </div>
@@ -318,7 +318,7 @@ export default function ClaudeSection() {
             <div className="flex items-center justify-between mb-3">
               <p className="font-mono text-[11px] text-steel uppercase tracking-wide">By Project</p>
               {summary.most_active_project && (
-                <p className="font-mono text-[11px] text-silver truncate ml-2">
+                <p className="font-mono text-[11px] text-steel truncate ml-2">
                   Most active: <span className="text-steel">{summary.most_active_project}</span>
                 </p>
               )}
@@ -340,7 +340,7 @@ export default function ClaudeSection() {
                   </div>
                   <div className="flex items-center justify-between mt-1">
                     {typeof p.active_days === 'number' && (
-                      <span className="font-mono text-[10px] text-silver">
+                      <span className="font-mono text-[10px] text-steel">
                         {p.active_days} active day{p.active_days === 1 ? '' : 's'}
                         {typeof p.sessions === 'number' && p.sessions > 0 ? ` · ${p.sessions} sessions` : ''}
                       </span>

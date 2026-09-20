@@ -16,7 +16,7 @@ const INVOICE_COLORS: Record<string, string> = {
   partial: 'bg-violet/15 text-violet',
   paid: 'bg-teal/15 text-teal',
   overdue: 'bg-ember/15 text-ember',
-  void: 'bg-silver/20 text-silver',
+  void: 'bg-silver/20 text-steel',
 }
 
 const ENGAGEMENT_COLORS: Record<string, string> = {
@@ -31,7 +31,7 @@ const CONTRACT_COLORS: Record<string, string> = {
   sent: 'bg-blue/10 text-blue',
   accepted: 'bg-teal/15 text-teal',
   declined: 'bg-ember/15 text-ember',
-  void: 'bg-silver/20 text-silver',
+  void: 'bg-silver/20 text-steel',
 }
 
 export function Pill({ label, kind = 'invoice' }: { label: string; kind?: 'stage' | 'invoice' | 'engagement' | 'contract' }) {

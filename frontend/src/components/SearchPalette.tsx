@@ -100,7 +100,7 @@ export default function SearchPalette({ open, onClose }: { open: boolean; onClos
                 onChange={e => setQ(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder="Search projects, posts, pages…"
-                className="flex-1 py-4 bg-transparent text-ink placeholder:text-silver focus:outline-none text-[15px]"
+                className="flex-1 py-4 bg-transparent text-ink placeholder:text-steel focus:outline-none text-[15px]"
               />
               {loading && <Loader2 size={15} className="text-steel animate-spin shrink-0" />}
               <kbd className="hidden sm:block font-mono text-[10px] text-steel border border-mist rounded px-1.5 py-0.5 shrink-0">ESC</kbd>
@@ -138,7 +138,7 @@ export default function SearchPalette({ open, onClose }: { open: boolean; onClos
                 <p className="text-center text-steel text-sm py-10 font-mono">No results for “{q.trim()}”</p>
               )}
               {q.trim().length < 2 && (
-                <p className="text-center text-silver text-xs py-10 font-mono">Type to search projects, blog posts, and pages</p>
+                <p className="text-center text-steel text-xs py-10 font-mono">Type to search projects, blog posts, and pages</p>
               )}
             </div>
           </motion.div>

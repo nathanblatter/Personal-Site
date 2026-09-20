@@ -106,7 +106,7 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
               <span
                 {...dragHandleProps(project.id)}
                 onClick={e => e.stopPropagation()}
-                className="cursor-grab active:cursor-grabbing text-silver hover:text-steel"
+                className="cursor-grab active:cursor-grabbing text-steel hover:text-steel"
                 title="Drag to reorder"
               >
                 <GripVertical size={14} />
@@ -119,7 +119,7 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
                 </div>
                 <p className="text-xs text-steel truncate mt-0.5">{project.summary || project.description}</p>
               </div>
-              <span className="font-mono text-xs text-silver shrink-0">{project.year}</span>
+              <span className="font-mono text-xs text-steel shrink-0">{project.year}</span>
               <div className="flex items-center gap-1.5 shrink-0">
                 {project.link && (
                   <a href={project.link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="p-1.5 text-steel hover:text-blue transition-colors">
@@ -211,7 +211,7 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-silver font-mono py-3">No screenshots yet. Upload images to show in the project modal.</p>
+                        <p className="text-xs text-steel font-mono py-3">No screenshots yet. Upload images to show in the project modal.</p>
                       )}
                     </div>
 
@@ -290,7 +290,7 @@ export default function ProjectsSection({ showToast, showError, projects, setPro
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-silver font-mono py-2">No metrics. Add stats like "200+ dev hours" or "1,000 users".</p>
+                        <p className="text-xs text-steel font-mono py-2">No metrics. Add stats like "200+ dev hours" or "1,000 users".</p>
                       )}
                     </div>
 

@@ -93,12 +93,12 @@ export default function ContactSection({ showToast, showError, socials, setSocia
                 className="flex items-center gap-4 p-5 cursor-pointer hover:bg-cloud/50 transition-colors"
                 onClick={() => setEditingSocial(editingSocial === social.id ? null : social.id)}
               >
-                <GripVertical size={14} className="text-silver" />
+                <GripVertical size={14} className="text-steel" />
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-ink">{social.label}</span>
                   <p className="text-xs text-steel font-mono mt-0.5">{social.handle}</p>
                 </div>
-                <span className="font-mono text-xs text-silver truncate max-w-48 shrink-0">{social.href}</span>
+                <span className="font-mono text-xs text-steel truncate max-w-48 shrink-0">{social.href}</span>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={e => { e.stopPropagation(); setEditingSocial(editingSocial === social.id ? null : social.id) }} className="p-1.5 text-steel hover:text-blue transition-colors" aria-label="Edit">
                     <Pencil size={13} />

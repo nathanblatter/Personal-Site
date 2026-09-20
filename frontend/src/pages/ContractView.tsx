@@ -306,7 +306,7 @@ export default function ContractView() {
 
 function Stepi({ icon: Icon, label, active, done }: { icon: typeof Mail; label: string; active: boolean; done: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 ${active ? 'text-blue' : done ? 'text-teal' : 'text-silver'}`}>
+    <span className={`inline-flex items-center gap-1.5 ${active ? 'text-blue' : done ? 'text-teal' : 'text-steel'}`}>
       {done ? <CheckCircle2 size={13} /> : <Icon size={13} />} {label}
     </span>
   )
@@ -345,7 +345,7 @@ function Certificate({ cert, showAudit, onToggle }: { cert: ContractCertificate;
                   <span className="font-mono text-[10px] text-steel w-40 shrink-0">{fmtTs(e.occurred_at)}</span>
                   <span className="text-ink flex-1">{EVENT_LABELS[e.type] || e.type}</span>
                   <span className="text-steel truncate max-w-[40%]">{e.actor_name || e.actor_email || ''}</span>
-                  <span className="font-mono text-[10px] text-silver shrink-0">{e.ip || ''}</span>
+                  <span className="font-mono text-[10px] text-steel shrink-0">{e.ip || ''}</span>
                 </div>
               ))}
             </div>
@@ -373,7 +373,7 @@ function StatusChip({ status }: { status: string }) {
     accepted: { label: 'Executed', cls: 'text-teal bg-teal/10', dot: 'bg-teal' },
     draft: { label: 'Draft', cls: 'text-steel bg-cloud', dot: 'bg-silver' },
     declined: { label: 'Declined', cls: 'text-ember bg-ember/10', dot: 'bg-ember' },
-    void: { label: 'Void', cls: 'text-silver bg-cloud', dot: 'bg-silver' },
+    void: { label: 'Void', cls: 'text-steel bg-cloud', dot: 'bg-silver' },
   }
   const s = map[status] ?? map.draft
   return (

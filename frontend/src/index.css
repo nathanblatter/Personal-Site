@@ -10,7 +10,7 @@
   --color-cloud: #f1f4f8;
   --color-mist: #e4e9f0;
   --color-silver: #c8d0db;
-  --color-steel: #8c95a6;
+  --color-steel: #65708a;   /* 4.96:1 on white — AA for small text (was #8c95a6 = 3.0:1) */
   --color-slate: #5a6478;
   --color-ink: #2d3342;
   --color-midnight: #1a1f2e;

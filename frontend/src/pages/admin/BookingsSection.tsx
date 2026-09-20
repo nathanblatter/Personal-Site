@@ -191,7 +191,7 @@ export default function BookingsSection({ showToast, showError }: AdminCallbacks
                     </select>
                   </div>
                 </div>
-                <p className="font-mono text-[10px] text-silver">Bypasses availability windows. Creates a confirmed booking and sends the invite immediately.</p>
+                <p className="font-mono text-[10px] text-steel">Bypasses availability windows. Creates a confirmed booking and sends the invite immediately.</p>
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -229,7 +229,7 @@ export default function BookingsSection({ showToast, showError }: AdminCallbacks
                     {new Date(b.start_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                     {' · '}{b.duration_minutes} min
                   </p>
-                  <p className="font-mono text-[10px] text-silver mt-1">
+                  <p className="font-mono text-[10px] text-steel mt-1">
                     Requested {new Date(b.created_at).toLocaleDateString()}
                   </p>
                 </div>
@@ -322,13 +322,13 @@ export default function BookingsSection({ showToast, showError }: AdminCallbacks
         <div className="space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[10px] text-silver">Sort:</span>
+              <span className="font-mono text-[10px] text-steel">Sort:</span>
               {(['date', 'name', 'status'] as const).map(s => (
                 <button key={s} onClick={() => setBkPastSort(s)} className={`font-mono text-[10px] px-2 py-1 rounded transition-all capitalize ${bkPastSort === s ? 'bg-blue text-white' : 'text-steel hover:text-ink'}`}>{s}</button>
               ))}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[10px] text-silver">Filter:</span>
+              <span className="font-mono text-[10px] text-steel">Filter:</span>
               {['all', 'confirmed', 'declined', 'cancelled'].map(f => (
                 <button key={f} onClick={() => setBkPastFilter(f)} className={`font-mono text-[10px] px-2 py-1 rounded transition-all capitalize ${bkPastFilter === f ? 'bg-blue text-white' : 'text-steel hover:text-ink'}`}>{f}</button>
               ))}
@@ -539,7 +539,7 @@ export default function BookingsSection({ showToast, showError }: AdminCallbacks
                     {/* Day headers */}
                     <div className="grid grid-cols-7 gap-1 text-center">
                       {['Mo','Tu','We','Th','Fr','Sa','Su'].map(d => (
-                        <span key={d} className="font-mono text-[10px] text-silver py-1">{d}</span>
+                        <span key={d} className="font-mono text-[10px] text-steel py-1">{d}</span>
                       ))}
                     </div>
                     {/* Calendar grid */}
@@ -581,7 +581,7 @@ export default function BookingsSection({ showToast, showError }: AdminCallbacks
                                 isBlocked
                                   ? 'bg-ember/10 text-ember font-semibold border border-ember/20'
                                   : isPast
-                                  ? 'text-silver/40 cursor-not-allowed'
+                                  ? 'text-steel/40 cursor-not-allowed'
                                   : 'text-ink hover:bg-blue-wash hover:text-blue cursor-pointer'
                               }`}
                             >
@@ -603,7 +603,7 @@ export default function BookingsSection({ showToast, showError }: AdminCallbacks
                         className="w-full px-3 py-2 bg-white border border-mist rounded-lg text-sm text-ink placeholder-silver focus:outline-none focus:border-blue/50 transition-colors"
                       />
                     </div>
-                    <p className="font-mono text-[10px] text-silver">Click to block/unblock dates. Blocked dates shown in red.</p>
+                    <p className="font-mono text-[10px] text-steel">Click to block/unblock dates. Blocked dates shown in red.</p>
                   </div>
                 </motion.div>
               )}

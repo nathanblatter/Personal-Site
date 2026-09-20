@@ -75,16 +75,16 @@ export default function Blog() {
         </p>
 
         <div className="relative mt-6 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-silver" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-steel" />
           <input
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search posts…"
-            className="w-full pl-9 pr-8 py-2 text-sm font-mono bg-white border border-mist rounded-lg text-ink placeholder:text-silver focus:outline-none focus:border-blue/40 focus:ring-1 focus:ring-blue/20 transition-colors"
+            className="w-full pl-9 pr-8 py-2 text-sm font-mono bg-white border border-mist rounded-lg text-ink placeholder:text-steel focus:outline-none focus:border-blue/40 focus:ring-1 focus:ring-blue/20 transition-colors"
           />
           {query && (
-            <button onClick={() => setQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-silver hover:text-steel">
+            <button onClick={() => setQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-steel hover:text-steel">
               <X size={14} />
             </button>
           )}
@@ -158,7 +158,7 @@ export default function Blog() {
           ) : (
             <>
               <p className="font-mono text-sm mb-2">No posts yet.</p>
-              <p className="text-xs text-silver">Check back soon.</p>
+              <p className="text-xs text-steel">Check back soon.</p>
             </>
           )}
         </motion.div>
@@ -214,7 +214,7 @@ export default function Blog() {
                       </p>
                     )}
 
-                    <div className="flex items-center gap-4 text-silver text-[11px] font-mono mt-auto pt-4 border-t border-mist">
+                    <div className="flex items-center gap-4 text-steel text-[11px] font-mono mt-auto pt-4 border-t border-mist">
                       {post.published_at && (
                         <span className="flex items-center gap-1.5">
                           <Calendar size={11} />

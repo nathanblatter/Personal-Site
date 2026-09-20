@@ -79,7 +79,7 @@ export default function Now() {
             A snapshot of what has my attention at the moment — updated every so often.
           </p>
           {content?.last_updated && (
-            <p className="font-mono text-xs text-silver mt-3">Last updated: {content.last_updated}</p>
+            <p className="font-mono text-xs text-steel mt-3">Last updated: {content.last_updated}</p>
           )}
         </motion.div>
 

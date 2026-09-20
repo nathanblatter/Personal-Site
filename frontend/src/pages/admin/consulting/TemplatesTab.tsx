@@ -80,11 +80,11 @@ function Row({ t, summary, onEdit, onDelete }: { t: Template; summary: string; o
       </div>
       <span className="ml-auto font-mono text-[10px] text-steel">{summary}</span>
       <button onClick={onEdit} className="text-steel hover:text-blue" title="Edit"><Pencil size={13} /></button>
-      <button onClick={onDelete} className="text-silver hover:text-ember" title="Delete"><Trash2 size={13} /></button>
+      <button onClick={onDelete} className="text-steel hover:text-ember" title="Delete"><Trash2 size={13} /></button>
     </div>
   )
 }
-function Empty() { return <div className="text-xs text-silver">No templates yet</div> }
+function Empty() { return <div className="text-xs text-steel">No templates yet</div> }
 
 function TemplateForm({ kind, initial, onSave, onCancel }: {
   kind: TemplateKind; initial?: Template; onSave: (d: Partial<Template>) => void; onCancel: () => void
@@ -141,7 +141,7 @@ function TemplateForm({ kind, initial, onSave, onCancel }: {
                   className="px-2 py-2 bg-white border border-mist rounded-lg text-sm text-right font-mono focus:outline-none focus:border-blue/50" />
                 <input value={it.unit} onChange={e => setItem(i, 'unit', e.target.value)} placeholder="$ rate"
                   className="px-2 py-2 bg-white border border-mist rounded-lg text-sm text-right font-mono focus:outline-none focus:border-blue/50" />
-                <button onClick={() => setItems(items.filter((_, idx) => idx !== i))} className="text-silver hover:text-ember"><X size={14} /></button>
+                <button onClick={() => setItems(items.filter((_, idx) => idx !== i))} className="text-steel hover:text-ember"><X size={14} /></button>
               </div>
             ))}
             <button onClick={addItem} className="inline-flex items-center gap-1 text-xs text-blue hover:underline"><Plus size={12} /> Add line</button>

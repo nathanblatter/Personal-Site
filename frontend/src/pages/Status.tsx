@@ -83,7 +83,7 @@ export default function Status() {
                   </div>
                   <div className="flex items-center gap-4">
                     {svc.latency_ms > 0 && (
-                      <span className="font-mono text-xs text-silver">{svc.latency_ms}ms</span>
+                      <span className="font-mono text-xs text-steel">{svc.latency_ms}ms</span>
                     )}
                     <span className={`font-mono text-xs ${meta.color}`}>{meta.label}</span>
                   </div>
@@ -94,7 +94,7 @@ export default function Status() {
         )}
 
         {updatedAt && !error && (
-          <p className="font-mono text-xs text-silver mt-6 text-center">
+          <p className="font-mono text-xs text-steel mt-6 text-center">
             Last checked {updatedAt.toLocaleTimeString()}
           </p>
         )}

@@ -254,7 +254,7 @@ export default function BlogPost() {
           <p className="text-xl text-steel mb-6 leading-snug">{post.subtitle}</p>
         )}
 
-        <div className="flex items-center gap-5 text-xs font-mono text-silver pb-8 border-b border-mist">
+        <div className="flex items-center gap-5 text-xs font-mono text-steel pb-8 border-b border-mist">
           {post.published_at && (
             <span className="flex items-center gap-1.5">
               <Calendar size={12} />
@@ -420,7 +420,7 @@ export default function BlogPost() {
               if (dp['data-footnotes'] || dp['dataFootnotes'] || (node?.properties as Record<string, unknown>)?.['dataFootnotes']) {
                 return (
                   <section data-footnotes="true" className="mt-12 pt-6 border-t border-mist text-sm text-ink/70">
-                    <h2 className="font-mono text-[11px] uppercase tracking-wider text-silver mb-4">Footnotes</h2>
+                    <h2 className="font-mono text-[11px] uppercase tracking-wider text-steel mb-4">Footnotes</h2>
                     {children}
                   </section>
                 )
@@ -491,7 +491,7 @@ export default function BlogPost() {
         {toc.length >= 2 && (
           <aside className="hidden xl:block">
             <div className="sticky top-24">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-silver mb-3">On this page</p>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-steel mb-3">On this page</p>
               <TocNav toc={toc} activeId={activeId} />
             </div>
           </aside>
@@ -516,7 +516,7 @@ export default function BlogPost() {
                 onClick={() => setTocOpen(false)}
               />
               <div className="xl:hidden fixed bottom-20 right-6 z-40 w-64 max-h-[60vh] overflow-y-auto bg-white border border-mist rounded-xl shadow-2xl p-4">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-silver mb-3">On this page</p>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-steel mb-3">On this page</p>
                 <TocNav toc={toc} activeId={activeId} onNavigate={() => setTocOpen(false)} />
               </div>
             </>
@@ -544,7 +544,7 @@ function TocNav({ toc, activeId, onNavigate }: { toc: TocItem[]; activeId: strin
           } ${
             activeId === id
               ? 'text-blue'
-              : 'text-silver hover:text-steel'
+              : 'text-steel hover:text-steel'
           }`}
         >
           {text}

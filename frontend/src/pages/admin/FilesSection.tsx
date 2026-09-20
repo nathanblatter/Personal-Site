@@ -124,9 +124,9 @@ export default function FilesSection({ showToast, showError }: AdminCallbacks) {
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-ink block truncate">{fileName}</span>
                   <div className="flex items-center gap-3 mt-0.5">
-                    {folder && <span className="font-mono text-[10px] text-silver">{folder}/</span>}
-                    <span className="font-mono text-[10px] text-silver">{formatFileSize(file.size)}</span>
-                    <span className="font-mono text-[10px] text-silver">
+                    {folder && <span className="font-mono text-[10px] text-steel">{folder}/</span>}
+                    <span className="font-mono text-[10px] text-steel">{formatFileSize(file.size)}</span>
+                    <span className="font-mono text-[10px] text-steel">
                       {new Date(file.last_modified).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
                   </div>

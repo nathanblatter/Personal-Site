@@ -138,7 +138,7 @@ export default function CaseStudy() {
               <div className={`w-2 h-2 rounded-full ${statusColors[project.status]}`} />
               <span className="font-mono text-xs text-steel uppercase tracking-wider">{project.status}</span>
             </div>
-            <span className="font-mono text-xs text-silver">{project.year}</span>
+            <span className="font-mono text-xs text-steel">{project.year}</span>
           </div>
 
           <h1 className="font-serif text-4xl md:text-5xl italic text-ink mb-6">{project.title}</h1>

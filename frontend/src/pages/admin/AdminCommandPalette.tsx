@@ -90,7 +90,7 @@ export default function AdminCommandPalette({
             placeholder="Search sections, actions, themes…"
             className="flex-1 py-3.5 bg-transparent text-sm text-ink placeholder-silver focus:outline-none"
           />
-          <kbd className="font-mono text-[10px] text-silver border border-mist rounded px-1.5 py-0.5">ESC</kbd>
+          <kbd className="font-mono text-[10px] text-steel border border-mist rounded px-1.5 py-0.5">ESC</kbd>
         </div>
 
         <div className="max-h-80 overflow-y-auto p-1.5">
@@ -108,7 +108,7 @@ export default function AdminCommandPalette({
               >
                 <span>{cmd.label}</span>
                 <span className="flex items-center gap-2 shrink-0">
-                  <span className="font-mono text-[10px] text-silver uppercase tracking-wider">{cmd.group}</span>
+                  <span className="font-mono text-[10px] text-steel uppercase tracking-wider">{cmd.group}</span>
                   {i === active && <CornerDownLeft size={12} className="text-blue" />}
                 </span>
               </button>

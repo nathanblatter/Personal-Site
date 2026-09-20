@@ -102,7 +102,7 @@ function LinkButton({ link, index }: { link: BioLinkResponse; index: number }) {
       </div>
       <ArrowUpRight
         size={16}
-        className="flex-shrink-0 text-silver group-hover:text-blue transition-colors group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+        className="flex-shrink-0 text-steel group-hover:text-blue transition-colors group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
       />
     </motion.a>
   )
@@ -330,7 +330,7 @@ export default function LinkInBio() {
         >
           <a
             href="/"
-            className="font-mono text-[11px] text-silver hover:text-steel transition-colors tracking-wide"
+            className="font-mono text-[11px] text-steel hover:text-steel transition-colors tracking-wide"
           >
             nathanblatter.com
           </a>

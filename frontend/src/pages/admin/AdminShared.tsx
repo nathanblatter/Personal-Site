@@ -142,7 +142,7 @@ export function VisibilityToggle({ value = 'show', onChange }: { value?: string;
         <button
           key={key}
           onClick={() => onChange(key)}
-          className={`px-2.5 py-1 font-mono text-[9px] uppercase tracking-wide transition-colors border-r border-mist last:border-r-0 ${value === key ? active : 'text-silver hover:text-steel hover:bg-cloud'}`}
+          className={`px-2.5 py-1 font-mono text-[9px] uppercase tracking-wide transition-colors border-r border-mist last:border-r-0 ${value === key ? active : 'text-steel hover:text-steel hover:bg-cloud'}`}
         >
           {key}
         </button>
@@ -206,7 +206,7 @@ export function FileUploadButton({ prefix, onUploaded, label, accept, className 
     }
   }
   return (
-    <label className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer transition-all text-xs font-mono ${uploading ? 'bg-mist text-silver cursor-wait' : 'bg-cloud text-steel hover:bg-blue-wash hover:text-blue'} ${className}`}>
+    <label className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer transition-all text-xs font-mono ${uploading ? 'bg-mist text-steel cursor-wait' : 'bg-cloud text-steel hover:bg-blue-wash hover:text-blue'} ${className}`}>
       {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
       {label || 'Upload'}
       <input type="file" accept={accept} onChange={handleFile} className="hidden" disabled={uploading} />

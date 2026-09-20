@@ -189,7 +189,7 @@ export default function ServicesSection({ showToast, showError }: AdminCallbacks
           {offerings.map(o => (
             <SectionCard key={o.id} {...offeringDrag.dropTargetProps(o.id)} className={`!p-0 overflow-hidden ${offeringDrag.overId === o.id ? 'ring-2 ring-blue/30' : ''}`}>
               <div className="flex items-center gap-2 px-4 py-3">
-                <span {...offeringDrag.dragHandleProps(o.id)} className="cursor-grab text-silver hover:text-steel" title="Drag to reorder"><GripVertical size={14} /></span>
+                <span {...offeringDrag.dragHandleProps(o.id)} className="cursor-grab text-steel hover:text-steel" title="Drag to reorder"><GripVertical size={14} /></span>
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-ink block truncate">{o.title}</span>
                   <span className="font-mono text-[11px] text-steel">{o.icon}</span>
@@ -232,7 +232,7 @@ export default function ServicesSection({ showToast, showError }: AdminCallbacks
           {process.map((s, i) => (
             <SectionCard key={s.id} {...stepDrag.dropTargetProps(s.id)} className={`!p-0 overflow-hidden ${stepDrag.overId === s.id ? 'ring-2 ring-blue/30' : ''}`}>
               <div className="flex items-center gap-2 px-4 py-3">
-                <span {...stepDrag.dragHandleProps(s.id)} className="cursor-grab text-silver hover:text-steel" title="Drag to reorder"><GripVertical size={14} /></span>
+                <span {...stepDrag.dragHandleProps(s.id)} className="cursor-grab text-steel hover:text-steel" title="Drag to reorder"><GripVertical size={14} /></span>
                 <span className="font-mono text-xs text-blue w-5">{i + 1}</span>
                 <span className="flex-1 min-w-0 text-sm font-medium text-ink truncate">{s.title}</span>
                 {editingStep === s.id ? (
@@ -270,7 +270,7 @@ export default function ServicesSection({ showToast, showError }: AdminCallbacks
           {tiers.map(t => (
             <SectionCard key={t.id} {...tierDrag.dropTargetProps(t.id)} className={`!p-0 overflow-hidden ${tierDrag.overId === t.id ? 'ring-2 ring-blue/30' : ''}`}>
               <div className="flex items-center gap-2 px-4 py-3">
-                <span {...tierDrag.dragHandleProps(t.id)} className="cursor-grab text-silver hover:text-steel" title="Drag to reorder"><GripVertical size={14} /></span>
+                <span {...tierDrag.dragHandleProps(t.id)} className="cursor-grab text-steel hover:text-steel" title="Drag to reorder"><GripVertical size={14} /></span>
                 {t.highlighted && <Star size={13} className="text-blue fill-blue" />}
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-ink block truncate">{t.name}</span>

@@ -71,7 +71,7 @@ export default function EngagementsTab({ shared }: { shared: CrmShared }) {
             <Pill label={e.status} kind="engagement" />
           </button>
         ))}
-        {engagements.length === 0 && <div className="text-center text-sm text-silver py-8">No engagements yet</div>}
+        {engagements.length === 0 && <div className="text-center text-sm text-steel py-8">No engagements yet</div>}
       </div>
     </div>
   )
@@ -190,10 +190,10 @@ function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: Eng
               <span className="text-ink">{fmtMinutes(t.minutes)}</span>
               <span className="text-steel truncate flex-1">{t.description}</span>
               {t.invoice_id ? <span className="font-mono text-[9px] text-teal uppercase">billed</span>
-                : <button onClick={() => delTime(t.id)} className="text-silver hover:text-ember opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>}
+                : <button onClick={() => delTime(t.id)} className="text-steel hover:text-ember opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>}
             </div>
           ))}
-          {detail.time_entries.length === 0 && <div className="text-xs text-silver">No time logged</div>}
+          {detail.time_entries.length === 0 && <div className="text-xs text-steel">No time logged</div>}
         </div>
       </div>
 
@@ -228,7 +228,7 @@ function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: Eng
                   <button onClick={() => { setEditingContractId(c.id); setCreatingContract(false) }} className="text-steel hover:text-blue" title="Edit"><Pencil size={13} /></button>
                 )}
                 <a href={api.crm.contracts.pdfUrl(c.id)} target="_blank" rel="noopener noreferrer" className="text-steel hover:text-blue" title="PDF"><FileText size={13} /></a>
-                <button onClick={() => delContract(c.id)} className="text-silver hover:text-ember" title="Delete"><Trash2 size={13} /></button>
+                <button onClick={() => delContract(c.id)} className="text-steel hover:text-ember" title="Delete"><Trash2 size={13} /></button>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5 font-mono text-[10px] text-steel">
                 <span>EFFECTIVE {c.start_date ? fmtDate(c.start_date) : 'On signing'}</span>
@@ -243,7 +243,7 @@ function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: Eng
               )}
             </div>
           ))}
-          {detail.contracts.length === 0 && !creatingContract && <div className="text-xs text-silver">No contracts</div>}
+          {detail.contracts.length === 0 && !creatingContract && <div className="text-xs text-steel">No contracts</div>}
         </div>
 
         {creatingContract && (
@@ -270,7 +270,7 @@ function EngagementDetailView({ detail, shared, onBack, refresh }: { detail: Eng
               <a href={api.crm.invoices.pdfUrl(inv.id)} target="_blank" rel="noopener noreferrer" className="text-steel hover:text-blue" title="PDF"><FileText size={13} /></a>
             </div>
           ))}
-          {detail.invoices.length === 0 && <div className="text-xs text-silver">No invoices — generate one above, then manage it in the Invoices tab</div>}
+          {detail.invoices.length === 0 && <div className="text-xs text-steel">No invoices — generate one above, then manage it in the Invoices tab</div>}
         </div>
       </div>
     </div>

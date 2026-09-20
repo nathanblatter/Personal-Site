@@ -75,7 +75,7 @@ export default function CourseworkSection({ showToast, showError, coursework, se
           {coursework.map(course => (
             <span key={course.id} className="group inline-flex items-center gap-2 font-mono text-sm px-4 py-2.5 rounded-xl border border-mist bg-white text-ink hover:border-blue/30 transition-all">
               {course.name}
-              <button onClick={() => deleteCourse(course.id)} className="text-silver hover:text-ember opacity-0 group-hover:opacity-100 transition-all" aria-label="Remove">
+              <button onClick={() => deleteCourse(course.id)} className="text-steel hover:text-ember opacity-0 group-hover:opacity-100 transition-all" aria-label="Remove">
                 <X size={12} />
               </button>
             </span>

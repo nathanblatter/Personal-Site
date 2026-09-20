@@ -111,7 +111,7 @@ export default function Layout() {
               aria-label="Search"
             >
               <Search size={14} />
-              <kbd className="font-mono text-[10px] text-silver border border-mist rounded px-1 py-px">⌘K</kbd>
+              <kbd className="font-mono text-[10px] text-steel border border-mist rounded px-1 py-px">⌘K</kbd>
             </button>
 
             {/* Status indicator */}

@@ -79,7 +79,7 @@ export default function Projects() {
               }`}
             >
               {cat}
-              <span className="ml-2 text-silver">
+              <span className="ml-2 text-steel">
                 {cat === 'All'
                   ? visibleProjects.length
                   : visibleProjects.filter((p) => p.status === cat.toLowerCase()).length}
