@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { Download } from 'lucide-react'
 import { useDocumentMeta } from '../lib/useDocumentMeta'
+import { track } from '../lib/track'
 import { api, type ExperienceResponse, type SkillResponse, type ProjectResponse, type AboutResponse, type CourseworkResponse, type ResumeVariantResponse, type ResumeExtras } from '../lib/api'
 
 export default function Resume() {
@@ -42,6 +43,7 @@ export default function Resume() {
           <a
             href="/resume.pdf"
             target="_blank"
+            onClick={() => track('resume-download', { variant: 'default' })}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue text-white font-mono text-xs font-semibold rounded-lg hover:bg-blue-dim transition-colors"
           >
             <Download size={13} /> Download PDF
@@ -127,6 +129,7 @@ export default function Resume() {
         <a
           href={pdfHref}
           target="_blank"
+          onClick={() => track('resume-download', { variant: activeVariant?.key ?? 'default' })}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue text-white font-mono text-xs font-semibold rounded-lg hover:bg-blue-dim transition-colors shrink-0"
         >
           <Download size={13} /> Download{activeVariant ? ` · ${activeVariant.label}` : ''} PDF

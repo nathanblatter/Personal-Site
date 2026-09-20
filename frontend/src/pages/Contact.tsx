@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { Send, MapPin, ArrowUpRight, Calendar, Clock, ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import SectionHeader from '../components/SectionHeader'
 import { api, type SocialResponse, type ContactMetaResponse, type ContactSubmitRequest, type AvailableSlot, type BookingSettingsResponse } from '../lib/api'
+import { track } from '../lib/track'
 import { getIcon } from '../lib/iconMap'
 import { useFailover } from '../lib/useFailover'
 
@@ -100,6 +101,7 @@ function BookACall() {
         duration_minutes: selectedDuration,
         honeypot: bookingForm.honeypot || undefined,
       })
+      track('booking-request')
       setBookingSubmitted(true)
     } catch {
       setBookingError('Something went wrong. Please try again.')
@@ -407,6 +409,7 @@ export default function Contact() {
     setError(null)
     try {
       await api.contact.submit(formData)
+      track('contact-submit')
       setSubmitted(true)
     } catch {
       setError('Something went wrong. Please try again.')

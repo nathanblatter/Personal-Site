@@ -12,7 +12,20 @@ const EVENT_LABELS: Record<string, string> = {
 const fmtTs = (s?: string | null) => s ? new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
 const normName = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase()
 
+// The signature font is only used here; load it on demand instead of on every page.
+function useCaveatFont() {
+  useEffect(() => {
+    if (document.getElementById('font-caveat')) return
+    const link = document.createElement('link')
+    link.id = 'font-caveat'
+    link.rel = 'stylesheet'
+    link.href = 'https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&display=swap'
+    document.head.appendChild(link)
+  }, [])
+}
+
 export default function ContractView() {
+  useCaveatFont()
   const { token } = useParams<{ token: string }>()
   const [c, setC] = useState<ContractPublic | null>(null)
   const [error, setError] = useState(false)

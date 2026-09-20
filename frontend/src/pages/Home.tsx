@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from 'react'
 import { motion } from 'motion/react'
 import { Link } from 'react-router-dom'
+import { track } from '../lib/track'
 import { ArrowRight, ArrowUpRight, MapPin, GraduationCap } from 'lucide-react'
 import SectionHeader from '../components/SectionHeader'
 import ProjectCard from '../components/ProjectCard'
@@ -130,14 +131,14 @@ export default function Home() {
             <Link
               to="/projects"
               className="group inline-flex items-center justify-center gap-3 px-7 py-3.5 bg-blue text-white font-mono text-sm font-semibold rounded-xl hover:bg-blue-dim transition-colors shadow-lg shadow-blue/20"
-            >
+              onClick={() => track('hero-view-projects')}>
               View Projects
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link
               to="/contact"
               className="group inline-flex items-center justify-center gap-3 px-7 py-3.5 border border-mist text-ink font-mono text-sm rounded-xl hover:border-blue hover:text-blue transition-colors"
-            >
+              onClick={() => track('hero-get-in-touch')}>
               Get In Touch
               <ArrowUpRight size={16} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </Link>
@@ -338,7 +339,7 @@ export default function Home() {
             <Link
               to="/contact"
               className="group inline-flex items-center gap-3 px-8 py-4 bg-blue text-white font-mono text-sm font-semibold rounded-xl hover:bg-blue-dim transition-colors shadow-lg shadow-blue/20"
-            >
+              onClick={() => track('cta-start-conversation')}>
               Start a Conversation
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </Link>
