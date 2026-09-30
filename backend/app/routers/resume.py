@@ -24,8 +24,16 @@ async def _clear_other_defaults(db: AsyncSession, keep_id: int | None) -> None:
             v.is_default = False
 
 
+def public_variants(variants: list) -> list:
+    """Visitors only ever see the default résumé flavor (the tailored ones are for
+    Nathan's own applications): the is_default row, else the first by sort order."""
+    if not variants:
+        return []
+    return [next((v for v in variants if v.is_default), variants[0])]
+
+
 @router.get("/variants", response_model=List[schemas.ResumeVariantResponse])
-async def list_variants(db: AsyncSession = Depends(get_db)):
+async def list_variants(db: AsyncSession = Depends(get_db), _: None = Depends(require_auth)):
     result = await db.execute(
         select(models.ResumeVariant).order_by(models.ResumeVariant.sort_order, models.ResumeVariant.id)
     )
@@ -90,5 +98,5 @@ async def resume_data(db: AsyncSession = Depends(get_db)):
         "skills": [schemas.SkillResponse.model_validate(s).model_dump() for s in skills_r.scalars().all()],
         "projects": [schemas.ProjectResponse.model_validate(p).model_dump() for p in projects_r.scalars().all()],
         "coursework": [schemas.CourseworkResponse.model_validate(c).model_dump() for c in coursework_r.scalars().all()],
-        "variants": [schemas.ResumeVariantResponse.model_validate(v).model_dump() for v in variants_r.scalars().all()],
+        "variants": [schemas.ResumeVariantResponse.model_validate(v).model_dump() for v in public_variants(variants_r.scalars().all())],
     }

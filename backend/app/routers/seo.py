@@ -3,7 +3,7 @@ import logging
 import re
 import textwrap
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from app.database import get_db
 from app import models
+from app.auth import is_admin_token
 from app.utils import sort_experience
 
 logger = logging.getLogger(__name__)
@@ -247,9 +248,17 @@ async def robots_txt():
     return Response(content=body, media_type="text/plain", headers={"Cache-Control": "public, max-age=3600"})
 
 
+def pdf_variant_key(requested: str, is_admin: bool) -> str:
+    """Honour ?variant= only for the signed-in admin; "" means the default flavor."""
+    return requested if is_admin else ""
+
+
 @router.get("/resume.pdf", include_in_schema=False)
-async def resume_pdf(variant: str = Query(""), db: AsyncSession = Depends(get_db)):
+async def resume_pdf(variant: str = Query(""), auth_token: str | None = Cookie(default=None), db: AsyncSession = Depends(get_db)):
     from app.resume_pdf import generate_resume_pdf
+
+    # Tailored flavors are admin-only; the public always gets the default résumé.
+    variant = pdf_variant_key(variant, is_admin_token(auth_token))
 
     # Fetch all data
     about_row = (await db.execute(select(models.About).where(models.About.id == 1))).scalar_one_or_none()

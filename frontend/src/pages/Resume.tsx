@@ -11,9 +11,8 @@ export default function Resume() {
   const [skills, setSkills] = useState<SkillResponse[]>([])
   const [projects, setProjects] = useState<ProjectResponse[]>([])
   const [coursework, setCoursework] = useState<CourseworkResponse[]>([])
-  const [variants, setVariants] = useState<ResumeVariantResponse[]>([])
+  const [variant, setVariant] = useState<ResumeVariantResponse | null>(null)
   const [extras, setExtras] = useState<ResumeExtras>({})
-  const [activeKey, setActiveKey] = useState<string | null>(null)
 
   useDocumentMeta({
     title: 'Résumé — Nathan Blatter',
@@ -29,9 +28,8 @@ export default function Resume() {
       setSkills(sk)
       setProjects(pr.filter(p => p.status === 'live'))
       setCoursework(cw)
-      const list = vs ?? []
-      setVariants(list)
-      setActiveKey((list.find(v => v.is_default) ?? list[0])?.key ?? null)
+      // The API only returns the public (default) flavor; tailored ones are admin-only.
+      setVariant(vs?.[0] ?? null)
     })
   }, [])
 
@@ -82,11 +80,8 @@ export default function Resume() {
   const degrees = experience.filter(e => e.kind === 'education')
   const jobs = experience.filter(e => e.kind !== 'education')
 
-  const activeVariant = variants.find(v => v.key === activeKey) ?? null
-  const pdfHref = activeVariant ? `/resume.pdf?variant=${activeVariant.key}` : '/resume.pdf'
-
-  // Surface projects matching the active variant's emphasis tags first, then take 4 (one-page résumé).
-  const emphasis = new Set((activeVariant?.emphasis_tags ?? []).map(t => t.toLowerCase()))
+  // Surface projects matching the variant's emphasis tags first, then take 4 (one-page résumé).
+  const emphasis = new Set((variant?.emphasis_tags ?? []).map(t => t.toLowerCase()))
   const displayProjects = (emphasis.size === 0
     ? projects
     : [...projects].sort((a, b) => {
@@ -104,35 +99,14 @@ export default function Resume() {
         animate={{ opacity: 1, y: 0 }}
         className="max-w-[850px] mx-auto px-6 pt-8 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 print:hidden"
       >
-        {variants.length > 1 ? (
-          <div className="flex items-center gap-1.5 flex-wrap" role="tablist" aria-label="Résumé focus">
-            {variants.map(v => (
-              <button
-                key={v.key}
-                role="tab"
-                aria-selected={v.key === activeKey}
-                onClick={() => setActiveKey(v.key)}
-                className={`font-mono text-[11px] px-3 py-1.5 rounded-lg transition-all ${
-                  v.key === activeKey
-                    ? 'bg-ink text-white'
-                    : 'bg-white border border-mist text-steel hover:text-blue hover:border-blue/30'
-                }`}
-                title={v.headline}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <h1 className="font-mono text-xs text-steel uppercase tracking-wider">Resume</h1>
-        )}
+        <h1 className="font-mono text-xs text-steel uppercase tracking-wider">Resume</h1>
         <a
-          href={pdfHref}
+          href="/resume.pdf"
           target="_blank"
-          onClick={() => track('resume-download', { variant: activeVariant?.key ?? 'default' })}
+          onClick={() => track('resume-download', { variant: 'default' })}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue text-white font-mono text-xs font-semibold rounded-lg hover:bg-blue-dim transition-colors shrink-0"
         >
-          <Download size={13} /> Download{activeVariant ? ` · ${activeVariant.label}` : ''} PDF
+          <Download size={13} /> Download PDF
         </a>
       </motion.div>
 
@@ -161,8 +135,8 @@ export default function Resume() {
 
           {/* ── SUMMARY (variant-aware) ── */}
           <p className="text-[10.5px] leading-[1.6] mt-2.5 mb-3 text-justify">
-            {activeVariant ? (
-              <><span className="font-bold">{activeVariant.headline}</span> {activeVariant.summary}</>
+            {variant ? (
+              <><span className="font-bold">{variant.headline}</span> {variant.summary}</>
             ) : (
               <><span className="font-bold">Information Systems student (Full-Stack Software Engineering emphasis)</span> with experience in Python, Go, C#, PHP, SQL, and cloud platforms, complemented by a background in SCM, ERP, and AI-driven systems. Proven ability to build full-stack analytics and intelligent applications, including a voice-enabled AI platform deployed for clinical research. Known for strong ownership, clean code practices, and delivering measurable technical impact in collaborative team environments.</>
             )}

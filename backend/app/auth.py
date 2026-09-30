@@ -46,6 +46,18 @@ def check_admin_credentials(username: str, password: str) -> bool:
     return user_ok and pass_ok
 
 
+def is_admin_token(token: str | None) -> bool:
+    """True when `token` is a valid admin session JWT. For endpoints that stay
+    public but unlock extra behaviour for the signed-in admin."""
+    if not token:
+        return False
+    try:
+        jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.PyJWTError:
+        return False
+    return True
+
+
 def create_token() -> str:
     exp = datetime.now(timezone.utc) + timedelta(days=EXPIRE_DAYS)
     return jwt.encode({"sub": ADMIN_USERNAME, "exp": exp}, SECRET_KEY, algorithm=ALGORITHM)

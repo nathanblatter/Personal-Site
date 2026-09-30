@@ -103,7 +103,7 @@ _STATIC_OG: dict[str, dict[str, str]] = {
     },
 }
 
-_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude", "/status", "/solar", "/testimonial", "/bookings", "/bio", "/newsletter", "/site-content", "/health", "/privacy", "/quick-update"})
+_SKIP_CACHE = frozenset({"/auth", "/internships", "/storage", "/kpi", "/links", "/claude", "/status", "/solar", "/testimonial", "/bookings", "/bio", "/newsletter", "/site-content", "/health", "/privacy", "/quick-update", "/resume/variants"})
 
 # Known bot user-agent patterns for OG tag injection
 BOT_PATTERN = re.compile(
