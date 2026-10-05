@@ -1,17 +1,12 @@
 import logging
 import os
 import uuid
-import aiosmtplib
 from datetime import datetime, timedelta
-from email.message import EmailMessage
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+
+from app import mail_gateway
 
 log = logging.getLogger(__name__)
 
-SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "25"))
-SMTP_FROM = os.getenv("SMTP_FROM", "noreply@nathanblatter.com")
 SITE_URL = os.getenv("SITE_URL", "https://nathanblatter.com")
 
 
@@ -70,19 +65,12 @@ It only takes a couple of minutes.
 — nathanblatter.com
 """
 
-    msg = EmailMessage()
-    msg["Subject"] = "Nathan Blatter would love your testimonial"
-    msg["From"] = f"Nathan Blatter <{SMTP_FROM}>"
-    msg["To"] = req.requester_email
-    msg.set_content(text_body)
-    msg.add_alternative(html_body, subtype="html")
-
-    try:
-        await aiosmtplib.send(msg, hostname=SMTP_HOST, port=SMTP_PORT, use_tls=False, start_tls=False)
-        return True
-    except Exception as e:
-        log.warning("SMTP error: %s", e)
-        return False
+    return await mail_gateway.send(
+        to=req.requester_email,
+        subject="Nathan Blatter would love your testimonial",
+        text=text_body,
+        html=html_body,
+    )
 
 
 # ── Booking emails ───────────────────────────────────────────────────────────
@@ -124,29 +112,12 @@ async def _send_mime(to: str, subject: str, text_body: str, html_body: str,
     `reply_to` matters for owner notifications: the From is a no-mailbox
     noreply@ address, so without it "Reply" in Nathan's inbox goes nowhere.
     """
-    msg = MIMEMultipart("mixed")
-    msg["Subject"] = subject
-    msg["From"] = f"Nathan Blatter <{SMTP_FROM}>"
-    msg["To"] = to
-    if reply_to:
-        msg["Reply-To"] = reply_to
-
-    alt = MIMEMultipart("alternative")
-    alt.attach(MIMEText(text_body, "plain"))
-    alt.attach(MIMEText(html_body, "html"))
-    msg.attach(alt)
-
+    attachments = []
     if ics_content:
-        cal = MIMEText(ics_content, "calendar", "utf-8")
-        cal.add_header("Content-Disposition", "attachment", filename="invite.ics")
-        msg.attach(cal)
-
-    try:
-        await aiosmtplib.send(msg, hostname=SMTP_HOST, port=SMTP_PORT, use_tls=False, start_tls=False)
-        return True
-    except Exception as e:
-        log.warning("SMTP error (booking): %s", e)
-        return False
+        attachments.append(mail_gateway.Attachment("invite.ics", ics_content.encode("utf-8"), "text/calendar"))
+    return await mail_gateway.send(
+        to=to, subject=subject, text=text_body, html=html_body, reply_to=reply_to, attachments=attachments,
+    )
 
 
 def _btn(href: str, label: str) -> str:

@@ -9,6 +9,9 @@ services:
       DATABASE_URL_KPI: postgresql://postgres:postgres@host.docker.internal:5432/kpi
       DATABASE_URL_JOURNAL: postgresql://postgres:postgres@host.docker.internal:5432/journal
       STATIC_DIR: /dist
+      # Mail goes through email-api (budget, spool, iMessage paging); SMTP_* is the
+      # direct-to-postfix fallback if the gateway is unreachable. Key: EMAIL_API_KEY in .env.prod.
+      EMAIL_API_URL: http://email-api-app-1:4500
       SMTP_HOST: docker-services-postfix-1
       SMTP_PORT: 25
       CONTACT_TO_EMAIL: nzb22@byu.edu

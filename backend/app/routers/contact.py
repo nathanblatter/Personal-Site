@@ -1,14 +1,12 @@
 import logging
 import os
-import aiosmtplib
 from datetime import date
-from email.message import EmailMessage
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app import models, schemas, crm_utils
+from app import models, schemas, crm_utils, mail_gateway
 from app.auth import require_auth
 from app.cache import cache as app_cache
 from app.utils import get_client_ip, get_redis
@@ -17,8 +15,6 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/contact", tags=["contact"])
 
-SMTP_HOST = os.getenv("SMTP_HOST", "localhost")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "25"))
 CONTACT_TO_EMAIL = os.getenv("CONTACT_TO_EMAIL", "nzb22@byu.edu")
 
 DAILY_LIMIT = 100
@@ -55,18 +51,14 @@ async def submit_contact(payload: schemas.ContactSubmit, request: Request, db: A
     if daily_count > DAILY_LIMIT:
         raise HTTPException(status_code=503, detail="Daily message limit reached. Try again tomorrow.")
 
-    msg = EmailMessage()
-    msg["From"] = "noreply@nathanblatter.com"
-    msg["To"] = CONTACT_TO_EMAIL
-    msg["Reply-To"] = payload.email
-    msg["Subject"] = f"New contact from {payload.name} — nathanblatter.com"
-    msg.set_content(
-        f"Name: {payload.name}\nEmail: {payload.email}\n\n{payload.message}"
+    sent = await mail_gateway.send(
+        to=CONTACT_TO_EMAIL,
+        subject=f"New contact from {payload.name} — nathanblatter.com",
+        text=f"Name: {payload.name}\nEmail: {payload.email}\n\n{payload.message}",
+        reply_to=payload.email,
     )
-    try:
-        await aiosmtplib.send(msg, hostname=SMTP_HOST, port=SMTP_PORT, use_tls=False, start_tls=False, timeout=10)
-    except Exception:
-        log.warning("Contact email send failed; persisting lead anyway", exc_info=True)
+    if not sent:
+        log.warning("Contact email send failed; persisting lead anyway")
 
     # Persist as a CRM contact + timeline activity (de-duplicated by email).
     try:
