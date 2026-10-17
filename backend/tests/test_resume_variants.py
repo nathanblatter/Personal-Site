@@ -32,7 +32,7 @@ def test_pdf_variant_honoured_for_admin():
 
 
 def test_is_admin_token():
-    assert is_admin_token(create_token())
+    assert is_admin_token(create_token("owner"))
     assert not is_admin_token(None)
     assert not is_admin_token("")
     assert not is_admin_token("not-a-jwt")
