@@ -33,6 +33,40 @@ These are the conventions already established across the site. New features shou
 ## Admin UX (already built — reuse, don't reinvent)
 - `useUnsavedWarning(dirty)` for unsaved-change guards, `useDragReorder` for sort_order DnD, `Toast` with an optional undo action for destructive ops, `⌘K` command palette, persisted theme/section/density. Match these patterns in new sections.
 
+# Admin sign-in (Squawk)
+
+`/admin/login` signs in through **Squawk**, Nathan's auth service (`SQUAWK_ISSUER`, currently
+`https://squawk.nathanblatter.com`; the hostname is an env var because it was just renamed from
+`auth.`). The site is registered there as an invite-only user pool (`open_signup=false`), so the
+only accounts that exist are the ones Nathan provisions — "any verified user" = Nathan.
+
+- **Flow (Hydra-style, `backend/app/routers/auth.py` + `backend/app/squawk.py`):** the page's
+  "Sign in" button hits `GET /api/v1/auth/start`, which stashes a PKCE verifier + `state` in Redis
+  (5 min) and 302s to Squawk `/oauth/authorize` (`scope=admin`, `resource=SQUAWK_RESOURCE`).
+  Squawk parks the request and sends the browser back to `/admin/login?login_challenge=…`. The
+  page then offers **passkey** (`POST /auth/passkey/begin|finish`, WebAuthn bound to
+  `nathanblatter.com`) or **emailed 6-digit code** (`POST /auth/email/begin|finish`); the backend
+  proxies these to Squawk `/v1/login/*` with a cached **service token** (client_credentials with
+  `SQUAWK_SERVICE_ID` + `SQUAWK_CREDENTIAL`, refreshed 30 s before expiry). `finish` returns
+  `redirect_to` → Squawk → `GET /auth/callback?code&state`: exchange at `/oauth/token`, verify the
+  ES256 user token against Squawk's JWKS (`iss`, `aud == SQUAWK_SERVICE_ID`, `exp`, `sub` is
+  `usr:…`, `email_verified`), then mint the site's own `auth_token` cookie (`app.auth.create_token`,
+  `sub` = Squawk user id) and land on `/admin`. Failures redirect to `/admin/login?error=<code>`.
+- **Env:** `SQUAWK_ISSUER`, `SQUAWK_SERVICE_ID`, `SQUAWK_CREDENTIAL`, `SQUAWK_CLIENT_ID`
+  (public PKCE client, redirect_uri `https://nathanblatter.com/api/v1/auth/callback`),
+  `SQUAWK_RESOURCE`, optional `SITE_URL`. All documented in `backend/.env.example`.
+  **`SQUAWK_ISSUER` unset = local dev**: everything degrades to the old username/password login.
+- **Break-glass:** `ADMIN_PASSWORD_LOGIN=true` keeps `POST /auth/login` (username/password) reachable
+  while Squawk is configured; otherwise it answers 404. `GET /auth/config` tells the page which
+  mode is on. The per-IP throttle (`LOGIN_MAX_ATTEMPTS`/`LOGIN_WINDOW_SECONDS`) applies to the
+  Squawk proxy endpoints too; Squawk has its own limits on top.
+- **Provisioning an account** happens in the **Squawk console**, not on this site: owner →
+  service `personal-site` → users → create (method passkey or email; the user then registers a
+  passkey through Squawk). `~/dev/auth-service/docs/API.md` "End users" has the details.
+  Revoke/disable there as well.
+- **Verify:** `cd backend && python -c "import app.main" && pytest -q tests`
+  (`tests/test_auth_squawk.py` mocks Squawk with `httpx.MockTransport` and mints ES256 test tokens).
+
 # Repo location
 
 - **Canonical checkout: `~/dev/Personal-Site`.** `~/Desktop/Personal-Site` is only a symlink to it (moved 2026-09-19). iCloud Drive syncs ~/Desktop and evicts files, which hung `npx`/`eslint`/`vite` locally and blocked the CI runner's file opens for six hours. Never clone or build under ~/Desktop or ~/Documents.

@@ -35,6 +35,44 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return res.json()
 }
 
+export interface AuthConfig {
+  mode: 'squawk' | 'password'
+  password_login: boolean
+}
+
+/** Error from a Squawk sign-in proxy endpoint; `code` is Squawk's error code. */
+export class AuthError extends Error {
+  status: number
+  code: string
+  constructor(status: number, code: string, message: string) {
+    super(message)
+    this.name = 'AuthError'
+    this.status = status
+    this.code = code
+  }
+}
+
+/** POST to the admin sign-in proxies; surfaces the backend's {error, message} detail. */
+async function authRequest<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (res.ok) return res.json()
+  let code = 'server_error'
+  let message = 'Sign-in failed. Try again.'
+  try {
+    const detail = (await res.json() as { detail?: { error?: string; message?: string } | string }).detail
+    if (detail && typeof detail === 'object') {
+      code = detail.error ?? code
+      message = detail.message ?? message
+    }
+  } catch { /* non-JSON error body */ }
+  throw new AuthError(res.status, code, message)
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface ProjectMetric {
@@ -1128,6 +1166,19 @@ export const api = {
       request<void>('POST', '/auth/login', { username, password }),
     logout: () => request<void>('POST', '/auth/logout'),
     verify: () => request<void>('GET', '/auth/verify'),
+    /** Which login the page should render; password_login is the dev fallback / break-glass. */
+    config: () => request<AuthConfig>('GET', '/auth/config'),
+    /** Browser navigation target that begins the Squawk authorization (PKCE). */
+    startUrl: `${API_BASE}/auth/start`,
+    emailBegin: (login_challenge: string, email: string) =>
+      authRequest<{ challenge_id: string; expires_in: number }>('/auth/email/begin', { login_challenge, email }),
+    emailFinish: (challenge_id: string, code: string) =>
+      authRequest<{ redirect_to: string }>('/auth/email/finish', { challenge_id, code }),
+    passkeyBegin: (login_challenge: string) =>
+      authRequest<{ challenge_id: string; options: { publicKey: PublicKeyCredentialRequestOptionsJSON } }>(
+        '/auth/passkey/begin', { login_challenge }),
+    passkeyFinish: (challenge_id: string, credential: unknown) =>
+      authRequest<{ redirect_to: string }>('/auth/passkey/finish', { challenge_id, credential }),
   },
 
   aboutPage: {

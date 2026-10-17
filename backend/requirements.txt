@@ -9,6 +9,7 @@ aiofiles==24.1.0
 aiosmtplib==3.0.2
 redis[asyncio]==5.2.1
 PyJWT==2.13.0
+cryptography==50.0.2  # ES256 for Squawk user-token verification
 python-multipart==0.0.31
 boto3==1.35.0
 pillow==12.3.0
