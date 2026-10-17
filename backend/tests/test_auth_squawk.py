@@ -94,7 +94,6 @@ def squawk_env(monkeypatch, signing_key):
     monkeypatch.setattr(squawk, "CLIENT_ID", CLIENT_ID)
     monkeypatch.setattr(squawk, "RESOURCE", RESOURCE)
     monkeypatch.setattr(squawk, "SITE_URL", SITE)
-    monkeypatch.delenv("ADMIN_PASSWORD_LOGIN", raising=False)
     squawk._reset_service_token()
     monkeypatch.setattr(
         squawk, "_verifier",
@@ -428,25 +427,16 @@ def test_service_token_refreshes_near_expiry(client, fake_cache, squawk_env, mon
     assert [c.url.path for c in squawk_env.calls].count("/v1/token") == 2
 
 
-# ── Password login gating + config ──────────────────────────────────────────
+# ── No password login, ever ─────────────────────────────────────────────────
 
-def test_password_login_404_when_squawk_configured(client, fake_cache, squawk_env):
-    r = client.post("/auth/login", json={"username": "nathan", "password": "x"})
-    assert r.status_code == 404
-    assert client.get("/auth/config").json() == {"mode": "squawk", "password_login": False}
-
-
-def test_password_login_break_glass(client, fake_cache, squawk_env, monkeypatch):
-    monkeypatch.setenv("ADMIN_PASSWORD_LOGIN", "true")
-    assert client.get("/auth/config").json() == {"mode": "squawk", "password_login": True}
-    r = client.post("/auth/login", json={"username": "nathan", "password": "wrong"})
-    assert r.status_code == 401  # reachable again; credentials still checked
+def test_no_password_login(client, fake_cache, squawk_env):
+    assert client.get("/auth/config").json() == {"enabled": True}
+    assert client.post("/auth/login", json={"username": "nathan", "password": "x"}).status_code in (404, 405)
 
 
-def test_password_login_without_squawk(client, fake_cache, monkeypatch):
+def test_without_squawk_nothing_signs_in(client, fake_cache, monkeypatch):
     monkeypatch.setattr(squawk, "ISSUER", "")
-    monkeypatch.setattr(auth_router, "check_admin_credentials", lambda u, p: True)
-    assert client.get("/auth/config").json() == {"mode": "password", "password_login": True}
-    r = client.post("/auth/login", json={"username": "nathan", "password": "pw"})
-    assert r.status_code == 204 and r.cookies.get("auth_token")
+    assert client.get("/auth/config").json() == {"enabled": False}
+    assert client.post("/auth/login", json={"username": "nathan", "password": "pw"}).status_code in (404, 405)
+    assert client.get("/auth/start").status_code == 404
     assert client.post("/auth/email/begin", json={"login_challenge": "x", "email": "a@b.co"}).status_code == 404

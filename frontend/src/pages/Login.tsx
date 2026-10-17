@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { api, AuthError, type AuthConfig } from '../lib/api'
 
 /**
@@ -11,8 +11,7 @@ import { api, AuthError, type AuthConfig } from '../lib/api'
  * complete a passkey or emailed-code ceremony through the backend proxies and
  * finally follow `redirect_to` (our /auth/callback, which sets the cookie).
  *
- * The username/password form only renders when the backend reports it as
- * enabled (no SQUAWK_ISSUER locally, or the ADMIN_PASSWORD_LOGIN break-glass).
+ * There is no password login: without Squawk configured the page says so.
  */
 
 const CALLBACK_ERRORS: Record<string, string> = {
@@ -118,7 +117,6 @@ const secondaryBtn =
   'w-full py-2.5 bg-white text-ink border border-mist font-mono text-xs font-semibold rounded-lg hover:border-blue/50 hover:text-blue transition-colors disabled:opacity-60 disabled:cursor-not-allowed'
 
 export default function Login() {
-  const navigate = useNavigate()
   const location = useLocation()
   const params = new URLSearchParams(location.search)
   const loginChallenge = params.get('login_challenge')
@@ -138,13 +136,9 @@ export default function Login() {
   const [challengeId, setChallengeId] = useState<string | null>(null)
   const [code, setCode] = useState('')
 
-  // Password fallback state
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-
   useEffect(() => {
     if (loginChallenge) return
-    api.auth.config().then(setConfig).catch(() => setConfig({ mode: 'squawk', password_login: false }))
+    api.auth.config().then(setConfig).catch(() => setConfig({ enabled: true }))
   }, [loginChallenge])
 
   const fail = (err: unknown, fallback: string) => {
@@ -229,36 +223,6 @@ export default function Login() {
     }
   }
 
-  const submitPassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setBusy(true)
-    try {
-      await api.auth.login(username, password)
-      navigate('/admin')
-    } catch {
-      setError('Invalid username or password.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const passwordForm = (
-    <form onSubmit={submitPassword} className="space-y-5">
-      <div>
-        <label className={labelClass}>Username</label>
-        <input type="text" value={username} onChange={e => setUsername(e.target.value)} autoComplete="username" required className={inputClass} />
-      </div>
-      <div>
-        <label className={labelClass}>Password</label>
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" required className={inputClass} />
-      </div>
-      <button type="submit" disabled={busy} className={primaryBtn}>
-        {busy ? 'Signing in…' : 'Sign in with password'}
-      </button>
-    </form>
-  )
-
   let body: React.ReactNode
   if (loginChallenge && method !== 'choose' && challengeId) {
     body = (
@@ -332,8 +296,8 @@ export default function Login() {
         <div className="h-10 rounded-lg bg-mist/60" />
       </div>
     )
-  } else if (config.mode === 'password') {
-    body = passwordForm
+  } else if (!config.enabled) {
+    body = <p className="font-mono text-xs text-steel text-center">Squawk sign-in is not configured on this server.</p>
   } else {
     body = (
       <div className="space-y-5">
@@ -341,12 +305,6 @@ export default function Login() {
           {busy ? 'Redirecting…' : 'Sign in'}
         </button>
         <p className="font-mono text-[10px] text-silver tracking-wider text-center">PASSKEY OR EMAIL CODE VIA SQUAWK</p>
-        {config.password_login && (
-          <details className="pt-2 border-t border-mist">
-            <summary className="cursor-pointer font-mono text-[11px] text-steel hover:text-blue transition-colors">Break-glass password login</summary>
-            <div className="mt-4">{passwordForm}</div>
-          </details>
-        )}
       </div>
     )
   }

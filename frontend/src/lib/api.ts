@@ -36,8 +36,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export interface AuthConfig {
-  mode: 'squawk' | 'password'
-  password_login: boolean
+  /** Squawk sign-in is configured on the backend. There is no other way in. */
+  enabled: boolean
 }
 
 /** Error from a Squawk sign-in proxy endpoint; `code` is Squawk's error code. */
@@ -1162,11 +1162,9 @@ export const api = {
   },
 
   auth: {
-    login: (username: string, password: string) =>
-      request<void>('POST', '/auth/login', { username, password }),
     logout: () => request<void>('POST', '/auth/logout'),
     verify: () => request<void>('GET', '/auth/verify'),
-    /** Which login the page should render; password_login is the dev fallback / break-glass. */
+    /** Whether the page can offer sign-in at all. */
     config: () => request<AuthConfig>('GET', '/auth/config'),
     /** Browser navigation target that begins the Squawk authorization (PKCE). */
     startUrl: `${API_BASE}/auth/start`,

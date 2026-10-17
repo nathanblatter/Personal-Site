@@ -7,9 +7,9 @@ completes a passkey or emailed-code ceremony through the proxy endpoints below;
 Squawk redirects to `/auth/callback` with a code; we exchange it, verify the
 user token and mint the site's own `auth_token` cookie.
 
-Without `SQUAWK_ISSUER` (local dev) the legacy username/password login stays
-on. With Squawk configured it answers 404 unless `ADMIN_PASSWORD_LOGIN=true`
-(break-glass).
+There is no password login and no admin user in the env (Nathan, 2026-10-16:
+apps keep no identities of their own). Without `SQUAWK_ISSUER` the admin cannot
+sign in at all; Squawk's recovery codes are the break-glass.
 """
 
 import base64
@@ -25,7 +25,7 @@ from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel, Field
 
 from app import squawk
-from app.auth import EXPIRE_DAYS, COOKIE_SECURE, check_admin_credentials, create_token, require_auth
+from app.auth import EXPIRE_DAYS, COOKIE_SECURE, create_token, require_auth
 from app.cache import cache
 from app.utils import get_client_ip
 
@@ -40,11 +40,6 @@ LOGIN_WINDOW_SECONDS = int(os.getenv("LOGIN_WINDOW_SECONDS", "900"))  # 15 min
 STATE_TTL_SECONDS = 300
 LOGIN_PAGE = "/admin/login"
 ADMIN_PAGE = "/admin"
-
-
-def password_login_enabled() -> bool:
-    """Password login is the fallback without Squawk, or an explicit break-glass."""
-    return not squawk.enabled() or os.getenv("ADMIN_PASSWORD_LOGIN", "").lower() == "true"
 
 
 async def login_rate_limit(request: Request) -> None:
@@ -69,7 +64,7 @@ def require_squawk() -> None:
         raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Squawk sign-in is not configured"})
 
 
-def _set_session_cookie(response: Response, sub: str | None = None) -> None:
+def _set_session_cookie(response: Response, sub: str) -> None:
     response.set_cookie(
         key="auth_token",
         value=create_token(sub=sub),
@@ -85,27 +80,8 @@ def _set_session_cookie(response: Response, sub: str | None = None) -> None:
 
 @router.get("/config")
 def config() -> dict[str, Any]:
-    """What the login page should render."""
-    return {
-        "mode": "squawk" if squawk.enabled() else "password",
-        "password_login": password_login_enabled(),
-    }
-
-
-# ── Legacy password login (dev fallback / break-glass) ──────────────────────
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-@router.post("/login", status_code=204)
-def login(payload: LoginRequest, response: Response, _: None = Depends(login_rate_limit)):
-    if not password_login_enabled():
-        raise HTTPException(status_code=404, detail="Not found")
-    if not check_admin_credentials(payload.username, payload.password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    _set_session_cookie(response)
+    """Whether Squawk sign-in is configured; the page has nothing else to offer."""
+    return {"enabled": squawk.enabled()}
 
 
 @router.get("/verify", status_code=204)
