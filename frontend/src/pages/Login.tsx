@@ -156,15 +156,20 @@ export default function Login() {
     window.location.assign(api.auth.startUrl)
   }
 
-  const usePasskey = async () => {
+  /** Run a passkey assertion: `owner` uses Nathan's Squawk passkey, `account`
+   *  a passkey registered on a personal-site account. */
+  const signInWithPasskey = async (kind: 'owner' | 'account') => {
     if (!loginChallenge) return
     setError(null)
     setBusy(true)
     try {
-      const begin = await api.auth.passkeyBegin(loginChallenge)
+      const begin = kind === 'owner' ? await api.auth.ownerBegin(loginChallenge) : await api.auth.passkeyBegin(loginChallenge)
       const cred = await navigator.credentials.get({ publicKey: decodeAssertionOptions(begin.options.publicKey) })
       if (!cred) throw new Error('no credential')
-      const { redirect_to } = await api.auth.passkeyFinish(begin.challenge_id, encodeAssertion(cred as PublicKeyCredential))
+      const assertion = encodeAssertion(cred as PublicKeyCredential)
+      const { redirect_to } = kind === 'owner'
+        ? await api.auth.ownerFinish(begin.challenge_id, assertion)
+        : await api.auth.passkeyFinish(begin.challenge_id, assertion)
       window.location.assign(redirect_to)
     } catch (err) {
       if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
@@ -306,8 +311,12 @@ export default function Login() {
   } else if (loginChallenge) {
     body = (
       <div className="space-y-3">
-        <button type="button" onClick={usePasskey} disabled={busy} className={primaryBtn}>
-          {busy ? 'Waiting for passkey…' : 'Use passkey'}
+        <button type="button" onClick={() => signInWithPasskey('owner')} disabled={busy} className={primaryBtn}>
+          {busy ? 'Waiting for passkey…' : 'Sign in as owner'}
+        </button>
+        <p className="font-mono text-[10px] text-silver tracking-wider text-center -mt-1">YOUR SQUAWK PASSKEY</p>
+        <button type="button" onClick={() => signInWithPasskey('account')} disabled={busy} className={secondaryBtn}>
+          Use an account passkey
         </button>
         <button type="button" onClick={() => { setMethod('email'); setError(null) }} disabled={busy} className={secondaryBtn}>
           Email me a code

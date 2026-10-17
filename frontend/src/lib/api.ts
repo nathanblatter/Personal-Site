@@ -1179,6 +1179,12 @@ export const api = {
         '/auth/passkey/begin', { login_challenge }),
     passkeyFinish: (challenge_id: string, credential: unknown) =>
       authRequest<{ redirect_to: string }>('/auth/passkey/finish', { challenge_id, credential }),
+    /** Owner sign-in: Nathan's Squawk passkey (bound to nathanblatter.com) asserted on this page. */
+    ownerBegin: (login_challenge: string) =>
+      authRequest<{ challenge_id: string; options: { publicKey: PublicKeyCredentialRequestOptionsJSON } }>(
+        '/auth/owner/begin', { login_challenge }),
+    ownerFinish: (challenge_id: string, credential: unknown) =>
+      authRequest<{ redirect_to: string }>('/auth/owner/finish', { challenge_id, credential }),
     /** First-device passkey setup: emailed code → WebAuthn creation options → register. */
     passkeySetupBegin: (login_challenge: string, email: string) =>
       authRequest<{ challenge_id: string; expires_in: number }>('/auth/passkey/setup/begin', { login_challenge, email }),

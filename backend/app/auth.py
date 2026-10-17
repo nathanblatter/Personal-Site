@@ -59,8 +59,9 @@ def is_admin_token(token: str | None) -> bool:
 
 
 def create_token(sub: str | None = None) -> str:
-    """Mint the admin session JWT. `sub` is the Squawk user id (`usr:…`) when the
-    sign-in came through Squawk; the legacy password login uses the admin username."""
+    """Mint the admin session JWT. `sub` is the Squawk subject (`usr:…`, or `owner`
+    for the owner passkey) when the sign-in came through Squawk; the legacy password
+    login uses the admin username."""
     exp = datetime.now(timezone.utc) + timedelta(days=EXPIRE_DAYS)
     return jwt.encode({"sub": sub or ADMIN_USERNAME, "exp": exp}, SECRET_KEY, algorithm=ALGORITHM)
 

@@ -8,11 +8,11 @@ that talks to Squawk:
 * a cached **service token** (client_credentials with the service credential),
   which authenticates our backend when it drives the passkey / email-code
   ceremonies on behalf of the login page;
-* thin helpers for `/v1/login/{passkey,email}/{begin,finish}`;
+* thin helpers for `/v1/login/{passkey,email,owner}/{begin,finish}`;
 * the authorization-code exchange at `/oauth/token`;
 * a JWKS verifier for the **user access token** that exchange returns
-  (ES256, iss == SQUAWK_ISSUER, aud == SQUAWK_SERVICE_ID, sub `usr:…`,
-  email_verified).
+  (ES256, iss == SQUAWK_ISSUER, aud == SQUAWK_SERVICE_ID, and either sub `usr:…`
+  with email_verified, or sub `owner`: Nathan signing in with his Squawk passkey).
 
 When `SQUAWK_ISSUER` is unset (local dev) `enabled()` is False and the router
 falls back to the username/password login, so nothing breaks locally.
@@ -44,6 +44,8 @@ SITE_URL = os.getenv("SITE_URL", "https://nathanblatter.com").rstrip("/")
 
 ALGORITHMS = ["ES256"]
 REQUIRED_CLAIMS = ["iss", "sub", "aud", "exp", "iat"]
+# Squawk's subject for its owner (Nathan) signing in with the owner passkey.
+OWNER_SUBJECT = "owner"
 HTTP_TIMEOUT = 10.0
 # Refresh the service token this many seconds before it expires.
 TOKEN_REFRESH_MARGIN = 30
@@ -163,6 +165,17 @@ async def login_passkey_finish(challenge_id: str, credential: dict[str, Any]) ->
     return await _call("POST", "/v1/login/passkey/finish", json=credential, params={"challenge": challenge_id})
 
 
+async def login_owner_begin(login_challenge: str) -> dict[str, Any]:
+    """→ {"challenge_id", "options"}; assertion options for the *owner's* Squawk
+    passkeys (RP ID = nathanblatter.com, so they work on this origin)."""
+    return await _call("POST", "/v1/login/owner/begin", json={"login_challenge": login_challenge})
+
+
+async def login_owner_finish(challenge_id: str, credential: dict[str, Any]) -> dict[str, Any]:
+    """→ {"redirect_to", "subject": "owner"}."""
+    return await _call("POST", "/v1/login/owner/finish", json=credential, params={"challenge": challenge_id})
+
+
 async def passkey_activate_begin(login_challenge: str, email: str) -> dict[str, Any]:
     """→ {"challenge_id", "expires_in"}; mails a code to the passkey account
     provisioned with that address (first-device setup)."""
@@ -241,6 +254,8 @@ class UserTokenVerifier:
         except (jwt.PyJWTError, ValueError, TypeError):
             return None
         sub = str(claims.get("sub", ""))
+        if sub == OWNER_SUBJECT:
+            return claims
         if not sub.startswith("usr:") or claims.get("email_verified") is not True:
             return None
         return claims

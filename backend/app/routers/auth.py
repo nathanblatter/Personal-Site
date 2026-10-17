@@ -185,6 +185,7 @@ async def callback(code: str | None = None, state: str | None = None, error: str
 _ERROR_MESSAGES = {
     "code_rejected": "That code is wrong or expired. Request a new one.",
     "passkey_rejected": "Passkey not recognized.",
+    "setup_required": "No owner passkey is registered in Squawk yet.",
     "signup_closed": "No account exists for that address.",
     "account_disabled": "That account is disabled.",
     "email_unverified": "That account has not verified its email.",
@@ -278,6 +279,19 @@ async def passkey_begin(payload: PasskeyBegin) -> dict[str, Any]:
 @router.post("/passkey/finish", dependencies=_squawk_deps, response_model=Redirect)
 async def passkey_finish(payload: PasskeyFinish):
     out = await _proxy(squawk.login_passkey_finish(payload.challenge_id, payload.credential))
+    return {"redirect_to": out["redirect_to"]}
+
+
+@router.post("/owner/begin", dependencies=_squawk_deps)
+async def owner_begin(payload: PasskeyBegin) -> dict[str, Any]:
+    """Owner sign-in: assertion options for Nathan's Squawk passkeys."""
+    out = await _proxy(squawk.login_owner_begin(payload.login_challenge))
+    return {"challenge_id": out["challenge_id"], "options": out["options"]}
+
+
+@router.post("/owner/finish", dependencies=_squawk_deps, response_model=Redirect)
+async def owner_finish(payload: PasskeyFinish):
+    out = await _proxy(squawk.login_owner_finish(payload.challenge_id, payload.credential))
     return {"redirect_to": out["redirect_to"]}
 
 

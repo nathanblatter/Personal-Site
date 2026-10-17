@@ -184,10 +184,20 @@ def test_callback_happy_path_sets_cookie(client, fake_cache, squawk_env, mint):
     assert f"squawk:state:st4te" not in fake_cache.store
 
 
+def test_callback_accepts_owner_token(client, fake_cache, squawk_env, mint):
+    """The owner signs in with the Squawk passkey: sub=owner, no email claims."""
+    _stash_state(fake_cache)
+    squawk_env.handler = _exchange_handler(mint(sub="owner", email=None, email_verified=None), {})
+    r = client.get("/auth/callback?code=nbac_1&state=st4te")
+    assert r.status_code == 302 and r.headers["location"] == "/admin"
+    claims = jwt.decode(r.cookies.get("auth_token"), SECRET_KEY, algorithms=[ALGORITHM])
+    assert claims["sub"] == "owner"
+
+
 @pytest.mark.parametrize("bad", [
     {"aud": "svc_other"},
     {"iss": "https://evil.example.test"},
-    {"sub": "owner"},
+    {"sub": "svc:other"},
     {"email_verified": False},
     {"exp": int(time.time()) - 600},
 ])
@@ -319,6 +329,34 @@ def test_passkey_begin_and_finish(client, fake_cache, squawk_env):
     r = client.post("/auth/passkey/finish", json={"challenge_id": "ch_pk", "credential": cred})
     assert r.status_code == 200 and r.json()["redirect_to"].endswith("code=c&state=s")
     assert seen == {"challenge": "ch_pk", "body": cred}
+
+
+def test_owner_begin_and_finish(client, fake_cache, squawk_env):
+    options = {"publicKey": {"challenge": "Y2hhbGxlbmdl", "rpId": "example.test", "userVerification": "required"}}
+    seen = {}
+
+    def handler(req: httpx.Request):
+        if req.url.path == "/v1/login/owner/begin":
+            assert json.loads(req.content) == {"login_challenge": "lc_1"}
+            return httpx.Response(200, json={"challenge_id": "ch_own", "options": options})
+        assert req.url.path == "/v1/login/owner/finish"
+        seen["challenge"] = req.url.params["challenge"]
+        seen["body"] = json.loads(req.content)
+        return httpx.Response(200, json={"redirect_to": f"{SITE}/api/v1/auth/callback?code=c&state=s", "subject": "owner"})
+
+    squawk_env.handler = handler
+    r = client.post("/auth/owner/begin", json={"login_challenge": "lc_1"})
+    assert r.status_code == 200 and r.json() == {"challenge_id": "ch_own", "options": options}
+    cred = {"id": "abc", "rawId": "abc", "type": "public-key", "response": {"clientDataJSON": "e30"}}
+    r = client.post("/auth/owner/finish", json={"challenge_id": "ch_own", "credential": cred})
+    assert r.status_code == 200 and r.json()["redirect_to"].endswith("code=c&state=s")
+    assert seen == {"challenge": "ch_own", "body": cred}
+
+
+def test_owner_begin_setup_required_maps_to_409(client, fake_cache, squawk_env):
+    squawk_env.handler = lambda req: httpx.Response(409, json={"error": "setup_required"})
+    r = client.post("/auth/owner/begin", json={"login_challenge": "lc_1"})
+    assert r.status_code == 409 and r.json()["detail"]["error"] == "setup_required"
 
 
 def test_passkey_rejected_maps_to_401(client, fake_cache, squawk_env):
