@@ -327,6 +327,55 @@ def test_passkey_rejected_maps_to_401(client, fake_cache, squawk_env):
     assert r.status_code == 401 and r.json()["detail"]["error"] == "passkey_rejected"
 
 
+# ── First-device passkey setup ──────────────────────────────────────────────
+
+def test_passkey_setup_full_flow(client, fake_cache, squawk_env):
+    creation = {"publicKey": {"challenge": "Y2g", "rp": {"id": "site.example.test"}, "user": {"id": "dXNy", "name": "n"}}}
+    cred = {"id": "abc", "rawId": "abc", "type": "public-key",
+            "response": {"clientDataJSON": "e30", "attestationObject": "o2M", "transports": ["internal"]}}
+    seen = {}
+
+    def handler(req: httpx.Request):
+        body = json.loads(req.content)
+        if req.url.path == "/v1/login/passkey/activate/begin":
+            assert body == {"login_challenge": "lc_1", "email": "nathan@example.test"}
+            return httpx.Response(200, json={"challenge_id": "ch_act", "expires_in": 600})
+        if req.url.path == "/v1/login/passkey/activate/finish":
+            seen["finish"] = (req.url.params["challenge"], body)
+            return httpx.Response(200, json={"challenge_id": "ch_reg", "options": creation, "user": {"id": "usr_9", "email": "nathan@example.test"}})
+        assert req.url.path == "/v1/users/usr_9/passkeys/finish"
+        seen["register"] = (dict(req.url.params), body)
+        return httpx.Response(201, json={"id": "pk_1", "name": "Mac", "user_id": "usr_9", "created_at": "2026-10-16T00:00:00Z",
+                                         "redirect_to": f"{SITE}/api/v1/auth/callback?code=c&state=s"})
+
+    squawk_env.handler = handler
+    r = client.post("/auth/passkey/setup/begin", json={"login_challenge": "lc_1", "email": "nathan@example.test"})
+    assert r.status_code == 200 and r.json() == {"challenge_id": "ch_act", "expires_in": 600}
+    r = client.post("/auth/passkey/setup/finish", json={"challenge_id": "ch_act", "code": "123456"})
+    assert r.status_code == 200 and r.json() == {"challenge_id": "ch_reg", "options": creation, "user_id": "usr_9"}
+    assert seen["finish"] == ("ch_act", {"code": "123456"})
+    r = client.post("/auth/passkey/setup/register", json={"user_id": "usr_9", "challenge_id": "ch_reg", "name": "Mac", "credential": cred})
+    assert r.status_code == 200 and r.json()["redirect_to"].endswith("code=c&state=s")
+    assert seen["register"] == ({"challenge": "ch_reg", "name": "Mac"}, cred)
+
+
+def test_passkey_setup_begin_no_account(client, fake_cache, squawk_env):
+    squawk_env.handler = lambda req: httpx.Response(403, json={"error": "signup_closed"})
+    r = client.post("/auth/passkey/setup/begin", json={"login_challenge": "lc_1", "email": "x@example.test"})
+    assert r.status_code == 403 and r.json()["detail"]["error"] == "signup_closed"
+
+
+def test_passkey_setup_finish_code_rejected(client, fake_cache, squawk_env):
+    squawk_env.handler = lambda req: httpx.Response(401, json={"error": "code_rejected"})
+    r = client.post("/auth/passkey/setup/finish", json={"challenge_id": "ch_act", "code": "000000"})
+    assert r.status_code == 401 and r.json()["detail"]["error"] == "code_rejected"
+
+
+def test_passkey_setup_register_rejects_bad_user_id(client, fake_cache, squawk_env):
+    r = client.post("/auth/passkey/setup/register", json={"user_id": "../admin", "challenge_id": "c", "name": "n", "credential": {}})
+    assert r.status_code == 422 and squawk_env.calls == []
+
+
 # ── Service token cache ─────────────────────────────────────────────────────
 
 def test_service_token_refreshes_near_expiry(client, fake_cache, squawk_env, monkeypatch):

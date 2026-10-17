@@ -50,6 +50,47 @@ function decodeAssertionOptions(pk: PublicKeyCredentialRequestOptionsJSON): Publ
   }
 }
 
+function decodeCreationOptions(pk: PublicKeyCredentialCreationOptionsJSON): PublicKeyCredentialCreationOptions {
+  if ('parseCreationOptionsFromJSON' in PublicKeyCredential) {
+    return PublicKeyCredential.parseCreationOptionsFromJSON(pk)
+  }
+  return {
+    challenge: toBuf(pk.challenge),
+    rp: pk.rp,
+    user: { ...pk.user, id: toBuf(pk.user.id) },
+    pubKeyCredParams: pk.pubKeyCredParams.map(p => ({ type: p.type as PublicKeyCredentialType, alg: p.alg })),
+    timeout: pk.timeout,
+    attestation: pk.attestation as AttestationConveyancePreference | undefined,
+    authenticatorSelection: pk.authenticatorSelection,
+    excludeCredentials: (pk.excludeCredentials ?? []).map(c => ({
+      type: c.type as PublicKeyCredentialType,
+      id: toBuf(c.id),
+      transports: c.transports as AuthenticatorTransport[] | undefined,
+    })),
+    extensions: pk.extensions as AuthenticationExtensionsClientInputs | undefined,
+  }
+}
+
+function encodeAttestation(cred: PublicKeyCredential) {
+  if ('toJSON' in cred && typeof cred.toJSON === 'function') return cred.toJSON()
+  const r = cred.response as AuthenticatorAttestationResponse
+  return {
+    id: cred.id,
+    rawId: toB64(cred.rawId),
+    type: cred.type,
+    authenticatorAttachment: cred.authenticatorAttachment ?? undefined,
+    clientExtensionResults: cred.getClientExtensionResults(),
+    response: {
+      clientDataJSON: toB64(r.clientDataJSON),
+      attestationObject: toB64(r.attestationObject),
+      transports: typeof r.getTransports === 'function' ? r.getTransports() : undefined,
+    },
+  }
+}
+
+/** A human label for the passkey, e.g. "MacIntel" — editable later in the Squawk console. */
+const deviceName = () => (navigator.platform || 'This device').slice(0, 64)
+
 function encodeAssertion(cred: PublicKeyCredential) {
   if ('toJSON' in cred && typeof cred.toJSON === 'function') return cred.toJSON()
   const r = cred.response as AuthenticatorAssertionResponse
@@ -92,7 +133,7 @@ export default function Login() {
   const [busy, setBusy] = useState(false)
 
   // Challenge-page state
-  const [method, setMethod] = useState<'choose' | 'email'>('choose')
+  const [method, setMethod] = useState<'choose' | 'email' | 'setup'>('choose')
   const [email, setEmail] = useState('')
   const [challengeId, setChallengeId] = useState<string | null>(null)
   const [code, setCode] = useState('')
@@ -141,7 +182,9 @@ export default function Login() {
     setError(null)
     setBusy(true)
     try {
-      const { challenge_id } = await api.auth.emailBegin(loginChallenge, email.trim())
+      const { challenge_id } = method === 'setup'
+        ? await api.auth.passkeySetupBegin(loginChallenge, email.trim())
+        : await api.auth.emailBegin(loginChallenge, email.trim())
       setChallengeId(challenge_id)
       setCode('')
     } catch (err) {
@@ -157,11 +200,26 @@ export default function Login() {
     setError(null)
     setBusy(true)
     try {
+      if (method === 'setup') {
+        const setup = await api.auth.passkeySetupFinish(challengeId, code)
+        const cred = await navigator.credentials.create({ publicKey: decodeCreationOptions(setup.options.publicKey) })
+        if (!cred) throw new Error('no credential')
+        const { redirect_to } = await api.auth.passkeySetupRegister(
+          setup.user_id, setup.challenge_id, deviceName(), encodeAttestation(cred as PublicKeyCredential))
+        window.location.assign(redirect_to)
+        return
+      }
       const { redirect_to } = await api.auth.emailFinish(challengeId, code)
       window.location.assign(redirect_to)
     } catch (err) {
-      fail(err, 'That code was not accepted.')
-      if (err instanceof AuthError && err.code !== 'code_rejected') setChallengeId(null)
+      if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
+        // The code was consumed; the creation challenge is single-use, so start the setup over.
+        setError('Passkey creation was cancelled. Request a new code to try again.')
+        setChallengeId(null)
+      } else {
+        fail(err, 'That code was not accepted.')
+        if (err instanceof AuthError && err.code !== 'code_rejected') setChallengeId(null)
+      }
       setBusy(false)
     }
   }
@@ -197,10 +255,13 @@ export default function Login() {
   )
 
   let body: React.ReactNode
-  if (loginChallenge && method === 'email' && challengeId) {
+  if (loginChallenge && method !== 'choose' && challengeId) {
     body = (
       <form onSubmit={submitCode} className="space-y-5">
-        <p className="text-xs text-steel">We emailed a 6-digit code to <span className="font-mono text-ink">{email}</span>. It expires in 10 minutes.</p>
+        <p className="text-xs text-steel">
+          We emailed a 6-digit code to <span className="font-mono text-ink">{email}</span>. It expires in 10 minutes.
+          {method === 'setup' && ' After the code, your browser will ask to create a passkey.'}
+        </p>
         <div>
           <label className={labelClass}>Code</label>
           <input
@@ -217,16 +278,19 @@ export default function Login() {
           />
         </div>
         <button type="submit" disabled={busy || code.length !== 6} className={primaryBtn}>
-          {busy ? 'Checking…' : 'Verify code'}
+          {busy ? (method === 'setup' ? 'Creating passkey…' : 'Checking…') : method === 'setup' ? 'Verify and create passkey' : 'Verify code'}
         </button>
         <button type="button" onClick={() => { setChallengeId(null); setError(null) }} className="w-full font-mono text-[11px] text-steel hover:text-blue transition-colors">
           Use a different address
         </button>
       </form>
     )
-  } else if (loginChallenge && method === 'email') {
+  } else if (loginChallenge && method !== 'choose') {
     body = (
       <form onSubmit={sendCode} className="space-y-5">
+        {method === 'setup' && (
+          <p className="text-xs text-steel">We verify the address of your passkey account with a code, then this device creates its passkey.</p>
+        )}
         <div>
           <label className={labelClass}>Email</label>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required autoFocus className={inputClass} />
@@ -247,6 +311,9 @@ export default function Login() {
         </button>
         <button type="button" onClick={() => { setMethod('email'); setError(null) }} disabled={busy} className={secondaryBtn}>
           Email me a code
+        </button>
+        <button type="button" onClick={() => { setMethod('setup'); setError(null) }} disabled={busy} className="w-full pt-1 font-mono text-[11px] text-steel hover:text-blue transition-colors disabled:opacity-60">
+          Set up a passkey on this device
         </button>
       </div>
     )

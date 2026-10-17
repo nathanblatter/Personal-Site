@@ -233,6 +233,23 @@ class PasskeyFinish(BaseModel):
     credential: dict[str, Any]
 
 
+class PasskeySetupBegin(BaseModel):
+    login_challenge: str = Field(min_length=1, max_length=256)
+    email: str = Field(min_length=3, max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class PasskeySetupFinish(BaseModel):
+    challenge_id: str = Field(min_length=1, max_length=256)
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class PasskeySetupRegister(BaseModel):
+    user_id: str = Field(pattern=r"^usr_[A-Za-z0-9_-]{1,64}$")
+    challenge_id: str = Field(min_length=1, max_length=256)
+    name: str = Field(min_length=1, max_length=64)
+    credential: dict[str, Any]
+
+
 class Redirect(BaseModel):
     redirect_to: str
 
@@ -261,4 +278,24 @@ async def passkey_begin(payload: PasskeyBegin) -> dict[str, Any]:
 @router.post("/passkey/finish", dependencies=_squawk_deps, response_model=Redirect)
 async def passkey_finish(payload: PasskeyFinish):
     out = await _proxy(squawk.login_passkey_finish(payload.challenge_id, payload.credential))
+    return {"redirect_to": out["redirect_to"]}
+
+
+# ── Squawk: first-device passkey setup (emailed code → create → register) ──
+
+@router.post("/passkey/setup/begin", dependencies=_squawk_deps)
+async def passkey_setup_begin(payload: PasskeySetupBegin) -> dict[str, Any]:
+    out = await _proxy(squawk.passkey_activate_begin(payload.login_challenge, payload.email))
+    return {"challenge_id": out["challenge_id"], "expires_in": out.get("expires_in", 600)}
+
+
+@router.post("/passkey/setup/finish", dependencies=_squawk_deps)
+async def passkey_setup_finish(payload: PasskeySetupFinish) -> dict[str, Any]:
+    out = await _proxy(squawk.passkey_activate_finish(payload.challenge_id, payload.code))
+    return {"challenge_id": out["challenge_id"], "options": out["options"], "user_id": out["user"]["id"]}
+
+
+@router.post("/passkey/setup/register", dependencies=_squawk_deps, response_model=Redirect)
+async def passkey_setup_register(payload: PasskeySetupRegister):
+    out = await _proxy(squawk.passkey_register_finish(payload.user_id, payload.challenge_id, payload.name, payload.credential))
     return {"redirect_to": out["redirect_to"]}

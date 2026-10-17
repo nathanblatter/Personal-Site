@@ -64,6 +64,14 @@ only accounts that exist are the ones Nathan provisions — "any verified user" 
   service `personal-site` → users → create (method passkey or email; the user then registers a
   passkey through Squawk). `~/dev/auth-service/docs/API.md` "End users" has the details.
   Revoke/disable there as well.
+- **Passkey setup (first device):** a provisioned passkey account has no passkey until one is
+  created, so the challenge view's third option "Set up a passkey on this device" runs
+  `POST /auth/passkey/setup/begin` (email → Squawk `/v1/login/passkey/activate/begin` mails a code),
+  `/setup/finish` (code → WebAuthn **creation** options + `user_id`; the code also verifies the email),
+  `navigator.credentials.create`, then `/setup/register` (→ Squawk
+  `/v1/users/{id}/passkeys/finish?challenge=&name=`, name = `navigator.platform`) whose `redirect_to`
+  completes the parked sign-in like the other finishes. Same throttle and error mapping. A cancelled
+  browser prompt consumes the code; the page asks for a new one.
 - **Verify:** `cd backend && python -c "import app.main" && pytest -q tests`
   (`tests/test_auth_squawk.py` mocks Squawk with `httpx.MockTransport` and mints ES256 test tokens).
 

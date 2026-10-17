@@ -1179,6 +1179,14 @@ export const api = {
         '/auth/passkey/begin', { login_challenge }),
     passkeyFinish: (challenge_id: string, credential: unknown) =>
       authRequest<{ redirect_to: string }>('/auth/passkey/finish', { challenge_id, credential }),
+    /** First-device passkey setup: emailed code → WebAuthn creation options → register. */
+    passkeySetupBegin: (login_challenge: string, email: string) =>
+      authRequest<{ challenge_id: string; expires_in: number }>('/auth/passkey/setup/begin', { login_challenge, email }),
+    passkeySetupFinish: (challenge_id: string, code: string) =>
+      authRequest<{ challenge_id: string; options: { publicKey: PublicKeyCredentialCreationOptionsJSON }; user_id: string }>(
+        '/auth/passkey/setup/finish', { challenge_id, code }),
+    passkeySetupRegister: (user_id: string, challenge_id: string, name: string, credential: unknown) =>
+      authRequest<{ redirect_to: string }>('/auth/passkey/setup/register', { user_id, challenge_id, name, credential }),
   },
 
   aboutPage: {

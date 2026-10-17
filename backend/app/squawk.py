@@ -163,6 +163,26 @@ async def login_passkey_finish(challenge_id: str, credential: dict[str, Any]) ->
     return await _call("POST", "/v1/login/passkey/finish", json=credential, params={"challenge": challenge_id})
 
 
+async def passkey_activate_begin(login_challenge: str, email: str) -> dict[str, Any]:
+    """→ {"challenge_id", "expires_in"}; mails a code to the passkey account
+    provisioned with that address (first-device setup)."""
+    return await _call("POST", "/v1/login/passkey/activate/begin", json={"login_challenge": login_challenge, "email": email})
+
+
+async def passkey_activate_finish(challenge_id: str, code: str) -> dict[str, Any]:
+    """→ {"challenge_id" (new registration challenge), "options" (WebAuthn
+    creation options), "user"}."""
+    return await _call("POST", "/v1/login/passkey/activate/finish", json={"code": code}, params={"challenge": challenge_id})
+
+
+async def passkey_register_finish(user_id: str, challenge_id: str, name: str, credential: dict[str, Any]) -> dict[str, Any]:
+    """Store the created credential → 201 {"id", "name", ..., "redirect_to"}."""
+    return await _call(
+        "POST", f"/v1/users/{user_id}/passkeys/finish", json=credential,
+        params={"challenge": challenge_id, "name": name},
+    )
+
+
 # ── Authorization-code exchange ─────────────────────────────────────────────
 
 async def exchange_code(code: str, code_verifier: str) -> dict[str, Any]:
