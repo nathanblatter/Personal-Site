@@ -5,7 +5,12 @@
 # whisper if this is down. Re-running is safe (idempotent).
 set -euo pipefail
 
-REPO="/Users/nathanblatter/Desktop/Personal-Site"
+# Resolve the repo from this script's location (canonical checkout is ~/dev/Personal-Site;
+# never hardcode ~/Desktop, which is iCloud-managed).
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Build the venv from Homebrew's versioned opt path: it survives patch upgrades, unlike a
+# pyenv build (the 2026-10-19 outage was a venv pointing at a deleted ~/.pyenv Python).
+PYTHON="${JOURNAL_MLX_PYTHON:-/opt/homebrew/opt/python@3.14/bin/python3.14}"
 VENV="$HOME/journal-mlx/venv"
 PLIST_SRC="$REPO/backend/deploy/com.nathanblatter.journal-mlx.plist"
 PLIST_DST="$HOME/Library/LaunchAgents/com.nathanblatter.journal-mlx.plist"
@@ -14,7 +19,14 @@ echo "==> ffmpeg (mlx_whisper decodes audio via ffmpeg)"
 command -v ffmpeg >/dev/null 2>&1 || brew install ffmpeg
 
 echo "==> python venv + mlx-whisper stack at $VENV"
-[ -d "$VENV" ] || python3 -m venv "$VENV"
+# Rebuild if the venv is missing OR its interpreter no longer runs (dangling symlink).
+if ! "$VENV/bin/python" -c 'import sys' >/dev/null 2>&1; then
+  if [ -e "$VENV" ]; then
+    echo "    existing venv is broken; moving it to $VENV.broken-$(date +%Y%m%d%H%M%S)"
+    mv "$VENV" "$VENV.broken-$(date +%Y%m%d%H%M%S)"
+  fi
+  "$PYTHON" -m venv "$VENV"
+fi
 "$VENV/bin/pip" install --quiet --upgrade pip
 "$VENV/bin/pip" install --quiet mlx-whisper fastapi "uvicorn[standard]" python-multipart
 
