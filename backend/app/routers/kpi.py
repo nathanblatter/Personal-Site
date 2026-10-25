@@ -327,9 +327,27 @@ _KPI_INT_FIELDS = frozenset({
     "steps", "active_cal", "workout_duration_min", "meaningful_convos",
     "new_people", "ideas_count", "lc_solved", "github_commits", "github_prs",
     "instagram_pickups", "energy_am", "life_sat",
+    # HealthKit
+    "resting_energy_cal", "flights_climbed", "exercise_minutes", "stand_hours",
+    "mindful_minutes", "time_in_daylight_min",
 })
 _KPI_FLOAT_FIELDS = frozenset({
     "resting_hr", "hrv_morning", "sleep_hrs", "deep_work_hrs", "weight_lbs", "bmi",
+    # HealthKit
+    "avg_heart_rate", "max_heart_rate", "min_heart_rate", "walking_hr_avg",
+    "cardio_recovery", "sleep_deep_hrs", "sleep_rem_hrs", "sleep_core_hrs",
+    "sleep_awake_hrs", "walking_distance_mi", "respiratory_rate", "blood_oxygen",
+    "vo2_max", "body_fat_pct", "lean_body_mass_lbs", "wrist_temp_c",
+    "headphone_audio_db",
+})
+# Physiological values that can't really be 0. A Shortcut that runs while the
+# phone is locked (HealthKit is unreadable then) or before the Watch has synced
+# sends "0" — treat that as "no reading" so it can't clobber a real value.
+_KPI_ZERO_IS_MISSING = frozenset({
+    "resting_hr", "hrv_morning", "avg_heart_rate", "max_heart_rate",
+    "min_heart_rate", "walking_hr_avg", "respiratory_rate", "blood_oxygen",
+    "vo2_max", "weight_lbs", "bmi", "body_fat_pct", "lean_body_mass_lbs",
+    "sleep_hrs",
 })
 _KPI_BOOL_FIELDS = frozenset({
     "prayer_am", "prayer_pm", "scripture", "church", "temple",
@@ -398,7 +416,7 @@ def _kpi_coerce(col: str, raw):
         return n
     if col in _KPI_FLOAT_FIELDS:
         n = _kpi_first_number(raw)
-        if n is None:
+        if n is None or (n == 0 and col in _KPI_ZERO_IS_MISSING):
             return None
         # Quantize as Decimal so the NUMERIC column stores exactly 98.17, not the
         # binary-float tail a Python float would carry in (98.170000000000017).
