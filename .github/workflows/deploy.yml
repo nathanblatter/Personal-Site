@@ -72,6 +72,11 @@ jobs:
           fi
 
           # Scale up: start new container alongside old
+          # Roll the tunnel only when its image/config changed (a cloudflared
+          # security bump, say). --no-deps keeps compose off the app replicas,
+          # and the tunnel publishes no host port, so this is safe here.
+          docker compose $COMPOSE_ARGS up -d --no-deps tunnel
+
           echo "Scaling up to 2 replicas..."
           docker compose $COMPOSE_ARGS up -d --scale api=2 --no-recreate
 
