@@ -18,7 +18,7 @@ services:
   # Standby tunnel. Connected to Cloudflare at all times, but receives traffic
   # only while the apex CNAME points at it (i.e. during failover).
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.10.3
     container_name: site-failover-tunnel
     restart: unless-stopped
     # run as root so it can read the 600-perm tunnel credentials (keeps the

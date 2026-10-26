@@ -62,7 +62,7 @@ services:
       - docker-services
 
   tunnel:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.10.3
     env_file: .env.prod
     command: tunnel --no-autoupdate run
     restart: unless-stopped
