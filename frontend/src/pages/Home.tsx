@@ -2,7 +2,7 @@ import { useState, lazy, Suspense } from 'react'
 import { motion } from 'motion/react'
 import { Link } from 'react-router-dom'
 import { track } from '../lib/track'
-import { ArrowRight, ArrowUpRight, MapPin, GraduationCap } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, FileText, MapPin, GraduationCap } from 'lucide-react'
 import SectionHeader from '../components/SectionHeader'
 import ProjectCard from '../components/ProjectCard'
 import SkillBar from '../components/SkillBar'
@@ -134,6 +134,13 @@ export default function Home() {
               onClick={() => track('hero-view-projects')}>
               View Projects
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+            </Link>
+            <Link
+              to="/resume"
+              className="group inline-flex items-center justify-center gap-3 px-7 py-3.5 border border-mist text-ink font-mono text-sm rounded-xl hover:border-blue hover:text-blue transition-colors"
+              onClick={() => track('hero-resume')}>
+              Résumé
+              <FileText size={16} className="group-hover:-translate-y-0.5 transition-transform" />
             </Link>
             <Link
               to="/contact"
@@ -294,10 +301,11 @@ export default function Home() {
             className="mt-10 md:mt-14 text-center"
           >
             <Link
-              to="/about"
+              to="/resume"
               className="group inline-flex items-center gap-2 font-mono text-sm text-steel hover:text-blue transition-colors"
+              onClick={() => track('home-full-resume')}
             >
-              Full timeline
+              Full résumé &amp; timeline
               <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
             </Link>
           </motion.div>
