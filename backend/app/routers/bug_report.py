@@ -42,7 +42,7 @@ async def submit_bug_report(body: BugReportBody):
 
     severity = body.severity if body.severity in _VALID_SEVERITY else "med"
     payload = {
-        "site": "personal-site",
+        "site": "portfolio-site",
         "url": body.url or "",
         "message": body.message.strip(),
         "severity": severity,
