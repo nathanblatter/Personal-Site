@@ -65,6 +65,10 @@ html.dark {
   outline-offset: 2px;
   border-radius: 4px;
 }
+/* Inputs that live inside an already-framed surface (e.g. the search palette) opt out. */
+[data-no-focus-ring]:focus-visible {
+  outline: none;
+}
 :focus:not(:focus-visible) {
   outline: none;
 }

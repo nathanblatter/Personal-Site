@@ -72,13 +72,13 @@ export default function Layout() {
             <div className="w-9 h-9 bg-blue rounded-lg flex items-center justify-center">
               <span className="font-mono text-white text-sm font-bold">NB</span>
             </div>
-            <span className="font-mono text-xs text-steel group-hover:text-blue transition-colors tracking-wider">
+            <span className="hidden lg:inline font-mono text-xs text-steel group-hover:text-blue transition-colors tracking-wider">
               NathanBlatter.com
             </span>
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => {
               const isActive = location.pathname === link.to
               return (
@@ -87,7 +87,7 @@ export default function Layout() {
                   to={link.to}
                   onMouseEnter={() => prefetch(link.to)}
                   onFocus={() => prefetch(link.to)}
-                  className={`relative px-4 py-2.5 font-mono text-xs tracking-wider transition-colors rounded-lg ${
+                  className={`relative px-3 lg:px-3.5 py-2.5 font-mono text-xs tracking-wider whitespace-nowrap transition-colors rounded-lg ${
                     isActive ? 'text-blue bg-blue-wash' : 'text-steel hover:text-ink hover:bg-cloud'
                   }`}
                 >
@@ -118,7 +118,7 @@ export default function Layout() {
             {/* Status indicator */}
             <div className="flex items-center gap-2.5">
               <div className="w-2 h-2 rounded-full bg-teal animate-pulse" />
-              <span className="font-mono text-xs text-steel">Available for work</span>
+              <span className="font-mono text-xs text-steel whitespace-nowrap">Available for work</span>
             </div>
 
             {/* Theme toggle */}

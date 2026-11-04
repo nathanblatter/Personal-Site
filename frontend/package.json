@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "katex": "^0.16.45",
+    "katex": "^0.19.1",
     "lucide-react": "^0.577.0",
     "mermaid": "^11.16.0",
     "motion": "^12.36.0",
@@ -46,5 +46,11 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^7.3.1"
+  },
+  "overrides": {
+    "katex": "^0.19.1",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.4"
+    }
   }
 }

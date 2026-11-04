@@ -100,6 +100,7 @@ export default function SearchPalette({ open, onClose }: { open: boolean; onClos
                 onChange={e => setQ(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder="Search projects, posts, pages…"
+                data-no-focus-ring
                 className="flex-1 py-4 bg-transparent text-ink placeholder:text-steel focus:outline-none text-[15px]"
               />
               {loading && <Loader2 size={15} className="text-steel animate-spin shrink-0" />}
