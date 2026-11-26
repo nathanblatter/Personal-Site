@@ -1,0 +1,32 @@
+{
+  "id": "evt_1UfsmzKFRLWSAwaemYqOyk1K",
+  "object": "event",
+  "type": "invoice.paid",
+  "api_version": "2026-11-18.endive",
+  "created": 1795661521,
+  "livemode": false,
+  "data": {
+    "object": {
+      "id": "in_1UfsmbKFRLWSAwae2TCxMZ6y",
+      "object": "invoice",
+      "amount_due": 102500,
+      "amount_paid": 102500,
+      "amount_remaining": 0,
+      "currency": "usd",
+      "status": "paid",
+      "status_transitions": {
+        "finalized_at": 1795661499,
+        "marked_uncollectible_at": null,
+        "paid_at": 1795661520,
+        "voided_at": null
+      },
+      "metadata": {
+        "crm_invoice_id": "00000000-0000-0000-0000-0000000000a2",
+        "crm_invoice_number": "TEST-0002"
+      },
+      "customer": "cus_TEST",
+      "hosted_invoice_url": "https://invoice.stripe.com/i/test",
+      "number": "AKPUEUXG-0002"
+    }
+  }
+}

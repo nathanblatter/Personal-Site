@@ -1008,6 +1008,7 @@ export interface InvoicePublic {
   bill_to_company?: string | null
   consultant_name: string
   consultant_email: string
+  pay_online: boolean
 }
 
 export interface EngagementDetail extends EngagementResponse {
@@ -1508,6 +1509,7 @@ export const api = {
 
     public: {
       getInvoice: (token: string) => request<InvoicePublic>('GET', `/crm/public/invoices/${token}`),
+      payInvoice: (token: string) => request<{ url: string }>('POST', `/crm/public/invoices/${token}/pay`),
       getContract: (token: string) => request<ContractPublic>('GET', `/crm/public/contracts/${token}`),
       acceptContract: (token: string, data: { accepted_name: string; email: string }) =>
         request<ContractPublic>('POST', `/crm/public/contracts/${token}/accept`, data),

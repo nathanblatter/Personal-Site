@@ -5,6 +5,7 @@ All admin endpoints require auth. Client-facing magic-link endpoints live under
 /crm/public/* and are intentionally unauthenticated (guarded by an unguessable
 per-record token).
 """
+import logging
 import os
 import secrets
 from datetime import datetime, timezone, date, timedelta
@@ -16,12 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app import models, schemas, crm_utils
+from app import models, schemas, crm_utils, stripe_service
 from app.auth import require_auth
 from app.utils import get_client_ip, get_redis
 from app.email_service import send_contract_otp_email, send_contract_email, send_invoice_email
+from app.imessage_service import send_alert
 
 router = APIRouter(prefix="/crm", tags=["crm"])
+log = logging.getLogger(__name__)
 
 SITE_URL = os.getenv("SITE_URL", "https://nathanblatter.com")
 
@@ -934,7 +937,107 @@ async def public_invoice(token: str, db: AsyncSession = Depends(get_db)):
         line_items=[schemas.InvoiceLineItemResponse.model_validate(li) for li in inv.line_items],
         bill_to_name=contact.name if contact else None,
         bill_to_company=(contact.company_name if contact else None),
+        pay_online=bool(stripe_service.enabled() and stripe_service.payable(inv) and contact and contact.email),
     )
+
+
+@router.post("/public/invoices/{token}/pay", response_model=schemas.InvoicePayLink)
+async def public_invoice_pay(token: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Send the client to Stripe's hosted page for this invoice's current balance.
+
+    Called on every "Pay online" click: Stripe's hosted URLs are short-lived, and the
+    balance may have changed since the last click (see stripe_service.hosted_invoice_url).
+    """
+    if not stripe_service.enabled():
+        raise HTTPException(404, "Online payment is not available")
+    ip = get_client_ip(request)
+    r = get_redis()
+    key = f"crm:pay:{ip}"
+    if await r.incr(key) > 20:
+        raise HTTPException(429, "Too many attempts; try again in a few minutes")
+    await r.expire(key, 600)
+
+    res = await db.execute(
+        select(models.Invoice).where(models.Invoice.public_token == token)
+        .options(selectinload(models.Invoice.line_items))
+    )
+    inv = res.scalars().first()
+    if not inv:
+        raise HTTPException(404, "Invoice not found")
+    if not stripe_service.payable(inv):
+        raise HTTPException(400, "This invoice has nothing to pay online")
+    contact = await db.get(models.Contact, inv.contact_id) if inv.contact_id else None
+    if not (contact and contact.email):
+        raise HTTPException(400, "This invoice has no billing email on file")
+    try:
+        url, stripe_invoice_id, customer_id = await stripe_service.hosted_invoice_url(inv, contact)
+    except stripe_service.StripeError as exc:
+        log.error("stripe pay link failed for invoice %s: %s", inv.number, exc)
+        raise HTTPException(502, "Online payment is temporarily unavailable")
+    inv.stripe_invoice_id = stripe_invoice_id
+    contact.stripe_customer_id = customer_id
+    await db.commit()
+    return schemas.InvoicePayLink(url=url)
+
+
+async def record_stripe_payment(db: AsyncSession, paid: stripe_service.PaidEvent) -> str:
+    """Apply a Stripe invoice.paid to the CRM, exactly once. Returns what happened."""
+    inv = await db.get(models.Invoice, paid.crm_invoice_id, options=[
+        selectinload(models.Invoice.line_items), selectinload(models.Invoice.payments)])
+    if not inv:
+        return "unknown_invoice"
+    if any(p.reference == paid.stripe_invoice_id for p in inv.payments):
+        return "duplicate"
+    if paid.amount_cents <= 0:
+        return "zero_amount"
+    paid_at = datetime.fromtimestamp(paid.paid_at, tz=timezone.utc)
+    db.add(models.Payment(
+        invoice_id=inv.id, amount_cents=paid.amount_cents, method=models.PaymentMethod.stripe,
+        reference=paid.stripe_invoice_id, paid_at=paid_at, note="Paid online through Stripe",
+    ))
+    inv.amount_paid_cents = (inv.amount_paid_cents or 0) + paid.amount_cents
+    if inv.status == models.InvoiceStatus.draft:
+        inv.status = models.InvoiceStatus.sent
+    crm_utils.recalc_invoice_totals(inv)
+    if inv.status == models.InvoiceStatus.paid and not inv.paid_at:
+        inv.paid_at = paid_at
+    inv.updated_at = _now()
+    if inv.contact_id:
+        await crm_utils.log_activity(
+            db, contact_id=inv.contact_id, engagement_id=inv.engagement_id,
+            type=models.ActivityType.status_change, occurred_at=paid_at,
+            body_md=f"Paid {_money_str(paid.amount_cents, inv.currency)} on invoice {inv.number} online (Stripe {paid.stripe_invoice_id}).",
+        )
+    await db.commit()
+    return "recorded"
+
+
+@router.post("/stripe/webhook", include_in_schema=False)
+async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
+    """Stripe → CRM. Unauthenticated by design; trust comes from the Stripe-Signature HMAC."""
+    secret = stripe_service.webhook_secret()
+    payload = await request.body()
+    if not stripe_service.verify_signature(payload, request.headers.get("stripe-signature", ""), secret):
+        raise HTTPException(400, "Invalid signature")
+    import json as _json
+    event = _json.loads(payload)
+    etype = event.get("type")
+    obj = (event.get("data") or {}).get("object") or {}
+    if etype == "invoice.paid":
+        paid = stripe_service.parse_paid_event(event)
+        if paid:
+            outcome = await record_stripe_payment(db, paid)
+            log.info("stripe %s %s -> %s", event.get("id"), paid.stripe_invoice_id, outcome)
+            if outcome == "recorded":
+                number = (obj.get("metadata") or {}).get("crm_invoice_number", paid.stripe_invoice_id)
+                await send_alert(f"💸 Invoice {number} paid online: {_money_str(paid.amount_cents)}")
+            return {"received": True, "outcome": outcome}
+    elif etype in ("invoice.payment_failed", "charge.refunded", "charge.dispute.created", "credit_note.created"):
+        # Rare at this volume and each needs a human decision, so page Nathan instead of guessing.
+        number = (obj.get("metadata") or {}).get("crm_invoice_number") or obj.get("id")
+        log.warning("stripe %s for %s", etype, number)
+        await send_alert(f"Stripe: {etype} on {number}. Check the Stripe dashboard and the CRM invoice.")
+    return {"received": True}
 
 
 def _norm_name(s: Optional[str]) -> str:

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Printer, Loader2 } from 'lucide-react'
+import { Printer, Loader2, CreditCard } from 'lucide-react'
 import { api, type InvoicePublic } from '../lib/api'
 
 function money(cents: number, currency = 'USD') {
@@ -26,11 +26,35 @@ export default function InvoiceView() {
   const { token } = useParams<{ token: string }>()
   const [inv, setInv] = useState<InvoicePublic | null>(null)
   const [error, setError] = useState(false)
+  const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) return
     api.crm.public.getInvoice(token).then(setInv).catch(() => setError(true))
   }, [token])
+
+  // Coming back from Stripe's page (back button / bfcache): reload so a payment shows as paid.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted && token) { setPaying(false); api.crm.public.getInvoice(token).then(setInv).catch(() => {}) }
+    }
+    window.addEventListener('pageshow', onShow)
+    return () => window.removeEventListener('pageshow', onShow)
+  }, [token])
+
+  const payOnline = async () => {
+    if (!token) return
+    setPaying(true)
+    setPayError(null)
+    try {
+      const { url } = await api.crm.public.payInvoice(token)
+      window.location.assign(url)
+    } catch {
+      setPaying(false)
+      setPayError('Online payment is unavailable right now. Please try again shortly, or use Venmo below.')
+    }
+  }
 
   useEffect(() => { if (inv) document.title = `Invoice ${inv.number} — Nathan Blatter` }, [inv])
 
@@ -167,8 +191,19 @@ export default function InvoiceView() {
               {balance > 0 && inv.status !== 'void' && (
                 <div className="rounded-2xl bg-blue-wash/70 ring-1 ring-blue/10 p-5 print:bg-blue-wash">
                   <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-blue mb-1.5">Payment</div>
+                  {inv.pay_online && (
+                    <div className="no-print mb-4">
+                      <button onClick={payOnline} disabled={paying}
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-ink text-white text-sm font-medium shadow-lg shadow-ink/15 hover:bg-blue transition-colors disabled:opacity-60">
+                        {paying ? <Loader2 size={15} className="animate-spin" /> : <CreditCard size={15} />}
+                        Pay {money(balance, inv.currency)} online
+                      </button>
+                      <p className="mt-2 text-xs text-steel leading-relaxed">Card or US bank account, through Stripe.</p>
+                      {payError && <p className="mt-2 text-xs text-ember leading-relaxed" role="alert">{payError}</p>}
+                    </div>
+                  )}
                   <p className="text-sm text-slate leading-relaxed">
-                    Payable via <span className="font-medium text-ink">Venmo</span>. Please reference invoice
+                    {inv.pay_online ? 'Or pay' : 'Payable'} via <span className="font-medium text-ink">Venmo</span>. Please reference invoice
                     {' '}<span className="font-mono text-ink">{inv.number}</span> with your payment.
                   </p>
                 </div>

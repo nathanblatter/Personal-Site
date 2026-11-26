@@ -764,6 +764,7 @@ class Contact(Base):
     company_name = Column(String, nullable=True)          # free-text fallback when no org
     source = Column(SAEnum(ContactSource, name="crm_contact_source", create_constraint=False), nullable=True)
     tags = Column(JSON, nullable=False, default=list)
+    stripe_customer_id = Column(String, nullable=True)  # set the first time the client pays online
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
@@ -936,6 +937,8 @@ class Invoice(Base):
     sent_at = Column(DateTime(timezone=True), nullable=True)
     paid_at = Column(DateTime(timezone=True), nullable=True)
     reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
+    # The Stripe invoice currently collecting this invoice's balance (see app/stripe_service.py).
+    stripe_invoice_id = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
 

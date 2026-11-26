@@ -75,6 +75,27 @@ only accounts that exist are the ones Nathan provisions — "any verified user" 
 - **Verify:** `cd backend && python -c "import app.main" && pytest -q tests`
   (`tests/test_auth_squawk.py` mocks Squawk with `httpx.MockTransport` and mints ES256 test tokens).
 
+# Stripe invoice payments
+
+The CRM is the source of truth; Stripe only collects. `backend/app/stripe_service.py` (plain httpx,
+API version pinned to `2026-11-18.endive`, no SDK) + two routes in `routers/crm.py`:
+- `POST /crm/public/invoices/{token}/pay` (the invoice page's "Pay online" button): makes sure an
+  open, finalized Stripe invoice exists for the CRM invoice's **current balance** (line items + tax
+  − payments already recorded), voiding a stale one, then returns Stripe's Hosted Invoice Page URL.
+  Hosted URLs are short-lived, so they are fetched per click and never emailed. Stripe never emails
+  the client (`auto_advance=false`); the CRM's own invoice email is the only one.
+- `POST /crm/stripe/webhook`: Stripe-Signature HMAC checked by hand. `invoice.paid` records one
+  `Payment(method=stripe, reference=<Stripe invoice id>)` (idempotent on that reference), recalcs
+  status, logs to the contact timeline and iMessages Nathan. Failures, refunds, disputes and credit
+  notes only page Nathan; they need a human.
+- Env `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (`.env.example`). Unset = feature off.
+  Ids live in `crm_contact.stripe_customer_id` / `crm_invoice.stripe_invoice_id` (migration 023).
+- Tax is not calculated by Stripe (Nathan's call, 2026-11-25: consulting is generally non-taxable
+  in CA); the CRM's own `tax_cents` passes through as a line. Stripe planner guide:
+  `iguide_61VpGeV1VEYw7Ao6X41KFRLWSAwae`. Test sandbox: `acct_1Uey4JKFRLWSAwae`.
+- Local end-to-end: `stripe listen --forward-to localhost:8000/api/v1/crm/stripe/webhook` gives a
+  test `whsec_`; pay with card 4242 4242 4242 4242.
+
 # Repo location
 
 - **Canonical checkout: `~/dev/Personal-Site`.** `~/Desktop/Personal-Site` is only a symlink to it (moved 2026-09-19). iCloud Drive syncs ~/Desktop and evicts files, which hung `npx`/`eslint`/`vite` locally and blocked the CI runner's file opens for six hours. Never clone or build under ~/Desktop or ~/Documents.

@@ -1654,6 +1654,7 @@ class ContractResponse(BaseModel):
     declined_at: Optional[datetime] = None
     declined_reason: Optional[str] = None
     reminder_sent_at: Optional[datetime] = None
+    stripe_invoice_id: Optional[str] = None
     recipient_email: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -1674,6 +1675,7 @@ class ContractPublic(BaseModel):
     accepted_name: Optional[str] = None
     consultant_name: str = "Nathan Blatter"
     consultant_email: str = "nzb22@byu.edu"
+    pay_online: bool = False  # Stripe is configured and this invoice has a balance to collect
     consultant_signed_name: Optional[str] = None
     consultant_signed_at: Optional[datetime] = None
     client_name: Optional[str] = None
@@ -1936,3 +1938,8 @@ class TemplateResponse(TemplateBase):
 
 
 ContactDetail.model_rebuild()
+
+
+class InvoicePayLink(BaseModel):
+    """Where to send the client to pay: Stripe's hosted invoice page (short-lived URL)."""
+    url: str

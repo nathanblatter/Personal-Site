@@ -762,7 +762,7 @@ async def ensure_normalized_blog_tags(db) -> None:
 
 async def ensure_columns(conn) -> None:
     """Idempotent column adds for tables that predate the column (create_all
-    never ALTERs existing tables). Mirrors alembic/versions/020_*.py, 021_*.py and 022_*.py."""
+    never ALTERs existing tables). Mirrors alembic/versions/020_*.py through 023_*.py."""
     from sqlalchemy import text
     await conn.execute(text(
         "ALTER TABLE experience ADD COLUMN IF NOT EXISTS kind VARCHAR NOT NULL DEFAULT 'work'"
@@ -774,6 +774,9 @@ async def ensure_columns(conn) -> None:
     await conn.execute(text("ALTER TABLE about ADD COLUMN IF NOT EXISTS hero_intro TEXT"))
     await conn.execute(text("ALTER TABLE about ADD COLUMN IF NOT EXISTS meta_description VARCHAR"))
     await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS summary TEXT"))
+    # 023: Stripe ids for online invoice payment.
+    await conn.execute(text("ALTER TABLE crm_contact ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR"))
+    await conn.execute(text("ALTER TABLE crm_invoice ADD COLUMN IF NOT EXISTS stripe_invoice_id VARCHAR"))
     await conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS demo_credentials VARCHAR"))
     # One-time backfill: rows still at the default whose title looks like a degree.
     await conn.execute(text(
