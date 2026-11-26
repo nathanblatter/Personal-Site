@@ -1675,7 +1675,6 @@ class ContractPublic(BaseModel):
     accepted_name: Optional[str] = None
     consultant_name: str = "Nathan Blatter"
     consultant_email: str = "nzb22@byu.edu"
-    pay_online: bool = False  # Stripe is configured and this invoice has a balance to collect
     consultant_signed_name: Optional[str] = None
     consultant_signed_at: Optional[datetime] = None
     client_name: Optional[str] = None
@@ -1872,6 +1871,7 @@ class InvoicePublic(BaseModel):
     bill_to_company: Optional[str] = None
     consultant_name: str = "Nathan Blatter"
     consultant_email: str = "nzb22@byu.edu"
+    pay_online: bool = False  # Stripe is configured and this invoice has a balance to collect
 
 
 # ── Engagement detail (children embedded) ─────────────────────────────────────

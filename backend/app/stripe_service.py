@@ -19,12 +19,14 @@ invoice is never "sent" through Stripe): the CRM already emails its own invoice 
 """
 from __future__ import annotations
 
+import calendar
 import hashlib
 import hmac
 import logging
 import os
 import time
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, Optional
 from urllib.parse import urlencode
 
@@ -135,6 +137,19 @@ def invoice_items(inv) -> list[dict]:
     return items
 
 
+def due_timestamp(due: Optional[date], *, now: Optional[float] = None) -> Optional[int]:
+    """Stripe wants a timestamp; Stripe shows it as a date in the account's timezone.
+
+    Noon UTC on the due date is the same calendar day in every US timezone (it was a day
+    late when built from local midnight + 23h). Past dates return None (Stripe rejects them;
+    the caller falls back to days_until_due).
+    """
+    if not due:
+        return None
+    ts = calendar.timegm(due.timetuple()) + 12 * 3600
+    return ts if ts > (now if now is not None else time.time()) else None
+
+
 def matches(stripe_invoice: Optional[dict], inv) -> bool:
     """Can this existing Stripe invoice still be used to collect the CRM balance?"""
     if not stripe_invoice:
@@ -223,11 +238,7 @@ async def hosted_invoice_url(inv, contact, *, client: Optional[httpx.AsyncClient
     # A key per (CRM invoice, balance, replaced Stripe invoice) makes retries safe without
     # ever reusing a key for a different amount.
     key = f"crm-inv-{inv.id}-{balance_cents(inv)}-{inv.stripe_invoice_id or 'first'}"
-    due_ts = None
-    if inv.due_date:
-        due_ts = int(time.mktime(inv.due_date.timetuple())) + 23 * 3600
-        if due_ts <= time.time():
-            due_ts = None
+    due_ts = due_timestamp(inv.due_date)
     draft = await _call("POST", "/invoices", {
         "customer": customer_id,
         "collection_method": "send_invoice",

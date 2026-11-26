@@ -202,3 +202,20 @@ def test_webhook_route_rejects_unsigned_requests_and_accepts_signed_ones(monkeyp
         assert seen and seen[0].amount_cents == 102500
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+def test_the_public_invoice_response_carries_the_pay_flag_and_contracts_do_not():
+    # Regression: the flag was first added to ContractPublic by mistake, so the Pay button never showed.
+    from app import schemas
+
+    assert "pay_online" in schemas.InvoicePublic.model_fields
+    assert "pay_online" not in schemas.ContractPublic.model_fields
+
+
+def test_due_date_is_noon_utc_so_stripe_shows_the_same_day_and_past_dates_are_dropped():
+    from datetime import datetime, timezone
+
+    ts = stripe_service.due_timestamp(date(2026, 12, 9), now=0)
+    assert datetime.fromtimestamp(ts, tz=timezone.utc) == datetime(2026, 12, 9, 12, tzinfo=timezone.utc)
+    assert stripe_service.due_timestamp(date(2020, 1, 1)) is None
+    assert stripe_service.due_timestamp(None) is None
